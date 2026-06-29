@@ -26,9 +26,14 @@ public actor AppDatabase {
         if let path {
             url = URL(fileURLWithPath: path)
         } else {
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-                ?? FileManager.default.temporaryDirectory
-            let stratusDir = appSupport.appendingPathComponent("Stratus", isDirectory: true)
+            let stratusDir: URL
+            if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: FileProviderDomainStore.appGroupIdentifier) {
+                stratusDir = groupURL.appendingPathComponent("Database", isDirectory: true)
+            } else {
+                let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                    ?? FileManager.default.temporaryDirectory
+                stratusDir = appSupport.appendingPathComponent("Stratus", isDirectory: true)
+            }
             try FileManager.default.createDirectory(at: stratusDir, withIntermediateDirectories: true)
             url = stratusDir.appendingPathComponent("stratus.db")
         }
