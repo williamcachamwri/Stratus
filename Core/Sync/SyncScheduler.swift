@@ -81,8 +81,8 @@ public actor SyncScheduler {
     // MARK: - Network Reconnect
 
     private func listenForNetworkReconnect() async {
-        let reachability = NetworkReachability()
-        for await isConnected in await reachability.changes {
+        let reachability = NetworkReachability.shared
+        for await isConnected in await reachability.statusStream {
             if isConnected {
                 logger.info("Network reconnected — triggering sync for eligible pairs")
                 for (pairID, schedule) in schedules where schedule.triggers.contains(.onNetworkReconnect) {
