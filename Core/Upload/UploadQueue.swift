@@ -53,8 +53,11 @@ public actor UploadQueue {
             localChecksum: old.localChecksum,
             priority: priority,
             metadata: old.metadata,
-            state: old.state
+            state: .queued(priority: priority)
         )
+        if let uploadID = old.uploadID {
+            updated.setUploadID(uploadID)
+        }
         heap[idx] = updated
         tasksByID[taskID] = updated
         // Re-heapify: try both directions
