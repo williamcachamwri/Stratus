@@ -283,9 +283,9 @@ public actor ChunkEngine {
             return true
         case ProviderError.serverError(let statusCode, _):
             return [408, 429, 500, 502, 503, 504].contains(statusCode)
-        case ProviderError.accessDenied, ProviderError.authenticationFailed, ProviderError.fileNotFound,
-             ProviderError.quotaExceeded, ProviderError.sessionExpired, ProviderError.unsupportedOperation,
-             ProviderError.checksumMismatch, ProviderError.invalidResponse, ProviderError.providerSpecific:
+        case ProviderError.accessDenied(_), ProviderError.authenticationFailed(_), ProviderError.fileNotFound(_),
+             ProviderError.quotaExceeded, ProviderError.sessionExpired, ProviderError.unsupportedOperation(_),
+             ProviderError.checksumMismatch(_, _), ProviderError.invalidResponse(_), ProviderError.providerSpecific(_, _):
             return false
         default:
             return true
