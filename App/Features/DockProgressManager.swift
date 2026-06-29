@@ -1,4 +1,5 @@
 import AppKit
+import StratusCore
 import os.log
 
 // MARK: - DockProgressManager
