@@ -7,8 +7,8 @@ public enum UploadEngineEvent: Sendable {
     case taskAdded(UploadTask)
     case taskStarted(UUID)
     case taskProgress(UUID, ChunkProgress)
-    case taskCompleted(UUID, UploadResult)
-    case taskFailed(UUID, UploadError)
+    case taskCompleted(UploadTask, UploadResult)
+    case taskFailed(UploadTask, UploadError)
     case taskPaused(UUID)
     case taskResumed(UUID)
     case taskCancelled(UUID)
@@ -47,7 +47,7 @@ public actor UploadEngine {
 
     public func configure(maxConcurrentFiles: Int, maxBandwidthBPS: Double?) async {
         await scheduler.setManualBandwidthLimit(maxBandwidthBPS)
-        scheduler.maxConcurrentFiles = maxConcurrentFiles
+        await scheduler.setMaxConcurrentFiles(maxConcurrentFiles)
     }
 
     // MARK: - Lifecycle
@@ -180,7 +180,7 @@ public actor UploadEngine {
             guard let provider = providers[task.accountID],
                   let account = accounts[task.accountID] else {
                 await scheduler.markFailed(taskID: task.id)
-                emit(.taskFailed(task.id, .providerError("Provider not found for account \(task.accountID)")))
+                emit(.taskFailed(task, .providerError("Provider not found for account \(task.accountID)")))
                 continue
             }
 
@@ -211,16 +211,16 @@ public actor UploadEngine {
                         progressStream: progressContinuation
                     )
                     progressContinuation.finish()
-                    await self?.progressStreams.removeValue(forKey: taskID)
+                    await self?.removeProgressStream(forKey: taskID)
                     await self?.scheduler.markComplete(taskID: taskID)
-                    await self?.emit(.taskCompleted(taskID, result))
+                    await self?.emit(.taskCompleted(task, result))
                     await self?.logger.info("Completed \(task.sourceURL.lastPathComponent) — \(result.bytesUploaded) bytes in \(String(format: "%.1f", result.durationSeconds))s")
                 } catch {
                     progressContinuation.finish()
-                    await self?.progressStreams.removeValue(forKey: taskID)
+                    await self?.removeProgressStream(forKey: taskID)
                     await self?.scheduler.markFailed(taskID: taskID)
                     let uploadError = error as? UploadError ?? .unknown(error.localizedDescription)
-                    await self?.emit(.taskFailed(taskID, uploadError))
+                    await self?.emit(.taskFailed(task, uploadError))
                     await self?.logger.error("Failed \(task.sourceURL.lastPathComponent): \(error)")
                 }
             }
@@ -237,5 +237,9 @@ public actor UploadEngine {
 
     private func removeEventContinuation(id: UUID) {
         eventContinuations.removeValue(forKey: id)
+    }
+
+    private func removeProgressStream(forKey id: UUID) {
+        progressStreams.removeValue(forKey: id)
     }
 }
