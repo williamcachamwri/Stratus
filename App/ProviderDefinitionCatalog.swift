@@ -87,6 +87,8 @@ public final class ProviderDefinitionCatalog: ObservableObject {
 
     private static func loadProviders() -> [ProviderDefinition] {
         let decoder = JSONDecoder()
+        var decodeFailures: [String] = []
+
         for url in candidateURLs() {
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
             do {
@@ -94,24 +96,53 @@ public final class ProviderDefinitionCatalog: ObservableObject {
                 let file = try decoder.decode(ProviderDefinitionFile.self, from: data)
                 return file.providers.sorted { $0.displayName < $1.displayName }
             } catch {
-                assertionFailure("Could not load ProviderDefinitions.json: \(error)")
+                decodeFailures.append("\(url.path): \(error.localizedDescription)")
             }
         }
+
+        assertionFailure(
+            "ProviderDefinitions.json was not found or could not be decoded. "
+                + "Checked: \(candidateURLs().map(\.path).joined(separator: ", ")). "
+                + "Failures: \(decodeFailures.joined(separator: " | "))"
+        )
         return []
     }
 
     private static func candidateURLs() -> [URL] {
         var urls: [URL] = []
-        if let bundleURL = Bundle.main.url(forResource: "ProviderDefinitions", withExtension: "json") {
-            urls.append(bundleURL)
-        }
-        if let nestedBundleURL = Bundle.main.url(forResource: "ProviderDefinitions", withExtension: "json", subdirectory: "Resources") {
-            urls.append(nestedBundleURL)
+
+        appendResourceCandidates(from: Bundle.module, to: &urls)
+        appendResourceCandidates(from: Bundle.main, to: &urls)
+
+        if let executableURL = Bundle.main.executableURL {
+            let appContentsURL = executableURL
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+            urls.append(appContentsURL.appendingPathComponent("Resources/Resources/ProviderDefinitions.json"))
+            urls.append(appContentsURL.appendingPathComponent("Resources/ProviderDefinitions.json"))
         }
 
         let current = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         urls.append(current.appendingPathComponent("Resources/ProviderDefinitions.json"))
         urls.append(current.deletingLastPathComponent().appendingPathComponent("Resources/ProviderDefinitions.json"))
-        return urls
+
+        var seen = Set<String>()
+        return urls.filter { url in
+            let key = url.standardizedFileURL.path
+            return seen.insert(key).inserted
+        }
+    }
+
+    private static func appendResourceCandidates(from bundle: Bundle, to urls: inout [URL]) {
+        if let directURL = bundle.url(forResource: "ProviderDefinitions", withExtension: "json") {
+            urls.append(directURL)
+        }
+        if let nestedURL = bundle.url(
+            forResource: "ProviderDefinitions",
+            withExtension: "json",
+            subdirectory: "Resources"
+        ) {
+            urls.append(nestedURL)
+        }
     }
 }
