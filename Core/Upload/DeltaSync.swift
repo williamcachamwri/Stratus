@@ -4,9 +4,9 @@ import os.log
 // MARK: - Block Diff
 
 public struct BlockDiff: Sendable {
-    public let changedBlocks: [Int]   // indices of changed blocks
-    public let addedBlocks: [Int]     // new blocks (file grew)
-    public let removedBlocks: [Int]   // removed blocks (file shrank)
+    public let changedBlocks: [Int]
+    public let addedBlocks: [Int]
+    public let removedBlocks: [Int]
     public let totalBlocks: Int
     public let localMap: BlockMap
 
@@ -14,22 +14,72 @@ public struct BlockDiff: Sendable {
         !changedBlocks.isEmpty || !addedBlocks.isEmpty || !removedBlocks.isEmpty
     }
 
-    public var changedByteCount: Int {
-        (changedBlocks.count + addedBlocks.count) * localMap.blockSize
+    public var changedByteCount: Int64 {
+        Int64(changedBlocks.count + addedBlocks.count) * Int64(localMap.blockSize)
     }
 }
 
+public enum DeltaUploadPlan: Sendable {
+    case unavailable(reason: String)
+    case skip(localMap: BlockMap, bytesSkipped: Int64)
+    case uploadFull(localMap: BlockMap, diff: BlockDiff?, reason: String)
+}
+
 // MARK: - DeltaSync
-// Block-level diff for re-uploads — only transfer changed blocks.
-// rsync-inspired rolling CRC32 comparison. 256 KB block size.
+// Block-level diff planner.  Providers in the current protocol cannot patch
+// arbitrary object byte ranges safely, so this actor only performs true delta
+// skips when the remote manifest proves the file is unchanged.  Changed blocks
+// intentionally fall back to full upload instead of pretending bytes were saved.
 
 public actor DeltaSync {
-    static let defaultBlockSize = 256 * 1024  // 256 KB
+    static let defaultBlockSize = 256 * 1024
     private let checksumEngine = ChecksumEngine.shared
     private let resumeStore = ResumeStore.shared
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "DeltaSync")
 
     public init() {}
+
+    // MARK: - Planning
+
+    public func planUpload(
+        fileURL: URL,
+        remotePath: CloudPath,
+        account: CloudAccount,
+        provider: any CloudProvider
+    ) async throws -> DeltaUploadPlan {
+        let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let fileSize = (attrs[.size] as? Int64) ?? 0
+        guard fileSize > 50 * 1024 * 1024 else {
+            return .unavailable(reason: "Files smaller than 50 MB use normal upload because block manifests cost more than they save.")
+        }
+        guard provider.supportsBlockManifest else {
+            return .unavailable(reason: "Provider does not support Stratus block manifests.")
+        }
+
+        let localMap = try await computeBlockMap(url: fileURL)
+        let remoteMap = try await provider.fetchBlockManifest(path: remotePath, account: account)
+            ?? resumeStore.loadBlockManifest(fileURL: fileURL, providerID: provider.id)
+
+        guard let remoteMap else {
+            return .uploadFull(localMap: localMap, diff: nil, reason: "No previous block manifest exists for this object.")
+        }
+
+        if localMap.sha256 == remoteMap.sha256 && localMap.fileSize == remoteMap.fileSize {
+            logger.info("Delta skip: local SHA-256 matches remote manifest for \(remotePath.path, privacy: .private)")
+            return .skip(localMap: localMap, bytesSkipped: localMap.fileSize)
+        }
+
+        let diff = diffBlockMaps(local: localMap, remote: remoteMap)
+        if !diff.hasChanges {
+            return .skip(localMap: localMap, bytesSkipped: localMap.fileSize)
+        }
+
+        return .uploadFull(
+            localMap: localMap,
+            diff: diff,
+            reason: "Provider protocol cannot safely patch changed byte ranges yet; falling back to full upload."
+        )
+    }
 
     // MARK: - Block Map Computation
 
@@ -49,6 +99,7 @@ public actor DeltaSync {
         var offset: Int64 = 0
 
         while offset < fileSize {
+            try Task.checkCancellation()
             let remaining = Int(min(Int64(Self.defaultBlockSize), fileSize - offset))
             let block = try ChunkSlicer.readChunk(fileHandle: fileHandle, offset: offset, size: remaining)
             let crc = await checksumEngine.crc32c(of: block)
@@ -87,9 +138,8 @@ public actor DeltaSync {
 
     // MARK: - Eligibility Check
 
-    /// Returns true if delta sync should be attempted for this file/provider combo.
     public func shouldUseDelta(fileSize: Int64, provider: any CloudProvider, fileURL: URL) async -> Bool {
-        guard fileSize > 50 * 1024 * 1024 else { return false }  // only for files > 50 MB
+        guard fileSize > 50 * 1024 * 1024 else { return false }
         guard provider.supportsBlockManifest else { return false }
         let manifest = try? await resumeStore.loadBlockManifest(fileURL: fileURL, providerID: provider.id)
         return manifest != nil
