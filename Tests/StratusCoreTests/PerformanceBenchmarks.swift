@@ -28,7 +28,7 @@ final class PerformanceBenchmarks: XCTestCase {
 
     func test_crc32c_1MB_under5ms() async {
         let data = Data(repeating: 0xAB, count: 1024 * 1024)
-        let engine = ChecksumEngine()
+        let engine = ChecksumEngine.shared
         measure {
             let exp = expectation(description: "crc32c")
             Task {
@@ -45,7 +45,7 @@ final class PerformanceBenchmarks: XCTestCase {
         let data = Data(repeating: 0xFF, count: 4 * 1024 * 1024)
         let url = tempDir.appendingPathComponent("sha256bench.bin")
         try data.write(to: url)
-        let engine = ChecksumEngine()
+        let engine = ChecksumEngine.shared
         measure {
             let exp = expectation(description: "sha256")
             Task {
@@ -85,7 +85,7 @@ final class PerformanceBenchmarks: XCTestCase {
             let exp = expectation(description: "bw_samples")
             Task {
                 for _ in 0..<10_000 {
-                    await monitor.recordSample(bytes: 1_000_000, elapsed: 1.0)
+                    await monitor.recordBytes(1_000_000, elapsed: 1.0)
                 }
                 exp.fulfill()
             }
