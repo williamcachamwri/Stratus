@@ -77,13 +77,15 @@ public actor OAuthManager: NSObject {
     ///   - scopes: OAuth scopes to request.
     ///   - authorizationURL: The provider's authorization endpoint.
     ///   - tokenURL: The provider's token endpoint.
+    ///   - clientSecret: Optional OAuth client secret for providers/apps that require it.
     public func authenticate(
         provider: String,
         clientID: String,
         redirectURI: String,
         scopes: [String],
         authorizationURL: URL,
-        tokenURL: URL
+        tokenURL: URL,
+        clientSecret: String? = nil
     ) async throws -> OAuthTokens {
         // Generate PKCE pair
         let verifier = generateCodeVerifier()
@@ -133,7 +135,8 @@ public actor OAuthManager: NSObject {
             verifier: storedVerifier,
             clientID: clientID,
             redirectURI: redirectURI,
-            tokenURL: tokenURL
+            tokenURL: tokenURL,
+            clientSecret: clientSecret
         )
 
         logger.info("OAuth flow completed for provider: \(provider)")
@@ -146,18 +149,23 @@ public actor OAuthManager: NSObject {
     public func refresh(
         tokens: OAuthTokens,
         clientID: String,
-        tokenURL: URL
+        tokenURL: URL,
+        clientSecret: String? = nil
     ) async throws -> OAuthTokens {
         guard let refreshToken = tokens.refreshToken else {
             throw OAuthError.missingRefreshToken
         }
 
         var components = URLComponents()
-        components.queryItems = [
+        var formItems = [
             URLQueryItem(name: "grant_type", value: "refresh_token"),
             URLQueryItem(name: "refresh_token", value: refreshToken),
             URLQueryItem(name: "client_id", value: clientID),
         ]
+        if let clientSecret {
+            formItems.append(URLQueryItem(name: "client_secret", value: clientSecret))
+        }
+        components.queryItems = formItems
 
         guard let body = components.percentEncodedQuery?.data(using: .utf8) else {
             throw OAuthError.invalidTokenResponse("Could not encode refresh request body")
@@ -280,16 +288,21 @@ public actor OAuthManager: NSObject {
         verifier: String,
         clientID: String,
         redirectURI: String,
-        tokenURL: URL
+        tokenURL: URL,
+        clientSecret: String?
     ) async throws -> OAuthTokens {
         var components = URLComponents()
-        components.queryItems = [
+        var formItems = [
             URLQueryItem(name: "grant_type", value: "authorization_code"),
             URLQueryItem(name: "code", value: code),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
             URLQueryItem(name: "client_id", value: clientID),
             URLQueryItem(name: "code_verifier", value: verifier),
         ]
+        if let clientSecret {
+            formItems.append(URLQueryItem(name: "client_secret", value: clientSecret))
+        }
+        components.queryItems = formItems
 
         guard let body = components.percentEncodedQuery?.data(using: .utf8) else {
             throw OAuthError.invalidTokenResponse("Could not encode token exchange body")
