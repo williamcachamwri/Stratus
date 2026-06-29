@@ -2,12 +2,18 @@ import Foundation
 import FileProvider
 import os.log
 
+// Wraps a non-Sendable value for capture in Task closures (FileProvider callbacks are not @Sendable).
+private final class Box<T>: @unchecked Sendable {
+    let value: T
+    init(_ value: T) { self.value = value }
+}
+
 // MARK: - StratusFileProviderEnumerator
 // Enumerates items at a given container item for the File Provider extension.
 
-public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumerator {
+public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable {
 
-    private let containerItem: NSFileProviderItemIdentifier
+    private nonisolated(unsafe) let containerItem: NSFileProviderItemIdentifier
     private let provider: any CloudProvider
     private let account: CloudAccount
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "FileProviderEnumerator")
@@ -23,43 +29,37 @@ public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumer
     public func invalidate() {}
 
     public func enumerateItems(for observer: any NSFileProviderEnumerationObserver, startingAt page: NSFileProviderPage) {
-        let path: CloudPath
-        if containerItem == .rootContainer || containerItem == .workingSet {
-            path = CloudPath("/")
-        } else {
-            path = CloudPath(containerItem.rawValue)
-        }
+        // Extract Sendable values before Task to avoid region isolation errors
+        let containerRaw = containerItem.rawValue
+        let isRoot = containerItem == .rootContainer || containerItem == .workingSet
+        let pageToken = page == NSFileProviderPage.initialPageSortedByName as NSFileProviderPage
+            ? nil : String(data: page.rawValue, encoding: .utf8)
+        let path = isRoot ? CloudPath("/") : CloudPath(containerRaw)
+        let obs = Box(observer)
+        let log = logger
 
         Task {
             do {
-                let pageToken = page == NSFileProviderPage.initialPageSortedByName as NSFileProviderPage
-                    ? nil
-                    : String(data: page.rawValue, encoding: .utf8)
-
                 let result = try await provider.listDirectory(path: path, account: account, pageToken: pageToken)
-
+                let parentID = NSFileProviderItemIdentifier(rawValue: containerRaw)
                 let providerItems: [NSFileProviderItem] = result.items.map { item in
-                    StratusFileProviderItem(item: item, parentID: containerItem, accountID: account.id)
+                    StratusFileProviderItem(item: item, parentID: parentID, accountID: account.id)
                 }
-
-                observer.didEnumerate(providerItems)
-
+                obs.value.didEnumerate(providerItems)
                 if let nextToken = result.nextPageToken {
-                    let nextPage = NSFileProviderPage(nextToken.data(using: .utf8)!)
-                    observer.finishEnumerating(upTo: nextPage)
+                    obs.value.finishEnumerating(upTo: NSFileProviderPage(nextToken.data(using: .utf8)!))
                 } else {
-                    observer.finishEnumerating(upTo: nil)
+                    obs.value.finishEnumerating(upTo: nil)
                 }
-                logger.debug("Enumerated \(providerItems.count) items at \(path.path)")
+                log.debug("Enumerated \(providerItems.count) items at \(path.path)")
             } catch {
-                logger.error("Enumeration failed at \(path.path): \(error)")
-                observer.finishEnumeratingWithError(error)
+                log.error("Enumeration failed at \(path.path): \(error)")
+                obs.value.finishEnumeratingWithError(error)
             }
         }
     }
 
     public func enumerateChanges(for observer: any NSFileProviderChangeObserver, from anchor: NSFileProviderSyncAnchor) {
-        // Report no changes — real implementation would diff against stored state
         observer.finishEnumeratingChanges(upTo: anchor, moreComing: false)
     }
 
