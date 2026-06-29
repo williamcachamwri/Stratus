@@ -134,7 +134,7 @@ private final class FSEventsMonitor: @unchecked Sendable {
         let fsCallback: FSEventStreamCallback = { _, infoPtr, numEvents, eventPaths, eventFlags, _ in
             guard let infoPtr else { return }
             let box = Unmanaged<FSEventsCallbackBox>.fromOpaque(infoPtr).takeUnretainedValue()
-            let paths = unsafeBitCast(eventPaths, to: NSArray.self) as! [String]
+            let paths = (unsafeBitCast(eventPaths, to: NSArray.self) as? [String]) ?? []
             let flags = UnsafeBufferPointer(start: eventFlags, count: numEvents)
             for (path, flag) in zip(paths, flags) {
                 let url = URL(fileURLWithPath: path)
