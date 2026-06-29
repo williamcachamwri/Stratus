@@ -166,7 +166,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL {
-        let url = URL(string: "\(Self.apiBase)/files/\(path.path)/content")!
+        let url = URL(string: "\(Self.apiBase)/files/\(path.path)/content") ?? URL(fileURLWithPath: "/")
         let response = try await http.data(for: HTTPRequest(url: url, headers: try await authHeaders(account: account)))
         guard let location = response.headers["Location"], let downloadURL = URL(string: location) else {
             throw ProviderError.invalidResponse("Box did not return a download URL")
@@ -175,14 +175,14 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func downloadRange(path: CloudPath, range: ClosedRange<Int64>, account: CloudAccount) async throws -> Data {
-        let url = URL(string: "\(Self.apiBase)/files/\(path.path)/content")!
+        let url = URL(string: "\(Self.apiBase)/files/\(path.path)/content") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Range"] = "bytes=\(range.lowerBound)-\(range.upperBound)"
         return try await http.data(for: HTTPRequest(url: url, headers: headers)).data
     }
 
     public func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
-        let url = URL(string: "\(Self.apiBase)/folders")!
+        let url = URL(string: "\(Self.apiBase)/folders") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
         let body = try JSONSerialization.data(withJSONObject: ["name": path.lastComponent, "parent": ["id": "0"]])
@@ -195,7 +195,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func move(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
-        let url = URL(string: "\(Self.apiBase)/files/\(from.path)")!
+        let url = URL(string: "\(Self.apiBase)/files/\(from.path)") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
         let body = try JSONSerialization.data(withJSONObject: ["name": to.lastComponent, "parent": ["id": "0"]])
@@ -207,7 +207,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func copy(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
-        let url = URL(string: "\(Self.apiBase)/files/\(from.path)/copy")!
+        let url = URL(string: "\(Self.apiBase)/files/\(from.path)/copy") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
         let body = try JSONSerialization.data(withJSONObject: ["name": to.lastComponent, "parent": ["id": "0"]])
@@ -219,7 +219,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func delete(path: CloudPath, account: CloudAccount) async throws {
-        let url = URL(string: "\(Self.apiBase)/files/\(path.path)")!
+        let url = URL(string: "\(Self.apiBase)/files/\(path.path)") ?? URL(fileURLWithPath: "/")
         _ = try await http.data(for: HTTPRequest(url: url, method: .DELETE, headers: try await authHeaders(account: account)))
     }
 
@@ -235,7 +235,7 @@ public actor BoxProvider: CloudProvider {
     public func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
 
     public func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink {
-        let url = URL(string: "\(Self.apiBase)/shared_links/files/\(path.path)")!
+        let url = URL(string: "\(Self.apiBase)/shared_links/files/\(path.path)") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
         let shareAccess = options.password == nil ? "open" : "collaborators"
