@@ -148,7 +148,7 @@ public actor FileProviderDomainStore {
         do {
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let data = try encoder.encode(records)
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+            try data.write(to: fileURL, options: [.atomic])
         } catch let error as EncodingError {
             throw FileProviderDomainStoreError.encodingFailed(error)
         } catch {
