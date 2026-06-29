@@ -46,7 +46,7 @@ public actor GoogleDriveProvider: CloudProvider {
 
     public func validateCredentials(account: CloudAccount) async throws -> Bool {
         guard let cred = try await vault.loadOAuthCredential(providerID: id, accountID: account.id) else { return false }
-        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/about?fields=storageQuota")!,
+        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/about?fields=storageQuota") ?? URL(fileURLWithPath: "/"),
                                   headers: ["Authorization": "Bearer \(cred.accessToken)"])
         let response = try await http.data(for: request)
         return response.isSuccess
@@ -60,7 +60,7 @@ public actor GoogleDriveProvider: CloudProvider {
 
     public func quota(for account: CloudAccount) async throws -> StorageQuota {
         let token = try await accessToken(account: account)
-        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/about?fields=storageQuota")!,
+        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/about?fields=storageQuota") ?? URL(fileURLWithPath: "/"),
                                   headers: ["Authorization": "Bearer \(token)"])
         let response = try await http.data(for: request)
         guard response.isSuccess,
@@ -78,7 +78,7 @@ public actor GoogleDriveProvider: CloudProvider {
     public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
         let token = try await accessToken(account: account)
         let folderID = path.path == "/" ? "root" : path.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        var comps = URLComponents(string: "\(Self.baseURL)/files")!
+        var comps = URLComponents(string: "\(Self.baseURL)/files") ?? URLComponents()
         var queryItems = [
             URLQueryItem(name: "q", value: "'\(folderID)' in parents and trashed = false"),
             URLQueryItem(name: "fields", value: "files(id,name,size,mimeType,modifiedTime,createdTime,md5Checksum,trashed),nextPageToken"),
@@ -87,7 +87,8 @@ public actor GoogleDriveProvider: CloudProvider {
         if let pt = pageToken { queryItems.append(URLQueryItem(name: "pageToken", value: pt)) }
         comps.queryItems = queryItems
 
-        let request = HTTPRequest(url: comps.url!, headers: ["Authorization": "Bearer \(token)"])
+        guard let listURL = comps.url else { throw ProviderError.invalidResponse("Could not build URL") }
+        let request = HTTPRequest(url: listURL, headers: ["Authorization": "Bearer \(token)"])
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
@@ -113,7 +114,7 @@ public actor GoogleDriveProvider: CloudProvider {
         let token = try await accessToken(account: account)
         let fileID = path.lastComponent
         let request = HTTPRequest(
-            url: URL(string: "\(Self.baseURL)/files/\(fileID)?fields=id,name,size,mimeType,modifiedTime,md5Checksum")!,
+            url: URL(string: "\(Self.baseURL)/files/\(fileID)?fields=id,name,size,mimeType,modifiedTime,md5Checksum") ?? URL(fileURLWithPath: "/"),
             headers: ["Authorization": "Bearer \(token)"]
         )
         let response = try await http.data(for: request)
@@ -164,19 +165,20 @@ public actor GoogleDriveProvider: CloudProvider {
         var body: [String: Any] = ["name": remotePath.lastComponent]
         let bodyData = try JSONSerialization.data(withJSONObject: body)
 
-        var comps = URLComponents(string: "https://www.googleapis.com/upload/drive/v3/files")!
+        var comps = URLComponents(string: "https://www.googleapis.com/upload/drive/v3/files") ?? URLComponents()
         comps.queryItems = [URLQueryItem(name: "uploadType", value: "multipart")]
 
         // Build multipart body
         let boundary = "StratusBoundary\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
         var multipart = Data()
-        multipart.append("--\(boundary)\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".data(using: .utf8)!)
+        multipart.append("--\(boundary)\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".data(using: .utf8) ?? Data())
         multipart.append(bodyData)
-        multipart.append("\r\n--\(boundary)\r\nContent-Type: \(metadata.contentType ?? "application/octet-stream")\r\n\r\n".data(using: .utf8)!)
+        multipart.append("\r\n--\(boundary)\r\nContent-Type: \(metadata.contentType ?? "application/octet-stream")\r\n\r\n".data(using: .utf8) ?? Data())
         multipart.append(data)
-        multipart.append("\r\n--\(boundary)--".data(using: .utf8)!)
+        multipart.append("\r\n--\(boundary)--".data(using: .utf8) ?? Data())
 
-        var request = HTTPRequest(url: comps.url!, method: .POST)
+        guard let uploadURL = comps.url else { throw ProviderError.invalidResponse("Could not build URL") }
+        var request = HTTPRequest(url: uploadURL, method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "multipart/related; boundary=\(boundary)"
         request.body = multipart
@@ -196,7 +198,7 @@ public actor GoogleDriveProvider: CloudProvider {
         let token = try await accessToken(account: account)
         let fileID = path.lastComponent
         // Direct download link (requires token in header — not a shareable URL)
-        return URL(string: "\(Self.baseURL)/files/\(fileID)?alt=media&access_token=\(token)")!
+        return URL(string: "\(Self.baseURL)/files/\(fileID)?alt=media&access_token=\(token)") ?? URL(fileURLWithPath: "/")
     }
 
     public func downloadRange(path: CloudPath, range: ClosedRange<Int64>, account: CloudAccount) async throws -> Data {
@@ -215,7 +217,7 @@ public actor GoogleDriveProvider: CloudProvider {
             "name": path.lastComponent,
             "mimeType": "application/vnd.google-apps.folder"
         ])
-        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = body
@@ -236,7 +238,7 @@ public actor GoogleDriveProvider: CloudProvider {
         let token = try await accessToken(account: account)
         let fileID = from.lastComponent
         let body = try JSONSerialization.data(withJSONObject: ["name": to.lastComponent])
-        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)/copy")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)/copy") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = body
@@ -252,7 +254,7 @@ public actor GoogleDriveProvider: CloudProvider {
     public func delete(path: CloudPath, account: CloudAccount) async throws {
         let token = try await accessToken(account: account)
         let fileID = path.lastComponent
-        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)")!, method: .DELETE,
+        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)") ?? URL(fileURLWithPath: "/"), method: .DELETE,
                                    headers: ["Authorization": "Bearer \(token)"])
         let response = try await http.data(for: request)
         guard response.isSuccess || response.statusCode == 204 else {
@@ -264,7 +266,7 @@ public actor GoogleDriveProvider: CloudProvider {
         let token = try await accessToken(account: account)
         let fileID = path.lastComponent
         let body = try JSONSerialization.data(withJSONObject: ["name": newName])
-        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)")!, method: .PATCH)
+        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)") ?? URL(fileURLWithPath: "/"), method: .PATCH)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = body
@@ -300,7 +302,7 @@ public actor GoogleDriveProvider: CloudProvider {
         let token = try await accessToken(account: account)
         let fileID = path.lastComponent
         let body = try JSONSerialization.data(withJSONObject: ["trashed": true])
-        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)")!, method: .PATCH)
+        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)") ?? URL(fileURLWithPath: "/"), method: .PATCH)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = body
@@ -314,7 +316,7 @@ public actor GoogleDriveProvider: CloudProvider {
     public func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {
         let token = try await accessToken(account: account)
         let body = try JSONSerialization.data(withJSONObject: ["trashed": false])
-        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(item.id)")!, method: .PATCH)
+        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(item.id)") ?? URL(fileURLWithPath: "/"), method: .PATCH)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = body
@@ -323,7 +325,7 @@ public actor GoogleDriveProvider: CloudProvider {
 
     public func emptyTrash(account: CloudAccount) async throws {
         let token = try await accessToken(account: account)
-        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/trash")!, method: .DELETE,
+        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/trash") ?? URL(fileURLWithPath: "/"), method: .DELETE,
                                    headers: ["Authorization": "Bearer \(token)"])
         _ = try await http.data(for: request)
     }
@@ -334,7 +336,7 @@ public actor GoogleDriveProvider: CloudProvider {
         let token = try await accessToken(account: account)
         let fileID = path.lastComponent
         let request = HTTPRequest(
-            url: URL(string: "\(Self.baseURL)/files/\(fileID)/revisions?fields=revisions(id,size,modifiedTime,keepForever)")!,
+            url: URL(string: "\(Self.baseURL)/files/\(fileID)/revisions?fields=revisions(id,size,modifiedTime,keepForever)") ?? URL(fileURLWithPath: "/"),
             headers: ["Authorization": "Bearer \(token)"]
         )
         let response = try await http.data(for: request)
@@ -361,12 +363,12 @@ public actor GoogleDriveProvider: CloudProvider {
         let fileID = path.lastComponent
         let permission: [String: Any] = ["type": "anyone", "role": options.canEdit ? "writer" : "reader"]
         let body = try JSONSerialization.data(withJSONObject: permission)
-        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)/permissions")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "\(Self.baseURL)/files/\(fileID)/permissions") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = body
         _ = try await http.data(for: request)
-        return ShareLink(url: URL(string: "https://drive.google.com/file/d/\(fileID)/view")!, id: fileID)
+        return ShareLink(url: URL(string: "https://drive.google.com/file/d/\(fileID)/view") ?? URL(fileURLWithPath: "/"), id: fileID)
     }
 
     public func revokeShareLink(link: ShareLink, account: CloudAccount) async throws {}
