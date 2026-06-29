@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import CommonCrypto
+import Security
 
 // MARK: - Argon2id Key Derivation
 // Uses CommonCrypto's PBKDF2-SHA256 as a safe substitute until a native Argon2 library ships.
@@ -37,8 +38,18 @@ public struct EncryptionKeyDerivation: Sendable {
         return SymmetricKey(data: Data(derivedBytes))
     }
 
-    public static func generateSalt() -> Data {
-        Data((0..<saltLength).map { _ in UInt8.random(in: 0...255) })
+    public static func generateSalt() throws -> Data {
+        try secureRandomData(count: saltLength)
+    }
+
+    public static func secureRandomData(count: Int) throws -> Data {
+        guard count >= 0 else { throw EncryptionError.invalidRandomByteCount(count) }
+        var bytes = [UInt8](repeating: 0, count: count)
+        let status = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
+        guard status == errSecSuccess else {
+            throw EncryptionError.secureRandomFailed(Int(status))
+        }
+        return Data(bytes)
     }
 
     // MARK: - Key Wrapping (for storing file keys encrypted with the master key)
@@ -46,7 +57,8 @@ public struct EncryptionKeyDerivation: Sendable {
     public static func wrapKey(_ fileKey: SymmetricKey, with masterKey: SymmetricKey) throws -> Data {
         let fileKeyData = fileKey.withUnsafeBytes { Data($0) }
         let sealedBox = try AES.GCM.seal(fileKeyData, using: masterKey)
-        return sealedBox.combined!
+        guard let combined = sealedBox.combined else { throw EncryptionError.encryptionFailed }
+        return combined
     }
 
     public static func unwrapKey(_ wrappedKey: Data, with masterKey: SymmetricKey) throws -> SymmetricKey {
@@ -61,6 +73,8 @@ public struct EncryptionKeyDerivation: Sendable {
 public enum EncryptionError: Error, Sendable {
     case invalidSaltLength(expected: Int, got: Int)
     case keyDerivationFailed(Int)
+    case secureRandomFailed(Int)
+    case invalidRandomByteCount(Int)
     case encryptionFailed
     case decryptionFailed
     case integrityCheckFailed
