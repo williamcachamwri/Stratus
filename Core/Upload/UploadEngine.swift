@@ -11,6 +11,7 @@ public enum UploadEngineEvent: Sendable {
     case taskFailed(UploadTask, UploadError)
     case taskPaused(UUID)
     case taskResumed(UUID)
+    case taskReprioritized(UUID, TaskPriority)
     case taskCancelled(UUID)
     case sessionRestored(count: Int)
 }
@@ -167,6 +168,16 @@ public actor UploadEngine {
             emit(.taskResumed(taskID))
         } catch {
             logger.error("Failed to resume upload task \(taskID): \(error.localizedDescription)")
+        }
+    }
+
+    public func reprioritize(taskID: UUID, to priority: TaskPriority = .critical) async {
+        guard activeUploadTasks[taskID] == nil else {
+            logger.debug("Ignoring priority change for active upload task \(taskID)")
+            return
+        }
+        if await scheduler.reprioritize(taskID: taskID, to: priority) {
+            emit(.taskReprioritized(taskID, priority))
         }
     }
 
