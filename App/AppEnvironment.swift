@@ -14,6 +14,7 @@ public final class AppEnvironment: ObservableObject {
     let syncEngine = SyncEngine.shared
     let syncScheduler = SyncScheduler.shared
     let providerRegistry = CloudProviderRegistry.shared
+    let appUpdater = AppUpdater.shared
 
     // MARK: - Observable State
     @Published public var accounts: [CloudAccount] = []
