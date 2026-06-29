@@ -17,6 +17,11 @@ struct StratusApp: App {
         .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    env.appUpdater.checkForUpdates()
+                }
+            }
             CommandMenu("Sync") {
                 Button("Sync All Now") {
                     Task { await env.syncEngine.syncAll() }
