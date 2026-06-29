@@ -69,7 +69,7 @@ final class MenuBarManager: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 guard let self else { return }
-                await self.refreshLabel()
+                self.refreshLabel()
             }
         }
     }
