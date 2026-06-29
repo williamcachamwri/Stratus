@@ -25,7 +25,7 @@ public struct MountManagerView: View {
                 EmptyStateView(
                     icon: "externaldrive.badge.questionmark",
                     title: "No mounted accounts",
-                    subtitle: "Mount rows will be populated from File Provider mount state, not placeholder demo data."
+                    subtitle: "Mount rows will be populated only from File Provider mount state."
                 )
             } else {
                 LazyVStack(spacing: Spacing.sm) {
