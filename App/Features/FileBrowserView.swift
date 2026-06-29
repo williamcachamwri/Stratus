@@ -70,7 +70,7 @@ struct FileBrowserView: View {
 
     private func loadItems() {
         guard let account = selectedAccount,
-              let provider = env.providerRegistry.provider(id: account.id) else { return }
+              let provider = env.providerRegistry.provider(id: account.providerID) else { return }
         isLoading = true
         error = nil
         Task {
