@@ -21,8 +21,17 @@ struct FileBrowserView: View {
             List(env.accounts, id: \.id, selection: $selectedAccount) { account in
                 HStack(spacing: Spacing.sm) {
                     ProviderIcon(providerID: account.providerID, size: 20)
-                    Text(account.displayName)
-                        .font(.stratusBody)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.email ?? account.displayName)
+                            .font(.stratusBody)
+                            .lineLimit(1)
+                        if account.email != nil {
+                            Text(account.displayName)
+                                .font(.caption)
+                                .foregroundColor(.textSecondary)
+                                .lineLimit(1)
+                        }
+                    }
                 }
                 .tag(account)
             }
@@ -108,6 +117,7 @@ struct FileBrowserView: View {
     private func loadItems() {
         guard let account = selectedAccount else { return }
         let path = currentPath
+        items = []
         isLoading = true
         error = nil
         Task {
