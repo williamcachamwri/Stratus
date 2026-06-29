@@ -265,10 +265,9 @@ private struct UploadItemRowView: View {
             Button("Retry") { Task { await env.uploadEngine.resume(taskID: row.id) } }
                 .buttonStyle(.borderless)
         case .prioritize:
-            Button("Prioritize") { }
+            Button("Prioritize") { Task { await env.uploadEngine.reprioritize(taskID: row.id, to: .critical) } }
                 .buttonStyle(.borderless)
-                .disabled(true)
-                .help("Priority changes are handled by the scheduler; selection support is next.")
+                .help("Move this queued upload to critical priority.")
         case .none:
             EmptyView()
         }
