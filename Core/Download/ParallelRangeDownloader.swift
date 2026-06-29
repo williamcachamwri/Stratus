@@ -112,18 +112,9 @@ public actor ParallelRangeDownloader {
         // Buffer to hold each segment's data, indexed by segment.index.
         // Initialized to nil; filled in as segments complete.
         var buffer: [Data?] = Array(repeating: nil, count: totalSegments)
-        var completedCount = alreadyCompletedSegmentIndices.count
+        var completedCount = 0
         var bytesReceived: Int64 = 0
-
-        // Account for bytes already downloaded on resume.
-        for idx in alreadyCompletedSegmentIndices {
-            if idx < segments.count {
-                bytesReceived += segments[idx].length
-                buffer[idx] = Data()  // placeholder; will not be re-downloaded
-            }
-        }
-
-        let pending = segments.filter { !alreadyCompletedSegmentIndices.contains($0.index) }
+        let pending = segments
 
         logger.debug("Starting download of \(path) — \(totalSegments) segments, \(pending.count) pending")
 
@@ -200,16 +191,74 @@ public actor ParallelRangeDownloader {
         alreadyCompletedSegmentIndices: Set<Int> = [],
         progressHandler: (@Sendable (SegmentProgressUpdate) -> Void)? = nil
     ) async throws(DownloadError) -> URL {
-        let data = try await download(
-            path: path,
-            fileSize: fileSize,
-            account: account,
-            alreadyCompletedSegmentIndices: alreadyCompletedSegmentIndices,
-            progressHandler: progressHandler
-        )
+        guard fileSize > 0 else {
+            do {
+                try Data().write(to: destination, options: [.atomic])
+                return destination
+            } catch {
+                throw DownloadError.localIOError(error.localizedDescription)
+            }
+        }
+
+        let segments = makeSegments(fileSize: fileSize)
+        let totalSegments = segments.count
+        let pending = segments.filter { !alreadyCompletedSegmentIndices.contains($0.index) }
+        var completedCount = alreadyCompletedSegmentIndices.count
+        var bytesReceived = alreadyCompletedSegmentIndices.reduce(Int64(0)) { partial, index in
+            guard index < segments.count else { return partial }
+            return partial + segments[index].length
+        }
 
         do {
-            try data.write(to: destination, options: [.atomic])
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            if !FileManager.default.fileExists(atPath: destination.path) {
+                FileManager.default.createFile(atPath: destination.path, contents: nil)
+            }
+            let handle = try FileHandle(forWritingTo: destination)
+            defer { try? handle.close() }
+            try handle.truncate(atOffset: UInt64(fileSize))
+
+            try await withThrowingTaskGroup(of: SegmentResult.self) { group in
+                var pendingIterator = pending.makeIterator()
+                var inFlight = 0
+
+                while inFlight < configuration.maxConcurrentSegments,
+                      let segment = pendingIterator.next() {
+                    let seg = segment
+                    group.addTask {
+                        try await self.downloadSegment(seg, path: path, account: account)
+                    }
+                    inFlight += 1
+                }
+
+                for try await result in group {
+                    let offset = UInt64(segments[result.index].range.lowerBound)
+                    try handle.seek(toOffset: offset)
+                    try handle.write(contentsOf: result.data)
+
+                    completedCount += 1
+                    bytesReceived += Int64(result.data.count)
+                    progressHandler?(SegmentProgressUpdate(
+                        segmentsCompleted: completedCount,
+                        segmentsTotal: totalSegments,
+                        bytesReceived: bytesReceived,
+                        totalBytes: fileSize
+                    ))
+
+                    if let next = pendingIterator.next() {
+                        let seg = next
+                        group.addTask {
+                            try await self.downloadSegment(seg, path: path, account: account)
+                        }
+                    }
+                    inFlight -= 1
+                }
+            }
+        } catch let err as DownloadError {
+            throw err
         } catch {
             throw DownloadError.localIOError(error.localizedDescription)
         }
