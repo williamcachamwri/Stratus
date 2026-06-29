@@ -1,5 +1,6 @@
 import Foundation
 import Citadel
+import NIOCore
 import os.log
 
 // MARK: - SFTPProvider
@@ -72,13 +73,14 @@ public actor SFTPProvider: CloudProvider {
         let client = try await makeSFTPClient(info: info)
         defer { Task { try? await client.close() } }
         let entries = try await client.listDirectory(atPath: path.path)
-        let items = entries.map { entry -> CloudFileItem in
-            let isDir = entry.resourceType == .directory
+        let components = entries.flatMap { $0.components }
+        let items = components.map { entry -> CloudFileItem in
+            let isDir = (entry.attributes.permissions ?? 0) & 0xF000 == 0x4000
             return CloudFileItem(
                 id: path.appendingComponent(entry.filename).path,
                 name: entry.filename,
                 path: path.appendingComponent(entry.filename),
-                size: Int64(entry.attributes.size ?? 0),
+                size: entry.attributes.size.map(Int64.init),
                 isDirectory: isDir
             )
         }
@@ -89,7 +91,7 @@ public actor SFTPProvider: CloudProvider {
         guard let info = connectionInfos[account.id] else { throw ProviderError.authenticationFailed("No connection info") }
         let client = try await makeSFTPClient(info: info)
         defer { Task { try? await client.close() } }
-        let attrs = try await client.getAttributes(atPath: path.path)
+        let attrs = try await client.getAttributes(at: path.path)
         return CloudFileItem(id: path.path, name: path.lastComponent, path: path, size: attrs.size.map(Int64.init))
     }
 
@@ -110,10 +112,22 @@ public actor SFTPProvider: CloudProvider {
     public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
         guard let info = connectionInfos[account.id] else { throw ProviderError.authenticationFailed("No connection info") }
         let client = try await makeSFTPClient(info: info)
-        defer { Task { try? await client.close() } }
-        let file = try await client.openFile(filePath: remotePath.path, flags: [.write, .create, .truncate])
-        defer { Task { try? await file.close() } }
-        try await file.write(data, at: 0)
+        do {
+            let file = try await client.openFile(filePath: remotePath.path, flags: [.write, .create, .truncate])
+            var buffer = ByteBufferAllocator().buffer(capacity: data.count)
+            buffer.writeBytes(data)
+            do {
+                try await file.write(buffer, at: 0)
+            } catch {
+                try? await file.close()
+                throw error
+            }
+            try? await file.close()
+        } catch {
+            try? await client.close()
+            throw error
+        }
+        try? await client.close()
         return CloudFileItem(id: remotePath.path, name: remotePath.lastComponent, path: remotePath, size: Int64(data.count))
     }
 
@@ -124,10 +138,22 @@ public actor SFTPProvider: CloudProvider {
     public func downloadRange(path: CloudPath, range: ClosedRange<Int64>, account: CloudAccount) async throws -> Data {
         guard let info = connectionInfos[account.id] else { throw ProviderError.authenticationFailed("No connection info") }
         let client = try await makeSFTPClient(info: info)
-        defer { Task { try? await client.close() } }
-        let file = try await client.openFile(filePath: path.path, flags: .read)
-        defer { Task { try? await file.close() } }
-        return try await file.readAll()
+        do {
+            let file = try await client.openFile(filePath: path.path, flags: .read)
+            var buf: ByteBuffer
+            do {
+                buf = try await file.readAll()
+            } catch {
+                try? await file.close()
+                throw error
+            }
+            try? await file.close()
+            try? await client.close()
+            return buf.readData(length: buf.readableBytes) ?? Data()
+        } catch {
+            try? await client.close()
+            throw error
+        }
     }
 
     public func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
@@ -142,7 +168,7 @@ public actor SFTPProvider: CloudProvider {
         guard let info = connectionInfos[account.id] else { throw ProviderError.authenticationFailed("No connection info") }
         let client = try await makeSFTPClient(info: info)
         defer { Task { try? await client.close() } }
-        try await client.moveItem(atPath: from.path, toPath: to.path)
+        try await client.rename(at: from.path, to: to.path)
         return CloudFileItem(id: to.path, name: to.lastComponent, path: to)
     }
 
@@ -154,7 +180,7 @@ public actor SFTPProvider: CloudProvider {
         guard let info = connectionInfos[account.id] else { throw ProviderError.authenticationFailed("No connection info") }
         let client = try await makeSFTPClient(info: info)
         defer { Task { try? await client.close() } }
-        try await client.remove(atPath: path.path)
+        try await client.remove(at: path.path)
     }
 
     public func rename(path: CloudPath, newName: String, account: CloudAccount) async throws -> CloudFileItem {
@@ -192,7 +218,7 @@ public actor SFTPProvider: CloudProvider {
         return try await client.openSFTP()
     }
 
-    private func authMethod(from method: ConnectionInfo.AuthMethod, username: String) -> SSHAuthenticationMethod {
+    private nonisolated func authMethod(from method: ConnectionInfo.AuthMethod, username: String) -> SSHAuthenticationMethod {
         switch method {
         case .password(let pw):
             return .passwordBased(username: username, password: pw)
