@@ -91,4 +91,31 @@ final class ChunkSlicerTests: XCTestCase {
         // 100 MB boundary: uses 16 MB chunks
         XCTAssertEqual(chunkSize, 16 * 1024 * 1024)
     }
+    func test_readChunk_returnsExactRequestedBytes() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let data = Data((0..<4096).map { UInt8($0 % 251) })
+        try data.write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        let chunk = try ChunkSlicer.readChunk(fileHandle: handle, offset: 512, size: 1024)
+        XCTAssertEqual(chunk.count, 1024)
+        XCTAssertEqual(chunk, data[512..<1536])
+    }
+
+    func test_readChunk_throwsOnShortRead() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data([1, 2, 3, 4]).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        XCTAssertThrowsError(try ChunkSlicer.readChunk(fileHandle: handle, offset: 0, size: 8)) { error in
+            XCTAssertEqual(error as? ChunkSlicerError, .shortRead(expected: 8, actual: 4))
+        }
+    }
+
 }
