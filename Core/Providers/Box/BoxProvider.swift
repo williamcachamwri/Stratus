@@ -61,7 +61,7 @@ public actor BoxProvider: CloudProvider {
     // MARK: - Directory Listing
 
     public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
-        let folderID = path.path == "/" ? "0" : path.path
+        let folderID = boxID(for: path, rootID: "0")
         var components = URLComponents(string: "\(Self.apiBase)/folders/\(folderID)/items") ?? URLComponents()
         components.queryItems = [
             .init(name: "fields", value: "id,name,type,size,modified_at,etag,sha1"),
@@ -78,7 +78,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
-        let fileID = path.path
+        let fileID = boxID(for: path, rootID: "")
         let url = URL(string: "\(Self.apiBase)/files/\(fileID)?fields=id,name,type,size,modified_at,etag,sha1") ?? URL(fileURLWithPath: "/")
         let response = try await http.data(for: HTTPRequest(url: url, headers: try await authHeaders(account: account)))
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
@@ -90,7 +90,7 @@ public actor BoxProvider: CloudProvider {
     // MARK: - Upload (chunked sessions for large files)
 
     public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String {
-        let parentID = "0"  // TODO: resolve from path
+        let parentID = boxParentID(for: remotePath)
         let url = URL(string: "\(Self.uploadBase)/files/upload_sessions") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
@@ -152,7 +152,7 @@ public actor BoxProvider: CloudProvider {
         var body = Data()
         body.append("--\(boundary)\r\n".data(using: .utf8) ?? Data())
         body.append("Content-Disposition: form-data; name=\"attributes\"\r\n\r\n".data(using: .utf8) ?? Data())
-        let attrs = try JSONSerialization.data(withJSONObject: ["name": remotePath.lastComponent, "parent": ["id": "0"]])
+        let attrs = try JSONSerialization.data(withJSONObject: ["name": remotePath.lastComponent, "parent": ["id": boxParentID(for: remotePath)]])
         body.append(attrs)
         body.append("\r\n--\(boundary)\r\n".data(using: .utf8) ?? Data())
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(remotePath.lastComponent)\"\r\n".data(using: .utf8) ?? Data())
@@ -169,7 +169,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL {
-        let url = URL(string: "\(Self.apiBase)/files/\(path.path)/content") ?? URL(fileURLWithPath: "/")
+        let url = URL(string: "\(Self.apiBase)/files/\(boxID(for: path, rootID: ""))/content") ?? URL(fileURLWithPath: "/")
         let response = try await http.data(for: HTTPRequest(url: url, headers: try await authHeaders(account: account)))
         guard let location = response.headers["Location"], let downloadURL = URL(string: location) else {
             throw ProviderError.invalidResponse("Box did not return a download URL")
@@ -178,7 +178,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func downloadRange(path: CloudPath, range: ClosedRange<Int64>, account: CloudAccount) async throws -> Data {
-        let url = URL(string: "\(Self.apiBase)/files/\(path.path)/content") ?? URL(fileURLWithPath: "/")
+        let url = URL(string: "\(Self.apiBase)/files/\(boxID(for: path, rootID: ""))/content") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Range"] = "bytes=\(range.lowerBound)-\(range.upperBound)"
         return try await http.data(for: HTTPRequest(url: url, headers: headers)).data
@@ -188,7 +188,7 @@ public actor BoxProvider: CloudProvider {
         let url = URL(string: "\(Self.apiBase)/folders") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
-        let body = try JSONSerialization.data(withJSONObject: ["name": path.lastComponent, "parent": ["id": "0"]])
+        let body = try JSONSerialization.data(withJSONObject: ["name": path.lastComponent, "parent": ["id": boxParentID(for: path)]])
         let response = try await http.data(for: HTTPRequest(url: url, method: .POST, headers: headers, body: body))
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
               let folderID = json["id"] as? String else {
@@ -198,10 +198,10 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func move(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
-        let url = URL(string: "\(Self.apiBase)/files/\(from.path)") ?? URL(fileURLWithPath: "/")
+        let url = URL(string: "\(Self.apiBase)/files/\(boxID(for: from, rootID: ""))") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
-        let body = try JSONSerialization.data(withJSONObject: ["name": to.lastComponent, "parent": ["id": "0"]])
+        let body = try JSONSerialization.data(withJSONObject: ["name": to.lastComponent, "parent": ["id": boxParentID(for: to)]])
         let response = try await http.data(for: HTTPRequest(url: url, method: .PUT, headers: headers, body: body))
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
             throw ProviderError.serverError(statusCode: 0, message: "Box move failed")
@@ -210,10 +210,10 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func copy(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
-        let url = URL(string: "\(Self.apiBase)/files/\(from.path)/copy") ?? URL(fileURLWithPath: "/")
+        let url = URL(string: "\(Self.apiBase)/files/\(boxID(for: from, rootID: ""))/copy") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
-        let body = try JSONSerialization.data(withJSONObject: ["name": to.lastComponent, "parent": ["id": "0"]])
+        let body = try JSONSerialization.data(withJSONObject: ["name": to.lastComponent, "parent": ["id": boxParentID(for: to)]])
         let response = try await http.data(for: HTTPRequest(url: url, method: .POST, headers: headers, body: body))
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
             throw ProviderError.serverError(statusCode: 0, message: "Box copy failed")
@@ -222,7 +222,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func delete(path: CloudPath, account: CloudAccount) async throws {
-        let url = URL(string: "\(Self.apiBase)/files/\(path.path)") ?? URL(fileURLWithPath: "/")
+        let url = URL(string: "\(Self.apiBase)/files/\(boxID(for: path, rootID: ""))") ?? URL(fileURLWithPath: "/")
         _ = try await http.data(for: HTTPRequest(url: url, method: .DELETE, headers: try await authHeaders(account: account)))
     }
 
@@ -238,7 +238,7 @@ public actor BoxProvider: CloudProvider {
     public func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
 
     public func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink {
-        let url = URL(string: "\(Self.apiBase)/shared_links/files/\(path.path)") ?? URL(fileURLWithPath: "/")
+        let url = URL(string: "\(Self.apiBase)/shared_links/files/\(boxID(for: path, rootID: ""))") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
         let shareAccess = options.password == nil ? "open" : "collaborators"
@@ -263,6 +263,15 @@ public actor BoxProvider: CloudProvider {
 
     // MARK: - Private
 
+    private func boxID(for path: CloudPath, rootID: String) -> String {
+        let trimmed = path.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return trimmed.isEmpty ? rootID : trimmed.components(separatedBy: "/").last ?? rootID
+    }
+
+    private func boxParentID(for path: CloudPath) -> String {
+        boxID(for: path.deletingLastComponent, rootID: "0")
+    }
+
     private func authHeaders(account: CloudAccount) async throws -> [String: String] {
         let token = try await refresher.validToken(providerID: id, accountID: account.id)
         return ["Authorization": "Bearer \(token)"]
@@ -275,7 +284,8 @@ public actor BoxProvider: CloudProvider {
         let isDir = type == "folder"
         let size = json["size"] as? Int64 ?? 0
         let etag = json["etag"] as? String
-        return CloudFileItem(id: itemID, name: name, path: basePath.appendingComponent(name),
+        let itemPath = basePath.path == "/" ? CloudPath(itemID) : basePath.appendingComponent(itemID)
+        return CloudFileItem(id: itemID, name: name, path: itemPath,
                               size: isDir ? nil : size, isDirectory: isDir, etag: etag)
     }
 }
