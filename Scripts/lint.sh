@@ -1,7 +1,8 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+repo_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
 cd "$repo_root"
 
 require_tools="${STRATUS_REQUIRE_LINT_TOOLS:-0}"
@@ -21,6 +22,6 @@ else
   missing=1
 fi
 
-if [[ "$missing" -ne 0 && "$require_tools" == "1" ]]; then
+if [ "$missing" -ne 0 ] && [ "$require_tools" = "1" ]; then
   exit 1
 fi
