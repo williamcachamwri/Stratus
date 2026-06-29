@@ -309,10 +309,10 @@ public enum ProviderError: Error, Sendable {
 
 public protocol CloudProvider: Actor, Sendable {
 
-    var id: String { get }
-    var displayName: String { get }
-    var iconName: String { get }
-    var capabilities: ProviderCapabilities { get }
+    nonisolated var id: String { get }
+    nonisolated var displayName: String { get }
+    nonisolated var iconName: String { get }
+    nonisolated var capabilities: ProviderCapabilities { get }
 
     // Authentication
     func authenticate(account: CloudAccount) async throws
@@ -377,7 +377,7 @@ public protocol CloudProvider: Actor, Sendable {
     func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum?
 
     // Delta sync
-    var supportsBlockManifest: Bool { get }
+    nonisolated var supportsBlockManifest: Bool { get }
     func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap?
     func storeBlockManifest(_ manifest: BlockMap, path: CloudPath, account: CloudAccount) async throws
 
