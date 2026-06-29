@@ -200,7 +200,7 @@ public actor SyncEngine {
             let url = try await provider.downloadURL(path: remotePath, account: account, expiresIn: 3600)
             let (data, _) = try await URLSession.shared.data(from: url)
             try data.write(to: localURL)
-        case .keepBoth(let uploadURL, let remotePath, let downloadTo, let conflictCopy):
+        case .keepBoth(let uploadURL, let remotePath, _, let conflictCopy):
             _ = try await uploadEngine.upload(fileURL: uploadURL, destination: remotePath, accountID: pair.accountID, priority: .normal)
             let url = try await provider.downloadURL(path: remotePath, account: account, expiresIn: 3600)
             let (data, _) = try await URLSession.shared.data(from: url)
