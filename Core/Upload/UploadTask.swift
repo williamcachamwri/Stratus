@@ -114,6 +114,33 @@ public enum UploadError: Error, Sendable, Equatable {
     case unknown(String)
 }
 
+extension UploadError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .fileNotFound(let url):
+            return "File not found: \(url.lastPathComponent)"
+        case .fileChanged(let url):
+            return "File changed during upload: \(url.lastPathComponent)"
+        case .chunkExhausted(let chunk, let attempts):
+            return "Chunk \(chunk) failed after \(attempts) attempts"
+        case .checksumMismatch(let expected, let actual):
+            return "Checksum mismatch — expected \(expected.prefix(8))…, got \(actual.prefix(8))…"
+        case .providerError(let msg):
+            return "Provider error: \(msg)"
+        case .networkUnavailable:
+            return "Network unavailable. Check your connection and try again."
+        case .cancelled:
+            return "Upload was cancelled"
+        case .quotaExceeded:
+            return "Storage quota exceeded"
+        case .authenticationFailed:
+            return "Authentication failed. Re-authorize the account."
+        case .unknown(let msg):
+            return msg.isEmpty ? "Unknown upload error" : msg
+        }
+    }
+}
+
 // MARK: - Upload Task
 
 public final class UploadTask: @unchecked Sendable, Identifiable {
