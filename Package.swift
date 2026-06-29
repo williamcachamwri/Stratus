@@ -29,6 +29,7 @@ let package = Package(
             ],
             resources: [
                 .copy("Resources"),
+                .copy("shared"),
             ],
             swiftSettings: [
                 .unsafeFlags(["-strict-concurrency=complete"]),
