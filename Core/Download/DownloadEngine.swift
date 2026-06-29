@@ -341,16 +341,6 @@ public actor DownloadEngine {
         )))
 
         let startTime = Date()
-        var latestProgress = DownloadProgress(
-            totalBytes: fileSize,
-            receivedBytes: 0,
-            segmentsTotal: 0,
-            segmentsCompleted: 0,
-            segmentsInFlight: 0,
-            currentSpeedBPS: 0,
-            estimatedSecondsRemaining: nil
-        )
-
         let downloader = ParallelRangeDownloader(
             provider: provider,
             configuration: configuration.rangeDownloaderConfiguration
@@ -365,7 +355,8 @@ public actor DownloadEngine {
             return Int64(alreadyCompleted.count) * cfg.segmentSize
         }()
 
-        var bytesReceivedAccumulator: Int64 = totalBytesAtStart
+        let segmentSize = configuration.rangeDownloaderConfiguration.segmentSize
+        let segmentsUsed = Int((fileSize + segmentSize - 1) / segmentSize)
 
         do {
             let result = try await downloader.downloadToFile(
@@ -405,15 +396,13 @@ public actor DownloadEngine {
                 totalBytes: fileSize,
                 durationSeconds: duration,
                 averageBPS: duration > 0 ? Double(fileSize) / duration : 0,
-                segmentsUsed: latestProgress.segmentsTotal,
+                segmentsUsed: segmentsUsed,
                 localURL: task.destinationURL,
                 checksumVerified: false   // post-download verification is a caller responsibility
             )
-            _ = bytesReceivedAccumulator  // silence unused-variable warning
-            _ = latestProgress
 
             await finishTask(task, with: .success(summary))
-        } catch let dlErr as DownloadError {
+        } catch let dlErr {
             if task.retryCount < configuration.maxTaskRetries, isRetryable(dlErr) {
                 task.incrementRetry()
                 try? await resumeStore.incrementRetryCount(sessionID: taskID.uuidString)
