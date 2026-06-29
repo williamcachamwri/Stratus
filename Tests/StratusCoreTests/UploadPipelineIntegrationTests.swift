@@ -29,7 +29,8 @@ private actor IntegrationMockProvider: CloudProvider {
     private var chunkStorage: [String: [Int: Data]] = [:]   // uploadID → partNum(1-based) → data
     private var uploadPaths: [String: String] = [:]          // uploadID → remote path
     private var assembledChecksums: [String: String] = [:]   // remote path → SHA-256 hex
-    private(set) var chunksReceived: [String: Set<Int>] = [:] // uploadID → chunk numbers uploaded
+    private(set) var chunksReceived: [String: Set<Int>] = [:] // uploadID → chunk numbers available
+    private var uploadCallsBySession: [String: [Int]] = [:]
     private(set) var multipartSessionsStarted = 0
     private(set) var smallFileUploads = 0
     private(set) var completeCalls = 0
@@ -68,9 +69,20 @@ private actor IntegrationMockProvider: CloudProvider {
         return uploadID
     }
 
+    func seedMultipartSession(uploadID: String, remotePath: CloudPath, chunkNumber: Int, data: Data, etag: String) {
+        chunkStorage[uploadID, default: [:]][chunkNumber] = data
+        uploadPaths[uploadID] = remotePath.path
+        chunksReceived[uploadID, default: []].insert(chunkNumber)
+    }
+
+    func uploadedChunkNumbers(uploadID: String) -> [Int] {
+        uploadCallsBySession[uploadID] ?? []
+    }
+
     func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
         chunkStorage[uploadID, default: [:]][chunkNumber] = data
         chunksReceived[uploadID, default: []].insert(chunkNumber)
+        uploadCallsBySession[uploadID, default: []].append(chunkNumber)
         let checksum = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         return ChunkUploadResult(etag: "etag-\(chunkNumber)", checksum: checksum, serverConfirmedChecksum: true)
     }
@@ -357,45 +369,46 @@ final class UploadPipelineIntegrationTests: XCTestCase {
     // MARK: - Test: Resume skips already-completed chunks
 
     func test_resume_skipsCompletedChunks() async throws {
-        let size = 6 * 1024 * 1024  // 6 MB
+        let size = 20 * 1024 * 1024
         let url = try makeFileURL(size: size, name: "resume.bin")
         let task = try await makeTask(fileURL: url)
 
-        // Simulate a prior interrupted session: pre-save chunk 1 as completed
-        let fakeUploadID = "fake-upload-id-\(task.id.uuidString)"
-        let chunkSize = 2 * 1024 * 1024
+        let uploadID = "resume-upload-id-\(task.id.uuidString)"
+        let chunkSize = ChunkSlicer.defaultChunkSize(for: Int64(size))
         let totalChunks = Int(ceil(Double(size) / Double(chunkSize)))
+        let firstChunk = try Data(contentsOf: url).prefix(chunkSize)
+        await provider.seedMultipartSession(
+            uploadID: uploadID,
+            remotePath: task.destinationPath,
+            chunkNumber: 1,
+            data: Data(firstChunk),
+            etag: "etag-1"
+        )
+
         let priorSession = UploadSession(
             id: task.id.uuidString,
             fileURLString: url.path,
             providerID: provider.id,
             accountID: account.id,
             remotePath: task.destinationPath.path,
-            uploadID: fakeUploadID,
+            uploadID: uploadID,
             fileSize: Int64(size),
             fileChecksum: task.localChecksum,
             chunkSize: chunkSize,
             totalChunks: totalChunks,
-            completedChunks: [0],  // chunk 0 already done
+            completedChunks: [0],
             etags: [0: "etag-1"]
         )
         try await ResumeStore.shared.saveSession(priorSession)
 
-        // Prime the mock with the fake uploadID so it accepts the remaining chunks
-        // (The mock won't have this uploadID; ChunkEngine will use the persisted one)
-        // Just run the upload — ChunkEngine should resume from the stored session
-        do {
-            _ = try await runUpload(task: task)
-        } catch {
-            // May fail because mock doesn't know about the pre-seeded uploadID
-            // That's acceptable — the key is that ResumeStore was consulted
-        }
+        let result = try await runUpload(task: task)
 
-        // Verify ResumeStore was consulted (session existed at start)
-        let loaded = try await ResumeStore.shared.loadSession(task.id.uuidString)
-        // After runUpload, session is deleted on success or may remain on failure
-        // The important invariant: session was seeded with completedChunks=[0]
-        _ = loaded  // just ensure it compiles; runtime test above
+        XCTAssertEqual(result.chunkCount, totalChunks)
+        let uploadedChunks = await provider.uploadedChunkNumbers(uploadID: uploadID)
+        XCTAssertFalse(uploadedChunks.contains(1), "Resume must not re-upload a completed chunk")
+        XCTAssertTrue(uploadedChunks.contains(2), "Resume must upload the first missing chunk")
+        XCTAssertTrue(uploadedChunks.contains(3), "Resume must upload the final missing chunk")
+        XCTAssertNil(try await ResumeStore.shared.loadSession(task.id.uuidString))
     }
 
     // MARK: - Test: ResumeStore checkpoint written per chunk
