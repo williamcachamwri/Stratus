@@ -136,6 +136,7 @@ public final class AppEnvironment: ObservableObject {
     let syncScheduler = SyncScheduler.shared
     let providerRegistry = CloudProviderRegistry.shared
     let appUpdater = AppUpdater.shared
+    let vfsMount = VFSMount.shared
 
     private let accountStore = AccountStore.shared
     private let providerConfigStore = ProviderAccountConfigStore.shared
@@ -154,6 +155,7 @@ public final class AppEnvironment: ObservableObject {
     @Published public var downloadSummary: DownloadDashboardSummary = .empty
     @Published public var isOnline: Bool = true
     @Published public var activeUploads: Int = 0
+    @Published public var mountRows: [MountRow] = []
 
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "AppEnvironment")
     private var uploadEventTask: Task<Void, Never>?
@@ -187,6 +189,8 @@ public final class AppEnvironment: ObservableObject {
                 let config = try await providerConfigStore.load(accountID: account.id)
                 await registerProvider(for: account, config: config)
             }
+            await vfsMount.reloadMountedDomains(accounts: persistedAccounts)
+            await refreshMountRows()
         } catch {
             logger.error("Failed to load persisted accounts: \(error.localizedDescription)")
         }
@@ -591,6 +595,8 @@ public final class AppEnvironment: ObservableObject {
                     try await providerConfigStore.save(config)
                 }
                 await registerProvider(for: account, config: config)
+                try? await vfsMount.mount(account: account)
+                await refreshMountRows()
                 logger.info("Added persisted account: \(account.displayName)")
             } catch {
                 logger.error("Failed to persist account \(account.id): \(error.localizedDescription)")
@@ -602,6 +608,8 @@ public final class AppEnvironment: ObservableObject {
         accounts.removeAll { $0.id == account.id }
         Task { [weak self] in
             do {
+                try? await self?.vfsMount.unmount(account: account)
+                await self?.refreshMountRows()
                 try await self?.credentialVault.deleteAllCredentials(for: account)
                 try await self?.providerConfigStore.delete(accountID: account.id)
                 try await self?.accountStore.delete(id: account.id)
@@ -623,6 +631,46 @@ public final class AppEnvironment: ObservableObject {
         await syncEngine.removePair(id: id)
     }
 
+    // MARK: - Finder Mounts
+
+    public func mountAccount(_ account: CloudAccount) async {
+        do {
+            try await vfsMount.mount(account: account)
+            await refreshMountRows()
+        } catch {
+            logger.error("Failed to mount account \(account.id): \(error.localizedDescription)")
+            await refreshMountRows()
+        }
+    }
+
+    public func unmountAccount(_ account: CloudAccount) async {
+        do {
+            try await vfsMount.unmount(account: account)
+            await refreshMountRows()
+        } catch {
+            logger.error("Failed to unmount account \(account.id): \(error.localizedDescription)")
+            await refreshMountRows()
+        }
+    }
+
+    public func refreshMountRows() async {
+        let snapshots = await vfsMount.snapshots()
+        mountRows = snapshots.map { snapshot in
+            MountRow(
+                id: snapshot.id,
+                accountID: snapshot.accountID,
+                accountName: snapshot.finderDisplayName,
+                providerID: snapshot.providerID,
+                mountPath: "Finder Locations",
+                status: MountRow.Status(snapshot.status),
+                statusMessage: snapshot.statusMessage,
+                quotaUsed: 0,
+                quotaTotal: nil,
+                cacheUsed: 0
+            )
+        }
+    }
+
     // MARK: - Provider Registration
 
     private func registerProvider(for account: CloudAccount, config: ProviderAccountConfig?) async {
@@ -638,81 +686,7 @@ public final class AppEnvironment: ObservableObject {
     }
 
     private func makeProvider(for account: CloudAccount, config: ProviderAccountConfig?) async -> (any CloudProvider)? {
-        switch account.providerID {
-        case "s3", "wasabi", "backblaze_b2", "cloudflare_r2":
-            guard let config, let bucket = config.bucket, !bucket.isEmpty else { return nil }
-            let endpoint = config.endpointURL.flatMap(URL.init(string:))
-            let s3Config = S3Configuration(
-                endpoint: endpoint,
-                region: config.region ?? "us-east-1",
-                bucket: bucket,
-                useTransferAcceleration: config.useTransferAcceleration,
-                usePathStyleURL: config.usePathStyleURL
-            )
-            return S3Provider(
-                id: account.providerID,
-                displayName: providerName(for: account.providerID),
-                iconName: account.providerID,
-                config: s3Config
-            )
-
-        case "gdrive":
-            return GoogleDriveProvider()
-        case "dropbox":
-            return DropboxProvider()
-        case "onedrive":
-            return OneDriveProvider()
-        case "box":
-            return BoxProvider()
-
-        case "sftp":
-            guard
-                let config,
-                let host = config.host,
-                let username = config.username,
-                let basic = try? await credentialVault.loadBasicCredential(providerID: account.providerID, accountID: account.id)
-            else { return nil }
-            let provider = SFTPProvider()
-            await provider.registerConnection(
-                SFTPProvider.ConnectionInfo(
-                    host: host,
-                    port: config.port ?? 22,
-                    username: username,
-                    authMethod: .password(basic.password)
-                ),
-                accountID: account.id
-            )
-            return provider
-
-        case "webdav":
-            guard let urlString = config?.endpointURL, let url = URL(string: urlString) else { return nil }
-            let provider = WebDAVProvider()
-            await provider.registerBaseURL(url, accountID: account.id)
-            return provider
-
-        case "ftp":
-            guard
-                let config,
-                let host = config.host,
-                let basic = try? await credentialVault.loadBasicCredential(providerID: account.providerID, accountID: account.id)
-            else { return nil }
-            let provider = FTPProvider()
-            await provider.registerConfig(
-                FTPProvider.FTPConfig(
-                    host: host,
-                    port: config.port ?? 21,
-                    usesTLS: config.useTLS,
-                    username: basic.username,
-                    password: basic.password,
-                    basePath: config.basePath ?? "/"
-                ),
-                accountID: account.id
-            )
-            return provider
-
-        default:
-            return nil
-        }
+        await CloudProviderFactory.makeProvider(for: account, config: config, credentialVault: credentialVault)
     }
 
     private func providerName(for providerID: String) -> String {
