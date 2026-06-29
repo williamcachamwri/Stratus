@@ -36,8 +36,11 @@ public actor UploadScheduler {
         notifySlotAvailable()
     }
 
-    public func reprioritize(taskID: UUID, to priority: TaskPriority) async {
-        _ = await queue.reprioritize(taskID: taskID, to: priority)
+    @discardableResult
+    public func reprioritize(taskID: UUID, to priority: TaskPriority) async -> Bool {
+        let changed = await queue.reprioritize(taskID: taskID, to: priority)
+        if changed { notifySlotAvailable() }
+        return changed
     }
 
     public func setMaxConcurrentFiles(_ n: Int) {
