@@ -8,23 +8,12 @@ final class ResumeStoreTests: XCTestCase {
     private var store: ResumeStore!
 
     override func setUp() async throws {
-        db = try await AppDatabase.makeInMemory()
-        store = ResumeStore(database: db)
+        db = try AppDatabase.makeInMemory()
+        store = ResumeStore(db: db)
     }
 
     func test_saveAndLoadSession() async throws {
-        let session = UploadSession(
-            id: "test-session-001",
-            fileURL: URL(fileURLWithPath: "/tmp/test.bin"),
-            remotePath: CloudPath("/remote/test.bin"),
-            accountID: "account1",
-            totalSize: 100_000_000,
-            chunkSize: 5_000_000,
-            providerID: "s3",
-            uploadID: "mpu-abc123",
-            completedChunks: [],
-            etags: [:]
-        )
+        let session = makeSession(id: "test-session-001", uploadID: "mpu-abc123")
         try await store.saveSession(session)
         let pending = try await store.loadPendingSessions()
         XCTAssertEqual(pending.count, 1)
@@ -33,18 +22,7 @@ final class ResumeStoreTests: XCTestCase {
     }
 
     func test_markChunkComplete_updatesCompletedList() async throws {
-        let session = UploadSession(
-            id: "test-session-002",
-            fileURL: URL(fileURLWithPath: "/tmp/test2.bin"),
-            remotePath: CloudPath("/remote/test2.bin"),
-            accountID: "account1",
-            totalSize: 20_000_000,
-            chunkSize: 5_000_000,
-            providerID: "s3",
-            uploadID: "mpu-xyz",
-            completedChunks: [],
-            etags: [:]
-        )
+        let session = makeSession(id: "test-session-002", uploadID: "mpu-xyz")
         try await store.saveSession(session)
         try await store.markChunkComplete(sessionID: "test-session-002", chunk: 0, etag: "etag0")
         try await store.markChunkComplete(sessionID: "test-session-002", chunk: 1, etag: "etag1")
@@ -57,18 +35,7 @@ final class ResumeStoreTests: XCTestCase {
     }
 
     func test_deleteSession_removesFromPending() async throws {
-        let session = UploadSession(
-            id: "test-session-003",
-            fileURL: URL(fileURLWithPath: "/tmp/test3.bin"),
-            remotePath: CloudPath("/remote/test3.bin"),
-            accountID: "account1",
-            totalSize: 5_000_000,
-            chunkSize: 5_000_000,
-            providerID: "s3",
-            uploadID: "mpu-del",
-            completedChunks: [],
-            etags: [:]
-        )
+        let session = makeSession(id: "test-session-003", uploadID: "mpu-del")
         try await store.saveSession(session)
         try await store.deleteSession("test-session-003")
         let pending = try await store.loadPendingSessions()
@@ -77,21 +44,24 @@ final class ResumeStoreTests: XCTestCase {
 
     func test_multipleSessionsCoexist() async throws {
         for i in 0..<5 {
-            let session = UploadSession(
-                id: "multi-session-\(i)",
-                fileURL: URL(fileURLWithPath: "/tmp/multi\(i).bin"),
-                remotePath: CloudPath("/remote/multi\(i).bin"),
-                accountID: "acct",
-                totalSize: 10_000_000,
-                chunkSize: 5_000_000,
-                providerID: "gdrive",
-                uploadID: "mpu-\(i)",
-                completedChunks: [],
-                etags: [:]
-            )
-            try await store.saveSession(session)
+            try await store.saveSession(makeSession(id: "multi-session-\(i)", uploadID: "mpu-\(i)"))
         }
         let pending = try await store.loadPendingSessions()
         XCTAssertEqual(pending.filter { $0.id.hasPrefix("multi-session-") }.count, 5)
+    }
+
+    private func makeSession(id: String, uploadID: String) -> UploadSession {
+        UploadSession(
+            id: id,
+            fileURLString: "/tmp/test.bin",
+            providerID: "s3",
+            accountID: "account1",
+            remotePath: "/remote/test.bin",
+            uploadID: uploadID,
+            fileSize: 100_000_000,
+            fileChecksum: "abc",
+            chunkSize: 5_000_000,
+            totalChunks: 20
+        )
     }
 }
