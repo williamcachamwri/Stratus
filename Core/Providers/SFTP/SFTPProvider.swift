@@ -34,6 +34,13 @@ public actor SFTPProvider: CloudProvider {
             case password(String)
             case privateKey(Data, passphrase: String?)
         }
+
+        public init(host: String, port: Int = 22, username: String, authMethod: AuthMethod) {
+            self.host = host
+            self.port = port
+            self.username = username
+            self.authMethod = authMethod
+        }
     }
 
     private var connectionInfos: [String: ConnectionInfo] = [:]
