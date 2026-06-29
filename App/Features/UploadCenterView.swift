@@ -1,4 +1,5 @@
 import SwiftUI
+import StratusCore
 
 struct UploadCenterView: View {
     @EnvironmentObject private var env: AppEnvironment
