@@ -62,4 +62,34 @@ final class ChecksumEngineTests: XCTestCase {
         XCTAssertTrue(etag.hasSuffix("-2"))
         XCTAssertFalse(etag.isEmpty)
     }
+
+    func test_sha256_emptyData_knownHash() async {
+        let hash = await engine.sha256(of: Data())
+        XCTAssertEqual(hash, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+    }
+
+    func test_sha256_sameDataProducesSameHash() async {
+        let data = Data(repeating: 0xAB, count: 1024)
+        let h1 = await engine.sha256(of: data)
+        let h2 = await engine.sha256(of: data)
+        XCTAssertEqual(h1, h2)
+    }
+
+    func test_crc32c_knownVector_matchesStandard() async {
+        // Standard CRC32C check value for ASCII "123456789" is 0xE3069283
+        let data = "123456789".data(using: .utf8)!
+        let result = await engine.crc32c(of: data)
+        XCTAssertEqual(result, 0xE3069283)
+    }
+
+    func test_sha256Batch_returnsHashForEachURL() async throws {
+        let u1 = tempDir.appendingPathComponent("b1.bin")
+        let u2 = tempDir.appendingPathComponent("b2.bin")
+        try Data(repeating: 0x11, count: 1024).write(to: u1)
+        try Data(repeating: 0x22, count: 2048).write(to: u2)
+        let hashes = try await engine.sha256Batch(urls: [u1, u2])
+        XCTAssertEqual(hashes.count, 2)
+        XCTAssertEqual(hashes[u1]?.count, 64, "SHA-256 hex string must be 64 chars")
+        XCTAssertNotEqual(hashes[u1], hashes[u2], "Different files must produce different hashes")
+    }
 }
