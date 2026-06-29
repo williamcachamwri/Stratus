@@ -2,11 +2,16 @@ import SwiftUI
 import StratusCore
 
 public struct ProviderPickerView: View {
-    public let providers: [ProviderChoice]
+    @ObservedObject private var catalog = ProviderDefinitionCatalog.shared
+    public let providers: [ProviderChoice]?
     public var onSelect: (ProviderChoice) -> Void
 
+    private var visibleProviders: [ProviderChoice] {
+        providers ?? catalog.providerChoices()
+    }
+
     public init(
-        providers: [ProviderChoice] = ProviderChoice.builtIn,
+        providers: [ProviderChoice]? = nil,
         onSelect: @escaping (ProviderChoice) -> Void = { _ in }
     ) {
         self.providers = providers
@@ -18,18 +23,26 @@ public struct ProviderPickerView: View {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("Connect a Cloud Account")
                     .font(.stratusTitle)
-                Text("Choose a provider. Stratus will show only capabilities supported by that backend.")
+                Text("Providers are loaded from ProviderDefinitions.json so the onboarding UI matches the real backend capabilities.")
                     .stratusCaption()
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: Spacing.md)], spacing: Spacing.md) {
-                ForEach(providers) { provider in
-                    Button {
-                        onSelect(provider)
-                    } label: {
-                        ProviderChoiceCard(provider: provider)
+            if visibleProviders.isEmpty {
+                EmptyStateView(
+                    icon: "externaldrive.badge.questionmark",
+                    title: "No Provider Definitions",
+                    subtitle: "ProviderDefinitions.json was not found in the app bundle or repository Resources folder."
+                )
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: Spacing.md)], spacing: Spacing.md) {
+                    ForEach(visibleProviders) { provider in
+                        Button {
+                            onSelect(provider)
+                        } label: {
+                            ProviderChoiceCard(provider: provider)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -58,15 +71,6 @@ public struct ProviderChoice: Identifiable, Equatable, Sendable {
         self.supportsParallelChunks = supportsParallelChunks
         self.supportsMounting = supportsMounting
     }
-
-    public static let builtIn: [ProviderChoice] = [
-        ProviderChoice(id: "s3", title: "Amazon S3", subtitle: "Multipart, transfer acceleration, S3-compatible endpoints", supportsParallelChunks: true, supportsMounting: true),
-        ProviderChoice(id: "gdrive", title: "Google Drive", subtitle: "Resumable upload sessions and Drive metadata", supportsParallelChunks: false, supportsMounting: true),
-        ProviderChoice(id: "dropbox", title: "Dropbox", subtitle: "Sequential upload sessions with strong resume support", supportsParallelChunks: false, supportsMounting: true),
-        ProviderChoice(id: "onedrive", title: "OneDrive", subtitle: "Large file upload sessions and delta queries", supportsParallelChunks: false, supportsMounting: true),
-        ProviderChoice(id: "sftp", title: "SFTP", subtitle: "Parallel channels with SSH keychain storage", supportsParallelChunks: true, supportsMounting: true),
-        ProviderChoice(id: "webdav", title: "WebDAV", subtitle: "Basic, Digest, and OAuth-backed endpoints", supportsParallelChunks: false, supportsMounting: true),
-    ]
 }
 
 private struct ProviderChoiceCard: View {
