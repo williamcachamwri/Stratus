@@ -12,7 +12,9 @@ public actor OneDriveAuth {
 
     public func authorize(clientID: String, context: ASWebAuthenticationPresentationContextProviding) async throws -> OAuthCredential {
         let (verifier, challenge) = generatePKCE()
-        var comps = URLComponents(string: Self.authURL)!
+        guard var comps = URLComponents(string: Self.authURL) else {
+            throw AuthError.pkceGenerationFailed
+        }
         comps.queryItems = [
             URLQueryItem(name: "client_id", value: clientID),
             URLQueryItem(name: "response_type", value: "code"),
@@ -22,8 +24,9 @@ public actor OneDriveAuth {
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "response_mode", value: "query"),
         ]
+        guard let authURL = comps.url else { throw AuthError.pkceGenerationFailed }
         let callbackURL = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, any Error>) in
-            let session = ASWebAuthenticationSession(url: comps.url!, callbackURLScheme: "com.stratus.cloudmanager") { url, error in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "com.stratus.cloudmanager") { url, error in
                 if let error { cont.resume(throwing: error) }
                 else if let url { cont.resume(returning: url) }
                 else { cont.resume(throwing: AuthError.cancelled) }
@@ -35,7 +38,7 @@ public actor OneDriveAuth {
         guard let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "code" })?.value else {
             throw AuthError.noAuthorizationCode
         }
-        var request = URLRequest(url: URL(string: Self.tokenURL)!)
+        var request = URLRequest(url: URL(string: Self.tokenURL) ?? URL(fileURLWithPath: "/"))
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = "client_id=\(clientID)&redirect_uri=\(Self.redirectURI)&grant_type=authorization_code&code=\(code)&code_verifier=\(verifier)&scope=\(Self.scope)"
