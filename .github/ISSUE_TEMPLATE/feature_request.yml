@@ -1,0 +1,84 @@
+name: Feature request
+description: Suggest a production feature for Stratus
+title: "feat: "
+labels: [enhancement, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests should explain the real user workflow, not just the UI control to add.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options:
+        - Upload engine
+        - Download engine
+        - File Provider / Finder mount
+        - Cloud provider
+        - Sync manager
+        - Client-side encryption
+        - Accounts / authentication
+        - Preferences
+        - Menu bar
+        - Diagnostics
+        - Packaging / release
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider type if relevant
+      options:
+        - Not provider-specific
+        - Amazon S3
+        - S3-compatible / MinIO / Ceph
+        - Wasabi
+        - Backblaze B2
+        - Cloudflare R2
+        - Google Drive
+        - Dropbox
+        - OneDrive
+        - Box
+        - iCloud Drive
+        - SFTP
+        - WebDAV
+        - FTP / FTPS
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user pain or production gap does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include expected controls, data shown, error states, and edge cases.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: test-cases
+    attributes:
+      label: Acceptance test cases
+      placeholder: |
+        - Given ..., when ..., then ...
+        - Failure case: ...
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submit checklist
+      options:
+        - label: This request does not require committing secrets or private certificates.
+          required: true
+        - label: I searched existing issues and discussions.
+          required: true
