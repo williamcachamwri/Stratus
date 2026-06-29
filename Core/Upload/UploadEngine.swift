@@ -62,7 +62,7 @@ public actor UploadEngine {
             logger.info("Restored \(sessions.count) interrupted upload sessions")
             // Re-queue pending sessions (they will resume from saved chunk state)
             for session in sessions {
-                if let account = accounts[session.accountID] {
+                if accounts[session.accountID] != nil {
                     do {
                         let sourceURL = try resumeStore.resolvedFileURL(for: session)
                         let task = UploadTask(
@@ -280,6 +280,9 @@ public actor UploadEngine {
             }
 
             // Execute upload
+            let engineBandwidthMonitor = bandwidthMonitor
+            let engineCongestionController = congestionController
+            let engineLogger = logger
             let uploadTask = Task { [weak self] in
                 let chunkEngine = ChunkEngine()
                 do {
@@ -287,8 +290,8 @@ public actor UploadEngine {
                         task: task,
                         provider: provider,
                         account: account,
-                        bandwidthMonitor: await self?.bandwidthMonitor ?? BandwidthMonitor(),
-                        congestionController: await self?.congestionController ?? CongestionController(),
+                        bandwidthMonitor: engineBandwidthMonitor,
+                        congestionController: engineCongestionController,
                         progressStream: progressContinuation
                     )
                     progressContinuation.finish()
@@ -296,7 +299,7 @@ public actor UploadEngine {
                     await self?.removeActiveUploadTask(forKey: taskID)
                     await self?.scheduler.markComplete(taskID: taskID)
                     await self?.emit(.taskCompleted(task, result))
-                    await self?.logger.info("Completed \(task.sourceURL.lastPathComponent) — \(result.bytesUploaded) bytes in \(String(format: "%.1f", result.durationSeconds))s")
+                    engineLogger.info("Completed \(task.sourceURL.lastPathComponent) — \(result.bytesUploaded) bytes in \(String(format: "%.1f", result.durationSeconds))s")
                 } catch UploadError.cancelled {
                     progressContinuation.finish()
                     await self?.removeProgressStream(forKey: taskID)
@@ -311,7 +314,7 @@ public actor UploadEngine {
                     await self?.scheduler.markFailed(taskID: taskID)
                     let uploadError = error as? UploadError ?? .unknown(error.localizedDescription)
                     await self?.emit(.taskFailed(task, uploadError))
-                    await self?.logger.error("Failed \(task.sourceURL.lastPathComponent): \(error)")
+                    engineLogger.error("Failed \(task.sourceURL.lastPathComponent): \(error)")
                 }
             }
             activeUploadTasks[taskID] = uploadTask
