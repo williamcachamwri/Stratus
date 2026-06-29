@@ -46,8 +46,20 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                     } else {
                         ForEach(env.accounts, id: \.id) { account in
-                            Label(account.displayName, systemImage: "cloud")
-                                .foregroundColor(.primary)
+                            HStack(spacing: Spacing.sm) {
+                                ProviderIcon(providerID: account.providerID, size: 16)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(account.email ?? account.displayName)
+                                        .font(.stratusBody)
+                                        .lineLimit(1)
+                                    if account.email != nil {
+                                        Text(account.displayName)
+                                            .font(.caption2)
+                                            .foregroundColor(.textSecondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -59,10 +71,22 @@ struct ContentView: View {
                 }
 
                 Section("Transfers") {
-                    Label("\(env.uploadSummary.activeCount) uploading", systemImage: "arrow.up.circle")
-                    Label("\(env.downloadSummary.activeCount) downloading", systemImage: "arrow.down.circle")
-                    Label("\(env.uploadSummary.queuedCount + env.downloadSummary.queuedCount) queued", systemImage: "clock")
-                    Label("\(env.uploadSummary.failedCount + env.downloadSummary.failedCount) failed", systemImage: "exclamationmark.triangle")
+                    Button { selectedTab = .uploads } label: {
+                        Label("\(env.uploadSummary.activeCount) uploading", systemImage: "arrow.up.circle")
+                    }
+                    .buttonStyle(.plain)
+                    Button { selectedTab = .downloads } label: {
+                        Label("\(env.downloadSummary.activeCount) downloading", systemImage: "arrow.down.circle")
+                    }
+                    .buttonStyle(.plain)
+                    Button { selectedTab = .uploads } label: {
+                        Label("\(env.uploadSummary.queuedCount + env.downloadSummary.queuedCount) queued", systemImage: "clock")
+                    }
+                    .buttonStyle(.plain)
+                    Button { selectedTab = .uploads } label: {
+                        Label("\(env.uploadSummary.failedCount + env.downloadSummary.failedCount) failed", systemImage: "exclamationmark.triangle")
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 Section("Sync Pairs") {
