@@ -93,6 +93,11 @@ public actor UploadScheduler {
         notifySlotAvailable()
     }
 
+    public func markPaused(taskID: UUID) {
+        activeTasks.removeValue(forKey: taskID)
+        notifySlotAvailable()
+    }
+
     public func markFailed(taskID: UUID) {
         activeTasks.removeValue(forKey: taskID)
         notifySlotAvailable()
