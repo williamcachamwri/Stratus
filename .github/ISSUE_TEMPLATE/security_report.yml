@@ -1,0 +1,72 @@
+name: Security report
+description: Report a non-sensitive security hardening issue publicly
+title: "security: "
+labels: [security, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste live credentials, tokens, private keys, exploit payloads against third-party services, or user data. Use GitHub private security advisories for sensitive vulnerabilities.
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Authentication / OAuth
+        - Keychain / credential storage
+        - Client-side encryption
+        - Transport security / TLS
+        - Sandbox / entitlements
+        - File Provider permissions
+        - Update signing / Sparkle
+        - Dependency / supply chain
+        - Logging / diagnostics privacy
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: Stratus version or commit
+      placeholder: v0.1.0 / git SHA
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: High-level description without sensitive exploit details.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Estimated severity
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What data, capability, or trust boundary could be affected?
+    validations:
+      required: true
+  - type: textarea
+    id: remediation
+    attributes:
+      label: Suggested remediation
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Safety checklist
+      options:
+        - label: I did not include secrets, tokens, private keys, or personal data.
+          required: true
+        - label: This is safe to discuss publicly; otherwise I will use a private security advisory.
+          required: true
