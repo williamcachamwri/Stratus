@@ -305,6 +305,37 @@ public enum ProviderError: Error, Sendable {
     case providerSpecific(code: String, message: String)
 }
 
+extension ProviderError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .accessDenied(let msg):
+            return "Access denied: \(msg)"
+        case .fileNotFound(let path):
+            return "File not found: \(path.lastComponent)"
+        case .sessionExpired:
+            return "Session expired. Please re-authorize the account."
+        case .quotaExceeded:
+            return "Storage quota exceeded"
+        case .networkUnavailable:
+            return "Network unavailable. Check your connection."
+        case .rateLimited(let retryAfter):
+            return "Rate limited — retry in \(Int(retryAfter))s"
+        case .serverError(let code, let msg):
+            return "Server error \(code): \(msg)"
+        case .checksumMismatch(let expected, let actual):
+            return "Checksum mismatch — expected \(expected.prefix(8))…, got \(actual.prefix(8))…"
+        case .unsupportedOperation(let op):
+            return "Unsupported operation: \(op)"
+        case .authenticationFailed(let msg):
+            return "Authentication failed: \(msg)"
+        case .invalidResponse(let msg):
+            return "Invalid response: \(msg)"
+        case .providerSpecific(let code, let msg):
+            return "Provider error \(code): \(msg)"
+        }
+    }
+}
+
 // MARK: - CloudProvider Protocol
 
 public protocol CloudProvider: Actor, Sendable {
