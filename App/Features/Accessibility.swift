@@ -86,7 +86,7 @@ public struct FocusRestoringList<Data: RandomAccessCollection, Content: View>: V
         List(data, selection: $selection, rowContent: content)
             .onChange(of: data.count) { _, newCount in
                 // If selection is no longer valid after reload, clear it
-                if let sel = selection, !data.contains(where: { $0.id == sel as? Data.Element.ID }) {
+                if let sel = selection, !data.contains(where: { $0.id == sel }) {
                     selection = nil
                 }
             }
