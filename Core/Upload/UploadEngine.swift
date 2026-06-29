@@ -37,6 +37,7 @@ public actor UploadEngine {
     private var runLoopTask: Task<Void, Never>?
     private var progressStreams: [UUID: AsyncStream<ChunkProgress>.Continuation] = [:]
     private var activeUploadTasks: [UUID: Task<Void, Never>] = [:]
+    private var pausedQueuedTasks: [UUID: UploadTask] = [:]
 
     private init() {}
 
@@ -72,8 +73,9 @@ public actor UploadEngine {
                             providerID: session.providerID,
                             fileSize: session.fileSize,
                             localChecksum: session.fileChecksum,
-                            state: .paused(resumeToken: session.uploadID)
+                            state: .queued(priority: .normal)
                         )
+                        task.setUploadID(session.uploadID ?? "")
                         await scheduler.enqueue(task, priority: .normal)
                     } catch {
                         try? await resumeStore.updateSessionState(session.id, state: "failed", error: "Could not resolve security-scoped bookmark: \(error)")
@@ -129,15 +131,29 @@ public actor UploadEngine {
     }
 
     public func pause(taskID: UUID) async {
-        activeUploadTasks[taskID]?.cancel()
-        if let task = await scheduler.allTasks.first(where: { $0.id == taskID }) {
-            task.transition(to: .paused(resumeToken: task.uploadID))
+        if let activeTask = activeUploadTasks[taskID] {
+            activeTask.cancel()
+            try? await resumeStore.updateSessionState(taskID.uuidString, state: "paused")
+            emit(.taskPaused(taskID))
+            return
         }
-        try? await resumeStore.updateSessionState(taskID.uuidString, state: "paused")
-        emit(.taskPaused(taskID))
+
+        if let queuedTask = await scheduler.takeQueuedTask(taskID: taskID) {
+            queuedTask.transition(to: .paused(resumeToken: queuedTask.uploadID))
+            pausedQueuedTasks[taskID] = queuedTask
+            try? await resumeStore.updateSessionState(taskID.uuidString, state: "paused")
+            emit(.taskPaused(taskID))
+        }
     }
 
     public func resume(taskID: UUID) async {
+        if let pausedTask = pausedQueuedTasks.removeValue(forKey: taskID) {
+            pausedTask.transition(to: .queued(priority: pausedTask.priority))
+            await scheduler.enqueue(pausedTask, priority: pausedTask.priority)
+            emit(.taskResumed(taskID))
+            return
+        }
+
         if let inMemoryTask = await scheduler.allTasks.first(where: { $0.id == taskID }) {
             inMemoryTask.transition(to: .queued(priority: inMemoryTask.priority))
             await scheduler.enqueue(inMemoryTask, priority: inMemoryTask.priority)
@@ -161,7 +177,7 @@ public actor UploadEngine {
                 fileSize: session.fileSize,
                 localChecksum: session.fileChecksum,
                 priority: .normal,
-                state: .paused(resumeToken: session.uploadID)
+                state: .queued(priority: .normal)
             )
             task.setUploadID(session.uploadID ?? "")
             await scheduler.enqueue(task, priority: task.priority)
@@ -186,6 +202,7 @@ public actor UploadEngine {
         activeUploadTasks.removeValue(forKey: taskID)
         progressStreams[taskID]?.finish()
         progressStreams.removeValue(forKey: taskID)
+        pausedQueuedTasks.removeValue(forKey: taskID)
         await scheduler.dequeue(taskID: taskID)
         try? await resumeStore.updateSessionState(taskID.uuidString, state: "cancelled")
         emit(.taskCancelled(taskID))
@@ -284,7 +301,7 @@ public actor UploadEngine {
                     progressContinuation.finish()
                     await self?.removeProgressStream(forKey: taskID)
                     await self?.removeActiveUploadTask(forKey: taskID)
-                    await self?.scheduler.markFailed(taskID: taskID)
+                    await self?.scheduler.markPaused(taskID: taskID)
                     task.transition(to: .paused(resumeToken: task.uploadID))
                     await self?.emit(.taskPaused(taskID))
                 } catch {
