@@ -9,6 +9,7 @@ struct ContentView: View {
     enum AppTab: String, CaseIterable, Identifiable {
         case accounts  = "Accounts"
         case uploads   = "Uploads"
+        case downloads = "Downloads"
         case sync      = "Sync"
         case browse    = "Files"
         case prefs     = "Preferences"
@@ -19,6 +20,7 @@ struct ContentView: View {
             switch self {
             case .accounts: return "person.crop.circle.badge.plus"
             case .uploads:  return "arrow.up.circle"
+            case .downloads: return "arrow.down.circle"
             case .sync:     return "arrow.triangle.2.circlepath"
             case .browse:   return "folder"
             case .prefs:    return "gearshape"
@@ -50,8 +52,9 @@ struct ContentView: View {
 
                 Section("Transfers") {
                     Label("\(env.uploadSummary.activeCount) uploading", systemImage: "arrow.up.circle")
-                    Label("\(env.uploadSummary.queuedCount) queued", systemImage: "clock")
-                    Label("\(env.uploadSummary.failedCount) failed", systemImage: "exclamationmark.triangle")
+                    Label("\(env.downloadSummary.activeCount) downloading", systemImage: "arrow.down.circle")
+                    Label("\(env.uploadSummary.queuedCount + env.downloadSummary.queuedCount) queued", systemImage: "clock")
+                    Label("\(env.uploadSummary.failedCount + env.downloadSummary.failedCount) failed", systemImage: "exclamationmark.triangle")
                 }
 
                 Section("Sync Pairs") {
@@ -75,13 +78,21 @@ struct ContentView: View {
 
                     if inspectorVisible {
                         Divider()
-                        TransferInspectorView(summary: env.uploadSummary, selectedTab: selectedTab)
+                        TransferInspectorView(
+                            uploadSummary: env.uploadSummary,
+                            downloadSummary: env.downloadSummary,
+                            selectedTab: selectedTab
+                        )
                             .frame(width: 280)
                     }
                 }
 
                 Divider()
-                TransferStatusBar(summary: env.uploadSummary, isOnline: env.isOnline)
+                TransferStatusBar(
+                    uploadSummary: env.uploadSummary,
+                    downloadSummary: env.downloadSummary,
+                    isOnline: env.isOnline
+                )
             }
             .navigationTitle(selectedTab.rawValue)
             .toolbar {
@@ -107,6 +118,7 @@ struct ContentView: View {
         switch selectedTab {
         case .accounts: AccountsView()
         case .uploads:  UploadCenterView()
+        case .downloads: DownloadCenterView()
         case .sync:     SyncManagerView()
         case .browse:   FileBrowserView()
         case .prefs:    PreferencesView()
@@ -117,7 +129,8 @@ struct ContentView: View {
 // MARK: - Inspector
 
 private struct TransferInspectorView: View {
-    let summary: UploadDashboardSummary
+    let uploadSummary: UploadDashboardSummary
+    let downloadSummary: DownloadDashboardSummary
     let selectedTab: ContentView.AppTab
 
     var body: some View {
@@ -127,24 +140,25 @@ private struct TransferInspectorView: View {
 
             InspectorGroup(title: "Selection") {
                 InspectorRow(label: "View", value: selectedTab.rawValue)
-                InspectorRow(label: "Status", value: summary.activeCount > 0 ? "Transferring" : "Idle")
+                InspectorRow(label: "Status", value: uploadSummary.activeCount + downloadSummary.activeCount > 0 ? "Transferring" : "Idle")
             }
 
             InspectorGroup(title: "Upload Session") {
-                InspectorRow(label: "Progress", value: "\(Int(summary.progress * 100))%")
-                InspectorRow(label: "Transferred", value: formatStatusBytes(summary.bytesTransferred))
-                InspectorRow(label: "Total", value: formatStatusBytes(summary.totalBytes))
-                InspectorRow(label: "Current", value: formatStatusSpeed(summary.currentBPS))
-                InspectorRow(label: "Peak", value: formatStatusSpeed(summary.peakBPS))
-                InspectorRow(label: "ETA", value: formatStatusETA(summary.etaSeconds))
+                InspectorRow(label: "Progress", value: "\(Int(uploadSummary.progress * 100))%")
+                InspectorRow(label: "Transferred", value: formatStatusBytes(uploadSummary.bytesTransferred))
+                InspectorRow(label: "Total", value: formatStatusBytes(uploadSummary.totalBytes))
+                InspectorRow(label: "Current", value: formatStatusSpeed(uploadSummary.currentBPS))
+                InspectorRow(label: "Peak", value: formatStatusSpeed(uploadSummary.peakBPS))
+                InspectorRow(label: "ETA", value: formatStatusETA(uploadSummary.etaSeconds))
             }
 
             InspectorGroup(title: "Files") {
-                InspectorRow(label: "Active", value: "\(summary.activeCount)")
-                InspectorRow(label: "Queued", value: "\(summary.queuedCount)")
-                InspectorRow(label: "Paused", value: "\(summary.pausedCount)")
-                InspectorRow(label: "Failed", value: "\(summary.failedCount)")
-                InspectorRow(label: "Completed", value: "\(summary.completedCount)")
+                InspectorRow(label: "Uploading", value: "\(uploadSummary.activeCount)")
+                InspectorRow(label: "Downloading", value: "\(downloadSummary.activeCount)")
+                InspectorRow(label: "Queued", value: "\(uploadSummary.queuedCount + downloadSummary.queuedCount)")
+                InspectorRow(label: "Paused", value: "\(uploadSummary.pausedCount + downloadSummary.pausedCount)")
+                InspectorRow(label: "Failed", value: "\(uploadSummary.failedCount + downloadSummary.failedCount)")
+                InspectorRow(label: "Completed", value: "\(uploadSummary.completedCount + downloadSummary.completedCount)")
             }
 
             Spacer()
@@ -192,22 +206,25 @@ private struct InspectorRow: View {
 // MARK: - Bottom Status Bar
 
 private struct TransferStatusBar: View {
-    let summary: UploadDashboardSummary
+    let uploadSummary: UploadDashboardSummary
+    let downloadSummary: DownloadDashboardSummary
     let isOnline: Bool
 
     var body: some View {
         HStack(spacing: Spacing.md) {
             Label(isOnline ? "Online" : "Offline", systemImage: isOnline ? "wifi" : "wifi.slash")
             Divider().frame(height: 14)
-            Text("↑ \(summary.activeCount) uploading")
+            Text("↑ \(uploadSummary.activeCount) uploading")
+            Text("↓ \(downloadSummary.activeCount) downloading")
             Text("·")
-            Text(formatStatusSpeed(summary.currentBPS))
+            Text("↑ \(formatStatusSpeed(uploadSummary.currentBPS))")
+            Text("↓ \(formatStatusSpeed(downloadSummary.currentBPS))")
             Text("·")
-            Text("\(summary.queuedCount) files remaining")
+            Text("\(uploadSummary.queuedCount + downloadSummary.queuedCount) files remaining")
             Text("·")
-            Text("ETA \(formatStatusETA(summary.etaSeconds))")
+            Text("ETA \(formatStatusETA(uploadSummary.etaSeconds ?? downloadSummary.etaSeconds))")
             Spacer()
-            Text("\(formatStatusBytes(summary.bytesTransferred)) / \(formatStatusBytes(summary.totalBytes))")
+            Text("↑ \(formatStatusBytes(uploadSummary.bytesTransferred)) / \(formatStatusBytes(uploadSummary.totalBytes)) · ↓ \(formatStatusBytes(downloadSummary.bytesReceived)) / \(formatStatusBytes(downloadSummary.totalBytes))")
                 .font(.stratusSmallMono)
         }
         .font(.caption)
