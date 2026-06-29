@@ -44,7 +44,8 @@ final class ChunkSlicerTests: XCTestCase {
     }
 
     func test_defaultChunkSize_smallFile() {
-        XCTAssertEqual(ChunkSlicer.defaultChunkSize(for: 1 * 1024 * 1024), 5 * 1024 * 1024)
+        // Files under 5 MB are treated as single-part; chunk size = file size
+        XCTAssertEqual(ChunkSlicer.defaultChunkSize(for: 1 * 1024 * 1024), 1 * 1024 * 1024)
     }
 
     func test_defaultChunkSize_largeFile() {
