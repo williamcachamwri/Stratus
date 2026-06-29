@@ -7,11 +7,12 @@ import os.log
 // OAuth2 + PKCE (RFC 7636) for Box.com
 
 public actor BoxAuth {
-    private static let clientID     = "YOUR_BOX_CLIENT_ID"
-    private static let redirectURI  = "stratus://oauth/box"
-    private static let authURL      = "https://account.box.com/api/oauth2/authorize"
-    private static let tokenURL     = "https://api.box.com/oauth2/token"
-    private static let scope        = "root_readwrite manage_webhooks"
+    private static var clientID: String { SharedConfig.string("CLIENT_ID", providerID: "box") ?? "" }
+    private static var clientSecret: String? { SharedConfig.string("CLIENT_SECRET", providerID: "box") }
+    private static var redirectURI: String { SharedConfig.string("REDIRECT_URI", providerID: "box") ?? "stratus://oauth/box" }
+    private static let authURL = "https://account.box.com/api/oauth2/authorize"
+    private static let tokenURL = "https://api.box.com/oauth2/token"
+    private static var scope: String { SharedConfig.string("SCOPES", providerID: "box") ?? "root_readwrite manage_webhooks" }
 
     private let vault = CredentialVault.shared
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "BoxAuth")
@@ -21,6 +22,10 @@ public actor BoxAuth {
     // MARK: - Initiate Auth
 
     public func authenticate(presentingWindow: NSWindow?) async throws -> OAuthCredential {
+        guard !Self.clientID.isEmpty else {
+            throw ProviderError.authenticationFailed("Missing STRATUS_BOX_CLIENT_ID in shared/oauth.config or environment")
+        }
+
         let (verifier, challenge) = generatePKCE()
         let state = UUID().uuidString
 
@@ -69,14 +74,19 @@ public actor BoxAuth {
         var request = URLRequest(url: tokenURLValue)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        let body = [
-            "grant_type=authorization_code",
-            "code=\(code)",
-            "redirect_uri=\(Self.redirectURI)",
-            "client_id=\(Self.clientID)",
-            "code_verifier=\(verifier)",
-        ].joined(separator: "&")
-        request.httpBody = Data(body.utf8)
+        var components = URLComponents()
+        var formItems = [
+            URLQueryItem(name: "grant_type", value: "authorization_code"),
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "redirect_uri", value: Self.redirectURI),
+            URLQueryItem(name: "client_id", value: Self.clientID),
+            URLQueryItem(name: "code_verifier", value: verifier),
+        ]
+        if let clientSecret = Self.clientSecret {
+            formItems.append(URLQueryItem(name: "client_secret", value: clientSecret))
+        }
+        components.queryItems = formItems
+        request.httpBody = Data((components.percentEncodedQuery ?? "").utf8)
 
         let (data, _) = try await URLSession.shared.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
