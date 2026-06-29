@@ -50,7 +50,14 @@ let package = Package(
                 "StratusCore",
                 .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
             ],
-            path: "Tests/StratusCoreTests",
+            path: "Tests",
+            sources: [
+                "StratusCoreTests",
+                "Unit",
+                "Integration",
+                "Performance",
+                "UI",
+            ],
             swiftSettings: [
                 .unsafeFlags(["-strict-concurrency=complete"]),
             ]
