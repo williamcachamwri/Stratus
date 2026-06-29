@@ -1,4 +1,5 @@
 import SwiftUI
+import StratusCore
 
 struct AccountsView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -56,7 +57,7 @@ private struct AccountRowView: View {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(account.displayName)
                     .font(.stratusHeadline)
-                Text(account.username ?? account.id)
+                Text(account.email ?? account.id)
                     .stratusCaption()
             }
             Spacer()
@@ -114,7 +115,7 @@ private struct AddAccountSheet: View {
             id: UUID().uuidString,
             providerID: providerID,
             displayName: name,
-            username: nil
+            email: nil
         )
         env.addAccount(account)
         dismiss()
