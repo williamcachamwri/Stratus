@@ -115,8 +115,11 @@ public actor BoxProvider: CloudProvider {
         headers["Digest"] = "sha=\(data.sha1Base64())"
         let request = HTTPRequest(url: url, method: .PUT, headers: headers, body: data)
         let response = try await http.data(for: request)
+        guard response.isSuccess else {
+            throw ProviderError.serverError(statusCode: response.statusCode, message: String(data: response.data, encoding: .utf8) ?? "")
+        }
         let etag = response.headers["Etag"]
-        return ChunkUploadResult(etag: etag)
+        return ChunkUploadResult(etag: etag, serverConfirmedChecksum: true)
     }
 
     public func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
