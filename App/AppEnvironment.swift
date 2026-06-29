@@ -643,6 +643,19 @@ public final class AppEnvironment: ObservableObject {
         }
     }
 
+    /// Returns a human-readable error string if mounting failed, otherwise nil.
+    public func mountAccountReturningError(_ account: CloudAccount) async -> String? {
+        do {
+            try await vfsMount.mount(account: account)
+            await refreshMountRows()
+            return nil
+        } catch {
+            logger.error("Failed to mount account \(account.id): \(error.localizedDescription)")
+            await refreshMountRows()
+            return error.localizedDescription
+        }
+    }
+
     public func unmountAccount(_ account: CloudAccount) async {
         do {
             try await vfsMount.unmount(account: account)

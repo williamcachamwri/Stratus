@@ -5,6 +5,9 @@ public struct MountManagerView: View {
     @EnvironmentObject private var env: AppEnvironment
     public let mounts: [MountRow]?
 
+    @State private var mountError: String?
+    @State private var isMounting = false
+
     public init(mounts: [MountRow]? = nil) {
         self.mounts = mounts
     }
@@ -23,18 +26,32 @@ public struct MountManagerView: View {
                         .stratusCaption()
                 }
                 Spacer()
+                if isMounting {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .padding(.trailing, Spacing.xs)
+                }
                 Menu("Mount Account") {
                     if unmountedAccounts.isEmpty {
                         Text("All accounts are mounted")
                     } else {
                         ForEach(unmountedAccounts, id: \.id) { account in
-                            Button("Stratus - \(account.displayName)") {
-                                Task { await env.mountAccount(account) }
+                            Button(account.displayName) {
+                                Task { await performMount(account: account) }
                             }
                         }
                     }
                 }
-                .disabled(env.accounts.isEmpty)
+                .disabled(env.accounts.isEmpty || isMounting)
+            }
+
+            if let error = mountError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(Spacing.sm)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(6)
             }
 
             if env.accounts.isEmpty {
@@ -64,6 +81,16 @@ public struct MountManagerView: View {
         .padding(Spacing.lg)
         .background(Color.surfaceSecondary)
         .task { await env.refreshMountRows() }
+    }
+
+    private func performMount(account: CloudAccount) async {
+        mountError = nil
+        isMounting = true
+        defer { isMounting = false }
+        let error = await env.mountAccountReturningError(account)
+        if let error {
+            mountError = error
+        }
     }
 }
 
