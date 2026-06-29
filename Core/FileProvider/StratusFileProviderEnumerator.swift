@@ -14,14 +14,16 @@ private final class Box<T>: @unchecked Sendable {
 public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable {
 
     private let containerItem: NSFileProviderItemIdentifier
-    private let provider: any CloudProvider
-    private let account: CloudAccount
+    private let domainIdentifier: String
+    private let resolver: StratusFileProviderDomainResolver
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "FileProviderEnumerator")
 
-    public init(containerItem: NSFileProviderItemIdentifier, provider: any CloudProvider, account: CloudAccount) {
+    public init(containerItem: NSFileProviderItemIdentifier,
+                domain: NSFileProviderDomain,
+                resolver: StratusFileProviderDomainResolver = .shared) {
         self.containerItem = containerItem
-        self.provider = provider
-        self.account = account
+        self.domainIdentifier = domain.identifier.rawValue
+        self.resolver = resolver
     }
 
     // MARK: - NSFileProviderEnumerator
@@ -29,7 +31,6 @@ public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumer
     public func invalidate() {}
 
     public func enumerateItems(for observer: any NSFileProviderEnumerationObserver, startingAt page: NSFileProviderPage) {
-        // Extract Sendable values before Task to avoid region isolation errors
         let containerRaw = containerItem.rawValue
         let isRoot = containerItem == .rootContainer || containerItem == .workingSet
         let pageToken = page == NSFileProviderPage.initialPageSortedByName as NSFileProviderPage
@@ -37,13 +38,16 @@ public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumer
         let path = isRoot ? CloudPath("/") : CloudPath(containerRaw)
         let obs = Box(observer)
         let log = logger
+        let domainID = domainIdentifier
+        let resolver = resolver
 
         Task {
             do {
-                let result = try await provider.listDirectory(path: path, account: account, pageToken: pageToken)
-                let parentID = NSFileProviderItemIdentifier(rawValue: containerRaw)
+                let context = try await resolver.resolve(domainIdentifier: domainID)
+                let result = try await context.provider.listDirectory(path: path, account: context.account, pageToken: pageToken)
+                let parentID = isRoot ? NSFileProviderItemIdentifier.rootContainer : NSFileProviderItemIdentifier(rawValue: containerRaw)
                 let providerItems: [NSFileProviderItem] = result.items.map { item in
-                    StratusFileProviderItem(item: item, parentID: parentID, accountID: account.id)
+                    StratusFileProviderItem(item: item, parentID: parentID, accountID: context.account.id)
                 }
                 obs.value.didEnumerate(providerItems)
                 if let nextToken = result.nextPageToken {
@@ -53,7 +57,7 @@ public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumer
                 }
                 log.debug("Enumerated \(providerItems.count) items at \(path.path)")
             } catch {
-                log.error("Enumeration failed at \(path.path): \(error)")
+                log.error("Enumeration failed at \(path.path): \(error.localizedDescription)")
                 obs.value.finishEnumeratingWithError(error)
             }
         }
