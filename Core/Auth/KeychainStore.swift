@@ -7,7 +7,7 @@ import os.log
 public actor KeychainStore {
     public static let shared = KeychainStore()
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "Keychain")
-    private let accessGroup = "com.stratus.cloudmanager"
+    private let accessGroup = Bundle.main.object(forInfoDictionaryKey: "STRATUSKeychainAccessGroup") as? String
 
     private init() {}
 
@@ -51,9 +51,8 @@ public actor KeychainStore {
             let query: [String: Any] = [
                 kSecClass as String: itemClass,
                 kSecAttrAccount as String: accountID,
-                kSecAttrAccessGroup as String: accessGroup,
             ]
-            let status = SecItemDelete(query as CFDictionary)
+            let status = SecItemDelete(withAccessGroup(query) as CFDictionary)
             if status != errSecSuccess && status != errSecItemNotFound {
                 throw KeychainError.deleteFailed(status: status)
             }
@@ -62,12 +61,18 @@ public actor KeychainStore {
 
     // MARK: - Private Core Methods
 
+    private func withAccessGroup(_ query: [String: Any]) -> [String: Any] {
+        guard let accessGroup, !accessGroup.isEmpty else { return query }
+        var scoped = query
+        scoped[kSecAttrAccessGroup as String] = accessGroup
+        return scoped
+    }
+
     private func save(data: Data, service: String, account: String, class itemClass: CFString) throws {
         let query: [String: Any] = [
             kSecClass as String: itemClass,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
             kSecValueData as String: data,
             // Never accessible when device is locked; must be this device only
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
@@ -78,13 +83,12 @@ public actor KeychainStore {
             kSecClass as String: itemClass,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
         ]
         let updateAttributes: [String: Any] = [kSecValueData as String: data]
 
-        var status = SecItemUpdate(updateQuery as CFDictionary, updateAttributes as CFDictionary)
+        var status = SecItemUpdate(withAccessGroup(updateQuery) as CFDictionary, updateAttributes as CFDictionary)
         if status == errSecItemNotFound {
-            status = SecItemAdd(query as CFDictionary, nil)
+            status = SecItemAdd(withAccessGroup(query) as CFDictionary, nil)
         }
 
         guard status == errSecSuccess else {
@@ -98,13 +102,12 @@ public actor KeychainStore {
             kSecClass as String: itemClass,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
             kSecMatchLimit as String: kSecMatchLimitOne,
             kSecReturnData as String: true,
         ]
 
         var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let status = SecItemCopyMatching(withAccessGroup(query) as CFDictionary, &result)
 
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else {
@@ -118,9 +121,8 @@ public actor KeychainStore {
             kSecClass as String: itemClass,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: accessGroup,
         ]
-        let status = SecItemDelete(query as CFDictionary)
+        let status = SecItemDelete(withAccessGroup(query) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.deleteFailed(status: status)
         }
