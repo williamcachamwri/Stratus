@@ -271,6 +271,8 @@ public final class AppEnvironment: ObservableObject {
             updateUploadRow(id: id, phase: .paused, detail: "Paused with resume state preserved")
         case .taskResumed(let id):
             updateUploadRow(id: id, phase: .queued, detail: "Queued for resume")
+        case .taskReprioritized(let id, let priority):
+            updateUploadRow(id: id, phase: .queued, detail: "Queued at scheduler priority \(priority.rawValue)")
         case .taskCancelled(let id):
             updateUploadRow(id: id, phase: .cancelled, detail: "Cancelled by user")
         case .sessionRestored(let count):
