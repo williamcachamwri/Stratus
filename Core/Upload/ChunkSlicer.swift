@@ -55,7 +55,9 @@ public struct ChunkSlicer: Sendable {
     private static let MB = 1024 * 1024
 
     public static func slice(fileSize: Int64, chunkSize: Int) -> [ChunkDescriptor] {
-        guard fileSize > 0 else { return [] }
+        guard fileSize > 0 else {
+            return [ChunkDescriptor(number: 0, offset: 0, size: 0, isLast: true)]
+        }
         guard chunkSize > 0 else { return [] }
 
         var chunks: [ChunkDescriptor] = []
