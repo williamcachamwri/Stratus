@@ -442,17 +442,20 @@ final class UploadPipelineIntegrationTests: XCTestCase {
         XCTAssertEqual(result.bytesUploaded, Int64(size))
     }
 
-    // MARK: - Test: checksumVerified false when server returns wrong hash
+    // MARK: - Test: checksum mismatch fails instead of reporting success
 
     func test_checksumMismatch_detectedByEngine() async throws {
         let url = try makeFileURL(size: 1 * 1024 * 1024, name: "mismatch.bin")
-        // Give task a wrong checksum that doesn't match what mock will compute
         let task = try await makeTask(fileURL: url, checksumOverride: "wrongchecksum0000000000000000000000000000000000000000000000000000")
-        let result = try await runUpload(task: task)
 
-        // Mock will compute real SHA-256 of uploaded bytes; it won't match "wrongchecksum..."
-        XCTAssertFalse(result.checksumVerified,
-            "Engine must detect when server checksum doesn't match task localChecksum")
+        do {
+            _ = try await runUpload(task: task)
+            XCTFail("Checksum mismatch must throw, not return checksumVerified=false after upload")
+        } catch UploadError.checksumMismatch {
+            // Expected: integrity failures are terminal, visible errors.
+        } catch {
+            XCTFail("Expected UploadError.checksumMismatch, got \(error)")
+        }
     }
 
     // MARK: - Test: Concurrent uploads to same provider don't interfere
