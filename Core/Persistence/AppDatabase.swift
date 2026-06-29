@@ -9,7 +9,13 @@ public actor AppDatabase {
         do {
             return try AppDatabase()
         } catch {
-            fatalError("Failed to initialize AppDatabase: \(error)")
+            fputs("Stratus database unavailable, falling back to in-memory store: \(error)\n", stderr)
+            do {
+                return try AppDatabase(inMemory: true)
+            } catch {
+                fputs("Stratus in-memory database fallback failed: \(error)\n", stderr)
+                abort()
+            }
         }
     }()
 
@@ -21,7 +27,8 @@ public actor AppDatabase {
         if let path {
             url = URL(fileURLWithPath: path)
         } else {
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
             let stratusDir = appSupport.appendingPathComponent("Stratus", isDirectory: true)
             try FileManager.default.createDirectory(at: stratusDir, withIntermediateDirectories: true)
             url = stratusDir.appendingPathComponent("stratus.db")
