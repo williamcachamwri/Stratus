@@ -308,8 +308,6 @@ public actor GoogleDriveProvider: CloudProvider {
     }
 
     public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] {
-        let (result, _) = try await listDirectory(path: CloudPath("/"), account: account, pageToken: nil)
-            .items.partition { _ in false }  // placeholder
         return []
     }
 
