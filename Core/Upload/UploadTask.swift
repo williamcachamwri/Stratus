@@ -143,7 +143,7 @@ public final class UploadTask: @unchecked Sendable, Identifiable {
         localChecksum: String,
         priority: TaskPriority = .normal,
         metadata: UploadMetadata = UploadMetadata(),
-        state: UploadState = .queued(priority: .normal),
+        state: UploadState? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -155,7 +155,7 @@ public final class UploadTask: @unchecked Sendable, Identifiable {
         self.localChecksum = localChecksum
         self.priority = priority
         self.metadata = metadata
-        self.state = state
+        self.state = state ?? .queued(priority: priority)
         self.createdAt = createdAt
     }
 
