@@ -4,6 +4,7 @@ import StratusCore
 struct ContentView: View {
     @EnvironmentObject private var env: AppEnvironment
     @State private var selectedTab: AppTab = .accounts
+    @State private var inspectorVisible = true
 
     enum AppTab: String, CaseIterable, Identifiable {
         case accounts  = "Accounts"
@@ -27,29 +28,215 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(AppTab.allCases, selection: $selectedTab) { tab in
-                Label(tab.rawValue, systemImage: tab.icon)
-                    .tag(tab)
+            List(selection: $selectedTab) {
+                Section("Library") {
+                    ForEach(AppTab.allCases) { tab in
+                        Label(tab.rawValue, systemImage: tab.icon)
+                            .tag(tab)
+                    }
+                }
+
+                Section("Accounts") {
+                    if env.accounts.isEmpty {
+                        Label("Add account…", systemImage: "plus.circle")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(env.accounts, id: \.id) { account in
+                            Label(account.displayName, systemImage: "cloud")
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+
+                Section("Transfers") {
+                    Label("\(env.uploadSummary.activeCount) uploading", systemImage: "arrow.up.circle")
+                    Label("\(env.uploadSummary.queuedCount) queued", systemImage: "clock")
+                    Label("\(env.uploadSummary.failedCount) failed", systemImage: "exclamationmark.triangle")
+                }
+
+                Section("Sync Pairs") {
+                    if env.activeSyncPairs.isEmpty {
+                        Label("No sync pairs", systemImage: "folder.badge.questionmark")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(env.activeSyncPairs, id: \.id) { pair in
+                            Label(pair.localPath.lastPathComponent, systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    }
+                }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 160, ideal: 200)
+            .navigationSplitViewColumnWidth(min: 184, ideal: 220)
         } detail: {
-            switch selectedTab {
-            case .accounts: AccountsView()
-            case .uploads:  UploadCenterView()
-            case .sync:     SyncManagerView()
-            case .browse:   FileBrowserView()
-            case .prefs:    PreferencesView()
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    selectedContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    if inspectorVisible {
+                        Divider()
+                        TransferInspectorView(summary: env.uploadSummary, selectedTab: selectedTab)
+                            .frame(width: 280)
+                    }
+                }
+
+                Divider()
+                TransferStatusBar(summary: env.uploadSummary, isOnline: env.isOnline)
             }
-        }
-        .navigationTitle("Stratus")
-        .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                if env.activeUploads > 0 {
-                    Label("\(env.activeUploads) uploading", systemImage: "arrow.up.circle.fill")
-                        .foregroundColor(.uploadActive)
+            .navigationTitle(selectedTab.rawValue)
+            .toolbar {
+                ToolbarItemGroup {
+                    Button {
+                        selectedTab = .accounts
+                    } label: {
+                        Label("Add Account", systemImage: "plus")
+                    }
+
+                    Button {
+                        inspectorVisible.toggle()
+                    } label: {
+                        Label("Inspector", systemImage: "sidebar.right")
+                    }
                 }
             }
         }
     }
+
+    @ViewBuilder
+    private var selectedContent: some View {
+        switch selectedTab {
+        case .accounts: AccountsView()
+        case .uploads:  UploadCenterView()
+        case .sync:     SyncManagerView()
+        case .browse:   FileBrowserView()
+        case .prefs:    PreferencesView()
+        }
+    }
+}
+
+// MARK: - Inspector
+
+private struct TransferInspectorView: View {
+    let summary: UploadDashboardSummary
+    let selectedTab: ContentView.AppTab
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            Text("Inspector")
+                .font(.stratusHeadline)
+
+            InspectorGroup(title: "Selection") {
+                InspectorRow(label: "View", value: selectedTab.rawValue)
+                InspectorRow(label: "Status", value: summary.activeCount > 0 ? "Transferring" : "Idle")
+            }
+
+            InspectorGroup(title: "Upload Session") {
+                InspectorRow(label: "Progress", value: "\(Int(summary.progress * 100))%")
+                InspectorRow(label: "Transferred", value: formatStatusBytes(summary.bytesTransferred))
+                InspectorRow(label: "Total", value: formatStatusBytes(summary.totalBytes))
+                InspectorRow(label: "Current", value: formatStatusSpeed(summary.currentBPS))
+                InspectorRow(label: "Peak", value: formatStatusSpeed(summary.peakBPS))
+                InspectorRow(label: "ETA", value: formatStatusETA(summary.etaSeconds))
+            }
+
+            InspectorGroup(title: "Files") {
+                InspectorRow(label: "Active", value: "\(summary.activeCount)")
+                InspectorRow(label: "Queued", value: "\(summary.queuedCount)")
+                InspectorRow(label: "Paused", value: "\(summary.pausedCount)")
+                InspectorRow(label: "Failed", value: "\(summary.failedCount)")
+                InspectorRow(label: "Completed", value: "\(summary.completedCount)")
+            }
+
+            Spacer()
+        }
+        .padding(Spacing.lg)
+        .background(Color.surfacePrimary)
+    }
+}
+
+private struct InspectorGroup<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.textTertiary)
+                .tracking(0.5)
+            VStack(spacing: Spacing.xs) {
+                content()
+            }
+        }
+    }
+}
+
+private struct InspectorRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .foregroundColor(.textSecondary)
+            Spacer(minLength: Spacing.md)
+            Text(value)
+                .font(.stratusSmallMono)
+                .foregroundColor(.textPrimary)
+                .multilineTextAlignment(.trailing)
+        }
+        .font(.caption)
+    }
+}
+
+// MARK: - Bottom Status Bar
+
+private struct TransferStatusBar: View {
+    let summary: UploadDashboardSummary
+    let isOnline: Bool
+
+    var body: some View {
+        HStack(spacing: Spacing.md) {
+            Label(isOnline ? "Online" : "Offline", systemImage: isOnline ? "wifi" : "wifi.slash")
+            Divider().frame(height: 14)
+            Text("↑ \(summary.activeCount) uploading")
+            Text("·")
+            Text(formatStatusSpeed(summary.currentBPS))
+            Text("·")
+            Text("\(summary.queuedCount) files remaining")
+            Text("·")
+            Text("ETA \(formatStatusETA(summary.etaSeconds))")
+            Spacer()
+            Text("\(formatStatusBytes(summary.bytesTransferred)) / \(formatStatusBytes(summary.totalBytes))")
+                .font(.stratusSmallMono)
+        }
+        .font(.caption)
+        .foregroundColor(.textSecondary)
+        .padding(.horizontal, Spacing.md)
+        .frame(height: 28)
+        .background(Color.surfacePrimary)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Formatting
+
+private func formatStatusBytes(_ bytes: Int64) -> String {
+    guard bytes > 0 else { return "0 B" }
+    let formatter = ByteCountFormatter()
+    formatter.allowedUnits = [.useKB, .useMB, .useGB, .useTB]
+    formatter.countStyle = .file
+    return formatter.string(fromByteCount: bytes)
+}
+
+private func formatStatusSpeed(_ bps: Double) -> String {
+    guard bps > 0 else { return "0 B/s" }
+    return "\(formatStatusBytes(Int64(bps)))/s"
+}
+
+private func formatStatusETA(_ seconds: Double?) -> String {
+    guard let seconds, seconds.isFinite, seconds > 0 else { return "—" }
+    if seconds < 60 { return "\(Int(seconds))s" }
+    if seconds < 3600 { return "\(Int(seconds / 60))m \(Int(seconds) % 60)s" }
+    return "\(Int(seconds / 3600))h \(Int(seconds.truncatingRemainder(dividingBy: 3600)) / 60)m"
 }
