@@ -1,0 +1,63 @@
+import XCTest
+@testable import StratusCore
+
+final class ChunkSlicerTests: XCTestCase {
+
+    func test_sliceSingleChunk_smallFile() {
+        let chunks = ChunkSlicer.slice(fileSize: 100, chunkSize: 5 * 1024 * 1024)
+        XCTAssertEqual(chunks.count, 1)
+        XCTAssertEqual(chunks[0].offset, 0)
+        XCTAssertEqual(chunks[0].size, 100)
+        XCTAssertTrue(chunks[0].isLast)
+    }
+
+    func test_sliceExactMultiple() {
+        let chunkSize = 5 * 1024 * 1024
+        let fileSize = chunkSize * 4
+        let chunks = ChunkSlicer.slice(fileSize: Int64(fileSize), chunkSize: chunkSize)
+        XCTAssertEqual(chunks.count, 4)
+        XCTAssertFalse(chunks[0].isLast)
+        XCTAssertFalse(chunks[1].isLast)
+        XCTAssertFalse(chunks[2].isLast)
+        XCTAssertTrue(chunks[3].isLast)
+        XCTAssertEqual(chunks[3].number, 3)
+    }
+
+    func test_sliceRemainder() {
+        let chunkSize = 5 * 1024 * 1024
+        let fileSize = Int64(chunkSize * 3 + 100)
+        let chunks = ChunkSlicer.slice(fileSize: fileSize, chunkSize: chunkSize)
+        XCTAssertEqual(chunks.count, 4)
+        XCTAssertEqual(chunks[3].size, 100)
+        XCTAssertTrue(chunks[3].isLast)
+    }
+
+    func test_chunkOffsets_noOverlap() {
+        let chunkSize = 8 * 1024 * 1024
+        let fileSize = Int64(chunkSize * 5 + 1234)
+        let chunks = ChunkSlicer.slice(fileSize: fileSize, chunkSize: chunkSize)
+        for i in 1..<chunks.count {
+            XCTAssertEqual(chunks[i].offset, chunks[i-1].offset + Int64(chunks[i-1].size))
+        }
+        let totalCovered = chunks.reduce(Int64(0)) { $0 + Int64($1.size) }
+        XCTAssertEqual(totalCovered, fileSize)
+    }
+
+    func test_defaultChunkSize_smallFile() {
+        XCTAssertEqual(ChunkSlicer.defaultChunkSize(for: 1 * 1024 * 1024), 5 * 1024 * 1024)
+    }
+
+    func test_defaultChunkSize_largeFile() {
+        let size = Int64(2 * 1024 * 1024 * 1024)  // 2 GB
+        let chunk = ChunkSlicer.defaultChunkSize(for: size)
+        // Should produce at most ~1000 parts per S3 limits
+        let numParts = Int(ceil(Double(size) / Double(chunk)))
+        XCTAssertLessThanOrEqual(numParts, 1000)
+    }
+
+    func test_zeroFileSize() {
+        let chunks = ChunkSlicer.slice(fileSize: 0, chunkSize: 5 * 1024 * 1024)
+        XCTAssertEqual(chunks.count, 1)
+        XCTAssertEqual(chunks[0].size, 0)
+    }
+}
