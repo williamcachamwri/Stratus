@@ -55,28 +55,42 @@ public actor TokenRefresher {
             throw TokenError.noRefreshToken(accountID)
         }
 
-        // Determine token endpoint per provider
+        // Determine token endpoint per provider and read the OAuth client
+        // variables from shared/oauth.config, shared/*.local.config, or env.
         let tokenURL: URL
-        let clientID: String
         switch providerID {
         case "gdrive":
             tokenURL = URL(string: "https://oauth2.googleapis.com/token")!
-            clientID = ""  // Retrieved from config in practice
         case "dropbox":
             tokenURL = URL(string: "https://api.dropboxapi.com/oauth2/token")!
-            clientID = ""
         case "onedrive":
             tokenURL = URL(string: "https://login.microsoftonline.com/common/oauth2/v2.0/token")!
-            clientID = ""
+        case "box":
+            tokenURL = URL(string: "https://api.box.com/oauth2/token")!
         default:
             throw TokenError.unsupportedProvider(providerID)
         }
 
+        guard let clientID = SharedConfig.string("CLIENT_ID", providerID: providerID) else {
+            throw TokenError.missingClientID(providerID)
+        }
+
+        var formItems = [
+            URLQueryItem(name: "grant_type", value: "refresh_token"),
+            URLQueryItem(name: "refresh_token", value: refreshToken),
+            URLQueryItem(name: "client_id", value: clientID),
+        ]
+        if let clientSecret = SharedConfig.string("CLIENT_SECRET", providerID: providerID) {
+            formItems.append(URLQueryItem(name: "client_secret", value: clientSecret))
+        }
+
+        var components = URLComponents()
+        components.queryItems = formItems
+
         var request = URLRequest(url: tokenURL)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        let body = "grant_type=refresh_token&refresh_token=\(refreshToken)&client_id=\(clientID)"
-        request.httpBody = Data(body.utf8)
+        request.httpBody = Data((components.percentEncodedQuery ?? "").utf8)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
@@ -104,5 +118,6 @@ public enum TokenError: Error, Sendable {
     case noRefreshToken(String)
     case refreshFailed
     case unsupportedProvider(String)
+    case missingClientID(String)
     case internalError
 }
