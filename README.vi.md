@@ -29,13 +29,20 @@ Một ứng dụng quản lý đám mây macOS chuyên nghiệp, được xây d
 ```bash
 git clone https://github.com/williamcachamwri/Stratus.git
 cd Stratus
-swift build
+swift build --product Stratus
+```
+
+Đóng gói `.app` unsigned để tự test trên macOS:
+
+```bash
+Scripts/build_unsigned_release.sh
+open dist/Stratus.app
 ```
 
 ## Kiểm thử
 
 ```bash
-swift test
+Scripts/test.sh
 ```
 
 Hơn 120 unit test và hơn 20 integration test với mock providers.
@@ -79,6 +86,10 @@ App/
 
 MIT — xem [LICENSE](LICENSE).
 
+## Phát triển
+
+Xem [DEVELOP.md](DEVELOP.md) để biết cách setup local, đóng gói unsigned, tạo Sparkle appcast và xử lý lỗi.
+
 ## Đóng góp
 
-Xem [CONTRIBUTING.md](CONTRIBUTING.md).
+Xem [CONTRIBUTING.md](CONTRIBUTING.md). Mỗi file thay đổi phải được commit riêng với trailer co-author bắt buộc.
