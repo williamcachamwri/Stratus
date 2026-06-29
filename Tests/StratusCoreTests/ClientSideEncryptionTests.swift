@@ -68,10 +68,10 @@ final class ClientSideEncryptionTests: XCTestCase {
         }
     }
 
-    func test_inMemoryEncryptDecrypt() throws {
+    func test_inMemoryEncryptDecrypt() async throws {
         let original = Data("in-memory test data 1234567890".utf8)
-        let encrypted = try encryption.encryptData(original)
-        let decrypted = try encryption.decryptData(encrypted)
+        let encrypted = try await encryption.encryptData(original)
+        let decrypted = try await encryption.decryptData(encrypted)
         XCTAssertEqual(original, decrypted)
     }
 
