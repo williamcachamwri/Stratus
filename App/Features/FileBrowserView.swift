@@ -69,13 +69,21 @@ struct FileBrowserView: View {
     }
 
     private func loadItems() {
-        guard let account = selectedAccount,
-              let provider = env.providerRegistry.provider(id: account.providerID) else { return }
+        guard let account = selectedAccount else { return }
+        let path = currentPath
         isLoading = true
         error = nil
         Task {
+            guard let provider = await env.providerRegistry.provider(id: account.providerID) else {
+                await MainActor.run {
+                    self.error = "No provider is registered for \(account.displayName). Check account configuration."
+                    isLoading = false
+                }
+                return
+            }
+
             do {
-                let result = try await provider.listDirectory(path: currentPath, account: account, pageToken: nil)
+                let result = try await provider.listDirectory(path: path, account: account, pageToken: nil)
                 await MainActor.run {
                     items = result.items.sorted { ($0.isDirectory ? 0 : 1) < ($1.isDirectory ? 0 : 1) }
                     isLoading = false
