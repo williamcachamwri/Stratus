@@ -12,6 +12,23 @@ public enum VFSMountError: Error, Sendable {
     case managerUnavailable(accountID: String)
 }
 
+extension VFSMountError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .alreadyMounted:
+            return "This account is already mounted in Finder."
+        case .notMounted:
+            return "This account is not currently mounted."
+        case .domainRegistrationFailed(_, let underlying):
+            return "Finder mount failed: \(underlying.localizedDescription)"
+        case .domainRemovalFailed(_, let underlying):
+            return "Finder unmount failed: \(underlying.localizedDescription)"
+        case .managerUnavailable(let id):
+            return "File Provider manager unavailable for account \(id)."
+        }
+    }
+}
+
 // MARK: - VFSMountSnapshot
 
 public struct VFSMountSnapshot: Identifiable, Equatable, Sendable {
