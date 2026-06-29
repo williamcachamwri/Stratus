@@ -21,7 +21,11 @@ let package = Package(
                 "StratusCore",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
-            path: "App",
+            path: ".",
+            sources: [
+                "App",
+                "Features",
+            ],
             swiftSettings: [
                 .unsafeFlags(["-strict-concurrency=complete"]),
             ]
