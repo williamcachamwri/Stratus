@@ -198,10 +198,10 @@ public actor DiagnosticReport {
         do {
             logText = try fetchOSLogEntries()
         } catch {
-            // Non-fatal: write a placeholder so the bundle is still complete.
-            let placeholder = "os.log export unavailable: \(error.localizedDescription)\n"
-            guard let placeholderData = placeholder.data(using: .utf8) else { return }
-            try write(data: placeholderData, named: "os_log.txt", in: outputDir)
+            // Non-fatal: write a fallback note so the bundle is still complete.
+            let fallback = "os.log export unavailable: \(error.localizedDescription)\n"
+            guard let fallbackData = fallback.data(using: .utf8) else { return }
+            try write(data: fallbackData, named: "os_log.txt", in: outputDir)
             return
         }
 
