@@ -59,6 +59,30 @@ final class ConflictResolverTests: XCTestCase {
         if case .needsUserDecision(_) = action { } else { XCTFail("Expected needsUserDecision action") }
     }
 
+    func test_keepNewer_equalModTime_prefersLocal() async throws {
+        let now = Date()
+        let conflict = makeConflict(localDate: now, remoteDate: now)
+        let action = try await resolver.resolve(conflict: conflict, resolution: .keepNewer, provider: MockProvider(), account: makeAccount())
+        if case .upload(_, _) = action { } else { XCTFail("Equal mod times: keepNewer must prefer local (upload)") }
+    }
+
+    func test_keepLarger_equalSize_prefersLocal() async throws {
+        let conflict = makeConflict(localDate: Date(), remoteDate: Date(), localSize: 500, remoteSize: 500)
+        let action = try await resolver.resolve(conflict: conflict, resolution: .keepLarger, provider: MockProvider(), account: makeAccount())
+        if case .upload(_, _) = action { } else { XCTFail("Equal sizes: keepLarger must prefer local (upload)") }
+    }
+
+    func test_keepBoth_conflictCopyURL_containsConflict() async throws {
+        let conflict = makeConflict(localDate: Date(), remoteDate: Date())
+        let action = try await resolver.resolve(conflict: conflict, resolution: .keepBoth, provider: MockProvider(), account: makeAccount())
+        if case .keepBoth(_, _, _, let conflictURL) = action {
+            XCTAssertTrue(conflictURL.lastPathComponent.contains("conflict"),
+                "Conflict copy filename must contain 'conflict'")
+        } else {
+            XCTFail("Expected keepBoth action")
+        }
+    }
+
     private func makeAccount() -> CloudAccount {
         CloudAccount(id: "test", providerID: "s3", displayName: "Test", email: nil)
     }
