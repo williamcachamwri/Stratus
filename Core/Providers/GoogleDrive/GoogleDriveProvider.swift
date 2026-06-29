@@ -380,12 +380,10 @@ public actor GoogleDriveProvider: CloudProvider {
     // MARK: - Helpers
 
     private func accessToken(account: CloudAccount) async throws -> String {
-        guard let cred = try await vault.loadOAuthCredential(providerID: id, accountID: account.id) else {
-            throw ProviderError.authenticationFailed("No credential for \(account.id)")
+        do {
+            return try await TokenRefresher.shared.validToken(providerID: id, accountID: account.id)
+        } catch {
+            throw ProviderError.authenticationFailed("Could not obtain valid access token: \(error.localizedDescription)")
         }
-        if cred.isExpired {
-            throw ProviderError.authenticationFailed("Token expired — refresh needed")
-        }
-        return cred.accessToken
     }
 }
