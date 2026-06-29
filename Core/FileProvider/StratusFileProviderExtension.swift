@@ -40,9 +40,11 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
                      completionHandler: @escaping (NSFileProviderItem?, Error?) -> Void) -> Progress {
         let progress = Progress(totalUnitCount: 1)
         let cb = CB(completionHandler)
+        let resolver = self.resolver
+        let domainID = domain.identifier.rawValue
         Task {
             do {
-                let context = try await resolver.resolve(domain: domain)
+                let context = try await resolver.resolve(domainIdentifier: domainID)
                 if identifier == .rootContainer {
                     cb.fn(StratusFileProviderItem.root(accountID: context.account.id), nil)
                 } else {
@@ -54,7 +56,7 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
                 }
                 progress.completedUnitCount = 1
             } catch {
-                cb.fn(nil, mapFileProviderError(error))
+                cb.fn(nil, mapProviderError(error))
             }
         }
         return progress
@@ -66,20 +68,22 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
                               completionHandler: @escaping (URL?, NSFileProviderItem?, Error?) -> Void) -> Progress {
         let progress = Progress(totalUnitCount: 100)
         let cb = CB(completionHandler)
+        let resolver = self.resolver
+        let domainID = domain.identifier.rawValue
         Task {
             do {
-                let context = try await resolver.resolve(domain: domain)
+                let context = try await resolver.resolve(domainIdentifier: domainID)
                 let path = CloudPath(itemIdentifier.rawValue)
                 let downloadURL = try await context.provider.downloadURL(path: path, account: context.account, expiresIn: 3600)
                 let (temporaryURL, _) = try await URLSession.shared.download(from: downloadURL)
-                let cachedURL = try moveDownloadedContent(temporaryURL, itemIdentifier: itemIdentifier)
+                let cachedURL = try moveDownloadedFile(temporaryURL, itemIdentifier: itemIdentifier, domainID: domainID)
                 let item = try await context.provider.fileMetadata(path: path, account: context.account)
                 let parentID = NSFileProviderItemIdentifier(rawValue: path.deletingLastComponent.path)
                 let providerItem = StratusFileProviderItem(item: item, parentID: parentID, accountID: context.account.id)
                 progress.completedUnitCount = 100
                 cb.fn(cachedURL, providerItem, nil)
             } catch {
-                cb.fn(nil, nil, mapFileProviderError(error))
+                cb.fn(nil, nil, mapProviderError(error))
             }
         }
         return progress
@@ -96,9 +100,11 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
         let isFolder = itemTemplate.contentType == .folder
         let progress = Progress(totalUnitCount: 100)
         let cb = CB(completionHandler)
+        let resolver = self.resolver
+        let domainID = domain.identifier.rawValue
         Task {
             do {
-                let context = try await resolver.resolve(domain: domain)
+                let context = try await resolver.resolve(domainIdentifier: domainID)
                 let parentPath = parentRaw == NSFileProviderItemIdentifier.rootContainer.rawValue ? CloudPath("/") : CloudPath(parentRaw)
                 let remotePath = parentPath.appendingComponent(filename)
                 let createdItem: NSFileProviderItem
@@ -116,7 +122,7 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
                 progress.completedUnitCount = 100
                 cb.fn(createdItem, [], false, nil)
             } catch {
-                cb.fn(nil, [], false, mapFileProviderError(error))
+                cb.fn(nil, [], false, mapProviderError(error))
             }
         }
         return progress
@@ -134,9 +140,11 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
         let newName = changedFields.contains(.filename) ? item.filename : nil
         let progress = Progress(totalUnitCount: 100)
         let cb = CB(completionHandler)
+        let resolver = self.resolver
+        let domainID = domain.identifier.rawValue
         Task {
             do {
-                let context = try await resolver.resolve(domain: domain)
+                let context = try await resolver.resolve(domainIdentifier: domainID)
                 let path = CloudPath(itemID)
                 if let name = newName {
                     let renamed = try await context.provider.rename(path: path, newName: name, account: context.account)
@@ -152,7 +160,7 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
                 }
                 progress.completedUnitCount = 100
             } catch {
-                cb.fn(nil, [], false, mapFileProviderError(error))
+                cb.fn(nil, [], false, mapProviderError(error))
             }
         }
         return progress
@@ -165,15 +173,17 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
                            completionHandler: @escaping (Error?) -> Void) -> Progress {
         let progress = Progress(totalUnitCount: 1)
         let cb = CB(completionHandler)
+        let resolver = self.resolver
+        let domainID = domain.identifier.rawValue
         Task {
             do {
-                let context = try await resolver.resolve(domain: domain)
+                let context = try await resolver.resolve(domainIdentifier: domainID)
                 let path = CloudPath(identifier.rawValue)
                 try await context.provider.delete(path: path, account: context.account)
                 progress.completedUnitCount = 1
                 cb.fn(nil)
             } catch {
-                cb.fn(mapFileProviderError(error))
+                cb.fn(mapProviderError(error))
             }
         }
         return progress
@@ -202,38 +212,39 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
         }
     }
 
-    // MARK: - Private
+}
 
-    private func moveDownloadedContent(_ url: URL, itemIdentifier: NSFileProviderItemIdentifier) throws -> URL {
-        let cacheRoot = FileManager.default.temporaryDirectory
-            .appendingPathComponent("StratusFileProvider", isDirectory: true)
-            .appendingPathComponent(domain.identifier.rawValue, isDirectory: true)
-        try FileManager.default.createDirectory(at: cacheRoot, withIntermediateDirectories: true)
-        let safeName = itemIdentifier.rawValue
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: ":", with: "_")
-        let destination = cacheRoot.appendingPathComponent(safeName.isEmpty ? UUID().uuidString : safeName)
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
-        }
-        try FileManager.default.moveItem(at: url, to: destination)
-        return destination
+// MARK: - File-scope helpers (no self capture needed in Task closures)
+
+private func moveDownloadedFile(_ url: URL, itemIdentifier: NSFileProviderItemIdentifier, domainID: String) throws -> URL {
+    let cacheRoot = FileManager.default.temporaryDirectory
+        .appendingPathComponent("StratusFileProvider", isDirectory: true)
+        .appendingPathComponent(domainID, isDirectory: true)
+    try FileManager.default.createDirectory(at: cacheRoot, withIntermediateDirectories: true)
+    let safeName = itemIdentifier.rawValue
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: ":", with: "_")
+    let destination = cacheRoot.appendingPathComponent(safeName.isEmpty ? UUID().uuidString : safeName)
+    if FileManager.default.fileExists(atPath: destination.path) {
+        try FileManager.default.removeItem(at: destination)
     }
+    try FileManager.default.moveItem(at: url, to: destination)
+    return destination
+}
 
-    private func mapFileProviderError(_ error: any Error) -> any Error {
-        if error is StratusFileProviderDomainResolverError {
+private func mapProviderError(_ error: any Error) -> any Error {
+    if error is StratusFileProviderDomainResolverError {
+        return NSFileProviderError(.notAuthenticated)
+    }
+    if let providerError = error as? ProviderError {
+        switch providerError {
+        case .fileNotFound:
+            return NSFileProviderError(.noSuchItem)
+        case .authenticationFailed, .accessDenied:
             return NSFileProviderError(.notAuthenticated)
+        default:
+            break
         }
-        if let providerError = error as? ProviderError {
-            switch providerError {
-            case .fileNotFound:
-                return NSFileProviderError(.noSuchItem)
-            case .authenticationFailed, .accessDenied:
-                return NSFileProviderError(.notAuthenticated)
-            default:
-                break
-            }
-        }
-        return error
     }
+    return error
 }
