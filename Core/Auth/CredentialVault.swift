@@ -78,24 +78,24 @@ public actor CredentialVault {
 
     // MARK: - OAuth Credentials
 
-    public func saveOAuthCredential(_ credential: OAuthCredential, providerID: String, accountID: String) throws {
+    public func saveOAuthCredential(_ credential: OAuthCredential, providerID: String, accountID: String) async throws {
         let data = try encoder.encode(credential)
-        try keychain.saveSecret(data,
+        try await keychain.saveSecret(data,
             service: KeychainStore.ServiceName.accessToken(providerID: providerID, accountID: accountID),
             account: accountID
         )
     }
 
-    public func loadOAuthCredential(providerID: String, accountID: String) throws -> OAuthCredential? {
-        guard let data = try keychain.loadSecret(
+    public func loadOAuthCredential(providerID: String, accountID: String) async throws -> OAuthCredential? {
+        guard let data = try await keychain.loadSecret(
             service: KeychainStore.ServiceName.accessToken(providerID: providerID, accountID: accountID),
             account: accountID
         ) else { return nil }
         return try decoder.decode(OAuthCredential.self, from: data)
     }
 
-    public func deleteOAuthCredential(providerID: String, accountID: String) throws {
-        try keychain.deleteSecret(
+    public func deleteOAuthCredential(providerID: String, accountID: String) async throws {
+        try await keychain.deleteSecret(
             service: KeychainStore.ServiceName.accessToken(providerID: providerID, accountID: accountID),
             account: accountID
         )
@@ -103,16 +103,16 @@ public actor CredentialVault {
 
     // MARK: - API Key Credentials
 
-    public func saveAPIKeyCredential(_ credential: APIKeyCredential, providerID: String, accountID: String) throws {
+    public func saveAPIKeyCredential(_ credential: APIKeyCredential, providerID: String, accountID: String) async throws {
         let data = try encoder.encode(credential)
-        try keychain.saveSecret(data,
+        try await keychain.saveSecret(data,
             service: KeychainStore.ServiceName.apiKey(providerID: providerID, accountID: accountID),
             account: accountID
         )
     }
 
-    public func loadAPIKeyCredential(providerID: String, accountID: String) throws -> APIKeyCredential? {
-        guard let data = try keychain.loadSecret(
+    public func loadAPIKeyCredential(providerID: String, accountID: String) async throws -> APIKeyCredential? {
+        guard let data = try await keychain.loadSecret(
             service: KeychainStore.ServiceName.apiKey(providerID: providerID, accountID: accountID),
             account: accountID
         ) else { return nil }
@@ -121,16 +121,16 @@ public actor CredentialVault {
 
     // MARK: - Basic Credentials
 
-    public func saveBasicCredential(_ credential: BasicCredential, providerID: String, accountID: String) throws {
+    public func saveBasicCredential(_ credential: BasicCredential, providerID: String, accountID: String) async throws {
         let data = try encoder.encode(credential)
-        try keychain.saveSecret(data,
+        try await keychain.saveSecret(data,
             service: KeychainStore.ServiceName.sftpPassword(accountID: accountID),
             account: accountID
         )
     }
 
-    public func loadBasicCredential(providerID: String, accountID: String) throws -> BasicCredential? {
-        guard let data = try keychain.loadSecret(
+    public func loadBasicCredential(providerID: String, accountID: String) async throws -> BasicCredential? {
+        guard let data = try await keychain.loadSecret(
             service: KeychainStore.ServiceName.sftpPassword(accountID: accountID),
             account: accountID
         ) else { return nil }
@@ -139,8 +139,8 @@ public actor CredentialVault {
 
     // MARK: - Full Account Deletion
 
-    public func deleteAllCredentials(for account: CloudAccount) throws {
-        try keychain.deleteAllItems(forAccount: account.id)
+    public func deleteAllCredentials(for account: CloudAccount) async throws {
+        try await keychain.deleteAllItems(forAccount: account.id)
         logger.info("Deleted all credentials for account \(account.id)")
     }
 
