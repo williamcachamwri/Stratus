@@ -28,10 +28,14 @@ public actor GoogleDriveResumableUpload {
         }
         let bodyData = try JSONSerialization.data(withJSONObject: body)
 
-        var comps = URLComponents(string: Self.baseURL)!
+        guard var comps = URLComponents(string: Self.baseURL) else {
+            throw ProviderError.invalidResponse("Could not build resumable upload URL")
+        }
         comps.queryItems = [URLQueryItem(name: "uploadType", value: "resumable")]
-
-        var request = HTTPRequest(url: comps.url!, method: .POST)
+        guard let resumableURL = comps.url else {
+            throw ProviderError.invalidResponse("Could not build resumable upload URL with query")
+        }
+        var request = HTTPRequest(url: resumableURL, method: .POST)
         request.headers["Authorization"] = "Bearer \(accessToken)"
         request.headers["Content-Type"] = "application/json"
         request.headers["X-Upload-Content-Type"] = mimeType
