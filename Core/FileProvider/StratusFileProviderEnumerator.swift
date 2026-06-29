@@ -13,7 +13,7 @@ private final class Box<T>: @unchecked Sendable {
 
 public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable {
 
-    private nonisolated(unsafe) let containerItem: NSFileProviderItemIdentifier
+    private let containerItem: NSFileProviderItemIdentifier
     private let provider: any CloudProvider
     private let account: CloudAccount
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "FileProviderEnumerator")
