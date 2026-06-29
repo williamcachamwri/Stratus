@@ -1,5 +1,6 @@
 import Foundation
 import AuthenticationServices
+import CryptoKit
 import os.log
 
 // MARK: - Google OAuth2 via ASWebAuthenticationSession
@@ -100,7 +101,6 @@ public actor GoogleDriveAuth {
     }
 
     private func generatePKCE() -> (verifier: String, challenge: String) {
-        import CryptoKit
         var bytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         let verifier = Data(bytes).base64EncodedString()
