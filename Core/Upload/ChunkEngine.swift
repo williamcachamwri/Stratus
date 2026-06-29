@@ -227,6 +227,20 @@ public actor ChunkEngine {
             throw UploadError.providerError("Provider did not confirm one or more chunk checksums")
         }
 
+        let finalChecksumVerified: Bool
+        if isEncryptedUpload {
+            finalChecksumVerified = chunkVerification
+        } else {
+            finalChecksumVerified = try await verifyFinalChecksum(
+                provider: provider,
+                account: account,
+                path: task.destinationPath,
+                expectedSHA256: task.localChecksum,
+                expectedMD5: try await checksumEngine.md5Stream(url: task.sourceURL),
+                fallbackConfirmed: chunkVerification
+            )
+        }
+
         if !isEncryptedUpload, let deltaMapToStore {
             try? await provider.storeBlockManifest(deltaMapToStore, path: task.destinationPath, account: account)
             try? await resumeStore.saveBlockManifest(deltaMapToStore, fileURL: task.sourceURL, providerID: provider.id, accountID: account.id, remotePath: task.destinationPath.path)
@@ -237,7 +251,7 @@ public actor ChunkEngine {
             remoteItem: remoteItem,
             bytesUploaded: wireBytesUploaded,
             bytesSkippedByDelta: bytesSkippedByDelta,
-            checksumVerified: true,
+            checksumVerified: finalChecksumVerified,
             durationSeconds: Date().timeIntervalSince(startTime),
             chunkCount: totalChunks,
             retriedChunks: retriedChunks
