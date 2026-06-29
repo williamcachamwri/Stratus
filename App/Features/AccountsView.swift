@@ -108,7 +108,7 @@ private struct AddAccountSheet: View {
                 if let definition = selectedDefinition {
                     accountForm(definition: definition)
                 } else {
-                    ProviderPickerView { choice in
+                    ProviderPickerView(showsHeader: false) { choice in
                         selectedProviderID = choice.id
                         displayName = choice.title
                         applySharedDefaults(for: choice.id)
