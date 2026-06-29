@@ -32,7 +32,7 @@ public actor OneDriveProvider: CloudProvider {
     public func refreshCredentials(account: CloudAccount) async throws {}
     public func validateCredentials(account: CloudAccount) async throws -> Bool {
         guard let cred = try await vault.loadOAuthCredential(providerID: id, accountID: account.id) else { return false }
-        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)")!, headers: ["Authorization": "Bearer \(cred.accessToken)"])
+        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)") ?? URL(fileURLWithPath: "/"), headers: ["Authorization": "Bearer \(cred.accessToken)"])
         let response = try await http.data(for: request)
         return response.isSuccess
     }
@@ -42,7 +42,7 @@ public actor OneDriveProvider: CloudProvider {
 
     public func quota(for account: CloudAccount) async throws -> StorageQuota {
         let token = try await accessToken(account: account)
-        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)?$select=quota")!, headers: ["Authorization": "Bearer \(token)"])
+        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)?$select=quota") ?? URL(fileURLWithPath: "/"), headers: ["Authorization": "Bearer \(token)"])
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
@@ -60,7 +60,7 @@ public actor OneDriveProvider: CloudProvider {
         if let pt = pageToken, let nextURL = URL(string: pt) {
             url = nextURL
         } else {
-            url = URL(string: "\(Self.baseURL)/\(itemPath)/children?$select=id,name,size,file,folder,lastModifiedDateTime,@microsoft.graph.downloadUrl&$top=999")!
+            url = URL(string: "\(Self.baseURL)/\(itemPath)/children?$select=id,name,size,file,folder,lastModifiedDateTime,@microsoft.graph.downloadUrl&$top=999") ?? URL(fileURLWithPath: "/")
         }
         let request = HTTPRequest(url: url, headers: ["Authorization": "Bearer \(token)"])
         let response = try await http.data(for: request)
@@ -81,7 +81,7 @@ public actor OneDriveProvider: CloudProvider {
 
     public func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/root:\(path.path)")!, headers: ["Authorization": "Bearer \(token)"])
+        let request = HTTPRequest(url: URL(string: "\(Self.baseURL)/root:\(path.path)") ?? URL(fileURLWithPath: "/"), headers: ["Authorization": "Bearer \(token)"])
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
@@ -94,7 +94,7 @@ public actor OneDriveProvider: CloudProvider {
     // OneDrive large file upload session
     public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String {
         let token = try await accessToken(account: account)
-        let url = URL(string: "\(Self.baseURL)/root:\(remotePath.path):/createUploadSession")!
+        let url = URL(string: "\(Self.baseURL)/root:\(remotePath.path):/createUploadSession") ?? URL(fileURLWithPath: "/")
         var request = HTTPRequest(url: url, method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
@@ -113,7 +113,8 @@ public actor OneDriveProvider: CloudProvider {
     public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
         let chunkSize = 10 * 1024 * 1024  // Assume 10 MB chunks
         let offset = Int64(chunkNumber - 1) * Int64(chunkSize)
-        var request = HTTPRequest(url: URL(string: uploadID)!, method: .PUT)
+        guard let chunkURL = URL(string: uploadID) else { throw ProviderError.invalidResponse("Could not build URL") }
+        var request = HTTPRequest(url: chunkURL, method: .PUT)
         request.headers["Content-Length"] = "\(data.count)"
         request.headers["Content-Range"] = "bytes \(offset)-\(offset + Int64(data.count) - 1)/*"
         request.body = data
@@ -129,13 +130,14 @@ public actor OneDriveProvider: CloudProvider {
     }
 
     public func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {
-        let request = HTTPRequest(url: URL(string: uploadID)!, method: .DELETE)
+        guard let abortURL = URL(string: uploadID) else { return }
+        let request = HTTPRequest(url: abortURL, method: .DELETE)
         _ = try? await http.data(for: request)
     }
 
     public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        let url = URL(string: "\(Self.baseURL)/root:\(remotePath.path):/content")!
+        let url = URL(string: "\(Self.baseURL)/root:\(remotePath.path):/content") ?? URL(fileURLWithPath: "/")
         var request = HTTPRequest(url: url, method: .PUT)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = metadata.contentType ?? "application/octet-stream"
@@ -151,7 +153,7 @@ public actor OneDriveProvider: CloudProvider {
 
     public func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL {
         let token = try await accessToken(account: account)
-        let url = URL(string: "\(Self.baseURL)/root:\(path.path):/content")!
+        let url = URL(string: "\(Self.baseURL)/root:\(path.path):/content") ?? URL(fileURLWithPath: "/")
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("0", forHTTPHeaderField: "Content-Length")
@@ -174,7 +176,7 @@ public actor OneDriveProvider: CloudProvider {
     public func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
         let parentPath = path.deletingLastComponent.path
-        let url = URL(string: "\(Self.baseURL)/root:\(parentPath):/children")!
+        let url = URL(string: "\(Self.baseURL)/root:\(parentPath):/children") ?? URL(fileURLWithPath: "/")
         var request = HTTPRequest(url: url, method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
@@ -191,7 +193,7 @@ public actor OneDriveProvider: CloudProvider {
     public func move(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
         let item = try await fileMetadata(path: from, account: account)
-        let url = URL(string: "\(Self.baseURL)/items/\(item.id)")!
+        let url = URL(string: "\(Self.baseURL)/items/\(item.id)") ?? URL(fileURLWithPath: "/")
         var request = HTTPRequest(url: url, method: .PATCH)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
@@ -207,7 +209,7 @@ public actor OneDriveProvider: CloudProvider {
 
     public func delete(path: CloudPath, account: CloudAccount) async throws {
         let token = try await accessToken(account: account)
-        let url = URL(string: "\(Self.baseURL)/root:\(path.path)")!
+        let url = URL(string: "\(Self.baseURL)/root:\(path.path)") ?? URL(fileURLWithPath: "/")
         let request = HTTPRequest(url: url, method: .DELETE, headers: ["Authorization": "Bearer \(token)"])
         let response = try await http.data(for: request)
         guard response.isSuccess || response.statusCode == 204 else {
