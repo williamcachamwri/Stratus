@@ -87,4 +87,45 @@ final class ClientSideEncryptionTests: XCTestCase {
         let decrypted = try Data(contentsOf: decURL)
         XCTAssertEqual(original, decrypted)
     }
+
+    func test_bitflipInCiphertext_causesDecryptionFailure() async throws {
+        // DoD: bitflip in ciphertext → AES-GCM auth failure, not silent corruption
+        let original = Data("critical data that must not be silently corrupted".utf8)
+        let encrypted = try await encryption.encryptData(original)
+        var corrupted = encrypted
+        corrupted[EncryptionHeader.byteLength] ^= 0xFF  // flip first ciphertext byte
+        do {
+            _ = try await encryption.decryptData(corrupted)
+            XCTFail("AES-GCM authentication must detect ciphertext corruption")
+        } catch {
+            // Expected: auth tag mismatch → decryptionFailed
+        }
+    }
+
+    func test_encryptData_differentCiphertextEachCall() async throws {
+        let data = Data("same plaintext same plaintext".utf8)
+        let enc1 = try await encryption.encryptData(data)
+        let enc2 = try await encryption.encryptData(data)
+        XCTAssertNotEqual(enc1, enc2, "Each encryption must use a fresh random IV")
+    }
+
+    func test_encryptDecrypt_emptyData() async throws {
+        let empty = Data()
+        let encrypted = try await encryption.encryptData(empty)
+        let decrypted = try await encryption.decryptData(encrypted)
+        XCTAssertEqual(decrypted, empty, "Empty data must survive encrypt/decrypt round trip")
+    }
+
+    func test_headerParsing_wrongMagic_throwsIntegrityError() async throws {
+        var badHeader = Data(count: EncryptionHeader.byteLength)
+        badHeader[0] = 0xFF  // wrong magic (correct is 0x53 "S")
+        do {
+            _ = try EncryptionHeader.parse(from: badHeader)
+            XCTFail("Wrong magic bytes must throw integrityCheckFailed")
+        } catch EncryptionError.integrityCheckFailed {
+            // Expected
+        } catch {
+            XCTFail("Expected integrityCheckFailed, got: \(error)")
+        }
+    }
 }
