@@ -408,7 +408,7 @@ public actor CloudProviderRegistry {
 
     private init() {}
 
-    public func register(_ provider: some CloudProvider) {
+    public func register(_ provider: any CloudProvider) {
         providers[provider.id] = provider
     }
 
