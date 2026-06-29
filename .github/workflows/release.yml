@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without v prefix'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  unsigned-release:
+    name: Build unsigned release and appcast
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${{ inputs.version }}"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify toolchain
+        run: Scripts/ci_bootstrap.sh
+
+      - name: Build unsigned release bundle
+        run: Scripts/build_unsigned_release.sh "${{ steps.version.outputs.version }}"
+
+      - name: Prepare release directory
+        run: |
+          mkdir -p dist/releases
+          cp dist/Stratus-${{ steps.version.outputs.version }}.zip dist/releases/
+          if [[ -f dist/Stratus-${{ steps.version.outputs.version }}.dmg ]]; then
+            cp dist/Stratus-${{ steps.version.outputs.version }}.dmg dist/releases/
+          fi
+
+      - name: Generate Sparkle appcast if tool is available
+        run: |
+          if [[ -n "${SPARKLE_GENERATE_APPCAST:-}" ]] || find .build -name generate_appcast -type f -perm -111 | grep -q .; then
+            Scripts/generate_appcast.sh dist/releases
+          else
+            cp Updates/Sparkle/appcast.xml dist/releases/appcast.xml
+            echo "Sparkle generate_appcast tool was not found; published template appcast.xml."
+          fi
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Stratus ${{ steps.version.outputs.version }}
+          draft: true
+          prerelease: false
+          files: |
+            dist/releases/*
