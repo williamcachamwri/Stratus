@@ -25,8 +25,7 @@ public actor ChecksumEngine {
         defer { try? fileHandle.close() }
 
         while true {
-            let chunk = try fileHandle.read(upToCount: streamingChunkSize)
-            if chunk.isEmpty { break }
+            guard let chunk = try fileHandle.read(upToCount: streamingChunkSize), !chunk.isEmpty else { break }
             hasher.update(data: chunk)
         }
         let digest = hasher.finalize()
@@ -41,8 +40,7 @@ public actor ChecksumEngine {
         defer { try? fileHandle.close() }
 
         while true {
-            let chunk = try fileHandle.read(upToCount: streamingChunkSize)
-            if chunk.isEmpty { break }
+            guard let chunk = try fileHandle.read(upToCount: streamingChunkSize), !chunk.isEmpty else { break }
             hasher.update(data: chunk)
         }
         let digest = hasher.finalize()
