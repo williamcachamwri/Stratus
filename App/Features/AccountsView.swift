@@ -303,7 +303,8 @@ private struct AddAccountSheet: View {
                 redirectURI: oauthRedirectURI,
                 scopes: oauthScopes.split(separator: " ").map(String.init),
                 authorizationURL: authURL,
-                tokenURL: tokenURL
+                tokenURL: tokenURL,
+                clientSecret: SharedConfig.string("CLIENT_SECRET", providerID: definition.id)
             )
             oauthCredential = OAuthCredential(
                 accessToken: tokens.accessToken,
