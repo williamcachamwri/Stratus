@@ -1,0 +1,22 @@
+{
+  "appName": "Stratus",
+  "bundleIdentifier": "com.stratus.cloudmanager",
+  "minimumSystemVersion": "15.0",
+  "feedURL": "https://github.com/williamcachamwri/Stratus/releases/latest/download/appcast.xml",
+  "releaseRepository": "https://github.com/williamcachamwri/Stratus",
+  "artifactPattern": "Stratus-{version}.{zip,dmg}",
+  "automaticallyUpdate": false,
+  "updateSigning": {
+    "sparkleEdDSARequired": false,
+    "publicKeyInfoPlistKey": "SUPublicEDKey",
+    "privateKeysCommitted": false,
+    "notes": "Insert SUPublicEDKey only after generating a real Sparkle EdDSA public key. Never commit the private key."
+  },
+  "channels": [
+    {
+      "name": "stable",
+      "appcast": "appcast.xml",
+      "default": true
+    }
+  ]
+}
