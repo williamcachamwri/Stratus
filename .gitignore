@@ -62,3 +62,7 @@ coverage/
 *.tmp
 *.temp
 /tmp/
+
+# Local shared configs with real client IDs/secrets
+shared/*.local.config
+shared/local/*.config
