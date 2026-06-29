@@ -2,6 +2,67 @@ import SwiftUI
 import StratusCore
 import os.log
 
+// MARK: - Upload Dashboard Presentation State
+
+public enum UploadDisplayPhase: String, Sendable, CaseIterable {
+    case queued
+    case hashing
+    case uploading
+    case paused
+    case failed
+    case completed
+    case cancelled
+    case skipped
+}
+
+public struct UploadRowState: Identifiable, Sendable {
+    public let id: UUID
+    public let fileName: String
+    public let providerID: String
+    public let destinationPath: String
+    public let phase: UploadDisplayPhase
+    public let progress: Double
+    public let bytesTransferred: Int64
+    public let totalBytes: Int64
+    public let speedBPS: Double
+    public let etaSeconds: Double?
+    public let chunkText: String?
+    public let detailText: String
+    public let checksumVerified: Bool
+    public let updatedAt: Date
+}
+
+public struct UploadDashboardSummary: Sendable {
+    public let activeCount: Int
+    public let queuedCount: Int
+    public let failedCount: Int
+    public let pausedCount: Int
+    public let completedCount: Int
+    public let bytesTransferred: Int64
+    public let totalBytes: Int64
+    public let currentBPS: Double
+    public let peakBPS: Double
+    public let etaSeconds: Double?
+
+    public static let empty = UploadDashboardSummary(
+        activeCount: 0,
+        queuedCount: 0,
+        failedCount: 0,
+        pausedCount: 0,
+        completedCount: 0,
+        bytesTransferred: 0,
+        totalBytes: 0,
+        currentBPS: 0,
+        peakBPS: 0,
+        etaSeconds: nil
+    )
+
+    public var progress: Double {
+        guard totalBytes > 0 else { return 0 }
+        return min(1, Double(bytesTransferred) / Double(totalBytes))
+    }
+}
+
 // MARK: - AppEnvironment
 // Single source of truth for shared state and services injected into the SwiftUI environment.
 
@@ -21,12 +82,17 @@ public final class AppEnvironment: ObservableObject {
     @Published public var activeSyncPairs: [SyncPair] = []
     @Published public var pendingConflicts: [SyncConflict] = []
     @Published public var uploadEvents: [UploadEngineEvent] = []
+    @Published public var uploadRows: [UploadRowState] = []
+    @Published public var uploadSummary: UploadDashboardSummary = .empty
+    @Published public var uploadBandwidthSnapshot: BWSnapshot?
     @Published public var isOnline: Bool = true
     @Published public var activeUploads: Int = 0
 
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "AppEnvironment")
     private var uploadEventTask: Task<Void, Never>?
+    private var uploadBandwidthTask: Task<Void, Never>?
     private var syncEventTask: Task<Void, Never>?
+    private var uploadRowStore: [UUID: UploadRowState] = [:]
 
     private init() {
         startListeningForEvents()
@@ -38,6 +104,13 @@ public final class AppEnvironment: ObservableObject {
         uploadEventTask = Task { @MainActor [weak self] in
             for await event in await self?.uploadEngine.events ?? AsyncStream { _ in } {
                 self?.handleUploadEvent(event)
+            }
+        }
+
+        uploadBandwidthTask = Task { @MainActor [weak self] in
+            for await snapshot in await self?.uploadEngine.bandwidthUpdates ?? AsyncStream { _ in } {
+                self?.uploadBandwidthSnapshot = snapshot
+                self?.publishUploadState()
             }
         }
 
@@ -58,27 +131,164 @@ public final class AppEnvironment: ObservableObject {
     private func handleUploadEvent(_ event: UploadEngineEvent) {
         uploadEvents.append(event)
         if uploadEvents.count > 200 { uploadEvents.removeFirst() }
+
         switch event {
-        case .taskStarted:
-            activeUploads += 1
-        case .taskCompleted(let task, _):
-            activeUploads = max(0, activeUploads - 1)
+        case .taskAdded(let task):
+            uploadRowStore[task.id] = row(for: task, phase: .queued, detail: "Queued at normal scheduler priority")
+        case .taskStarted(let id):
+            updateRow(id: id, phase: .hashing, detail: "Preparing checksum, delta check, and upload session")
+        case .taskProgress(let id, let progress):
+            updateRow(id: id, progress: progress)
+        case .taskCompleted(let task, let result):
+            uploadRowStore[task.id] = row(
+                for: task,
+                phase: .completed,
+                progress: 1,
+                bytesTransferred: result.bytesUploaded,
+                speedBPS: result.durationSeconds > 0 ? Double(result.bytesUploaded) / result.durationSeconds : 0,
+                etaSeconds: nil,
+                chunkText: "\(result.chunkCount) chunks · \(result.retriedChunks) retries",
+                detail: result.checksumVerified ? "SHA-256 verified" : "Uploaded; checksum unavailable",
+                checksumVerified: result.checksumVerified
+            )
             StratusNotificationCenter.shared.notifyUploadComplete(
                 fileName: task.sourceURL.lastPathComponent,
                 providerName: task.accountID
             )
-            DockProgressManager.shared.updateUploadProgress(
-                activeUploads > 0 ? 0.5 : 0, activeCount: activeUploads
-            )
         case .taskFailed(let task, let error):
-            activeUploads = max(0, activeUploads - 1)
+            uploadRowStore[task.id] = row(
+                for: task,
+                phase: .failed,
+                detail: error.localizedDescription,
+                checksumVerified: false
+            )
             StratusNotificationCenter.shared.notifyUploadFailed(
                 fileName: task.sourceURL.lastPathComponent,
                 error: error.localizedDescription
             )
-        case .taskCancelled:
-            activeUploads = max(0, activeUploads - 1)
-        default: break
+        case .taskPaused(let id):
+            updateRow(id: id, phase: .paused, detail: "Paused with resume state preserved")
+        case .taskResumed(let id):
+            updateRow(id: id, phase: .queued, detail: "Queued for resume")
+        case .taskCancelled(let id):
+            updateRow(id: id, phase: .cancelled, detail: "Cancelled by user")
+        case .sessionRestored:
+            break
+        }
+
+        publishUploadState()
+        DockProgressManager.shared.updateUploadProgress(uploadSummary.progress, activeCount: activeUploads)
+    }
+
+    private func row(
+        for task: UploadTask,
+        phase: UploadDisplayPhase,
+        progress: Double = 0,
+        bytesTransferred: Int64 = 0,
+        speedBPS: Double = 0,
+        etaSeconds: Double? = nil,
+        chunkText: String? = nil,
+        detail: String,
+        checksumVerified: Bool = false
+    ) -> UploadRowState {
+        UploadRowState(
+            id: task.id,
+            fileName: task.sourceURL.lastPathComponent,
+            providerID: task.providerID,
+            destinationPath: task.destinationPath.path,
+            phase: phase,
+            progress: progress,
+            bytesTransferred: bytesTransferred,
+            totalBytes: task.fileSize,
+            speedBPS: speedBPS,
+            etaSeconds: etaSeconds,
+            chunkText: chunkText,
+            detailText: detail,
+            checksumVerified: checksumVerified,
+            updatedAt: Date()
+        )
+    }
+
+    private func updateRow(id: UUID, phase: UploadDisplayPhase, detail: String) {
+        guard let existing = uploadRowStore[id] else { return }
+        uploadRowStore[id] = UploadRowState(
+            id: existing.id,
+            fileName: existing.fileName,
+            providerID: existing.providerID,
+            destinationPath: existing.destinationPath,
+            phase: phase,
+            progress: existing.progress,
+            bytesTransferred: existing.bytesTransferred,
+            totalBytes: existing.totalBytes,
+            speedBPS: existing.speedBPS,
+            etaSeconds: existing.etaSeconds,
+            chunkText: existing.chunkText,
+            detailText: detail,
+            checksumVerified: existing.checksumVerified,
+            updatedAt: Date()
+        )
+    }
+
+    private func updateRow(id: UUID, progress: ChunkProgress) {
+        guard let existing = uploadRowStore[id] else { return }
+        uploadRowStore[id] = UploadRowState(
+            id: existing.id,
+            fileName: existing.fileName,
+            providerID: existing.providerID,
+            destinationPath: existing.destinationPath,
+            phase: .uploading,
+            progress: progress.percentComplete,
+            bytesTransferred: progress.bytesTransferred,
+            totalBytes: progress.totalBytes,
+            speedBPS: progress.currentSpeedBPS,
+            etaSeconds: progress.estimatedSecondsRemaining.isFinite ? progress.estimatedSecondsRemaining : nil,
+            chunkText: "Chunk \(progress.completed)/\(progress.total) · \(progress.inFlight) in flight",
+            detailText: "\(progress.failed) failed chunks · live transfer",
+            checksumVerified: existing.checksumVerified,
+            updatedAt: Date()
+        )
+    }
+
+    private func publishUploadState() {
+        let rows = uploadRowStore.values.sorted { lhs, rhs in
+            if phaseRank(lhs.phase) != phaseRank(rhs.phase) {
+                return phaseRank(lhs.phase) < phaseRank(rhs.phase)
+            }
+            return lhs.updatedAt > rhs.updatedAt
+        }
+        uploadRows = rows
+        activeUploads = rows.filter { $0.phase == .hashing || $0.phase == .uploading }.count
+        uploadSummary = makeUploadSummary(rows: rows)
+    }
+
+    private func makeUploadSummary(rows: [UploadRowState]) -> UploadDashboardSummary {
+        let snapshot = uploadBandwidthSnapshot
+        let transferred = rows.reduce(Int64(0)) { $0 + $1.bytesTransferred }
+        let total = rows.reduce(Int64(0)) { $0 + max($1.totalBytes, $1.bytesTransferred) }
+        let currentBPS = snapshot?.currentBPS ?? rows.reduce(Double(0)) { $0 + $1.speedBPS }
+        let remaining = max(0, total - transferred)
+        return UploadDashboardSummary(
+            activeCount: rows.filter { $0.phase == .hashing || $0.phase == .uploading }.count,
+            queuedCount: rows.filter { $0.phase == .queued }.count,
+            failedCount: rows.filter { $0.phase == .failed }.count,
+            pausedCount: rows.filter { $0.phase == .paused }.count,
+            completedCount: rows.filter { $0.phase == .completed }.count,
+            bytesTransferred: transferred,
+            totalBytes: total,
+            currentBPS: currentBPS,
+            peakBPS: snapshot?.peakBPS ?? 0,
+            etaSeconds: currentBPS > 0 ? Double(remaining) / currentBPS : nil
+        )
+    }
+
+    private func phaseRank(_ phase: UploadDisplayPhase) -> Int {
+        switch phase {
+        case .uploading, .hashing: return 0
+        case .queued: return 1
+        case .paused: return 2
+        case .failed: return 3
+        case .completed: return 4
+        case .cancelled, .skipped: return 5
         }
     }
 
