@@ -1,17 +1,18 @@
 import Foundation
 import FileProvider
+import UniformTypeIdentifiers
 
 // MARK: - StratusFileProviderItem
 // Bridges CloudFileItem into the NSFileProviderItem protocol for virtual filesystem presentation.
 
 public final class StratusFileProviderItem: NSObject, NSFileProviderItem, @unchecked Sendable {
 
-    // MARK: - NSFileProviderItem Required
+    // MARK: - NSFileProviderItem Required (macOS modern API)
 
     public let itemIdentifier: NSFileProviderItemIdentifier
     public let parentItemIdentifier: NSFileProviderItemIdentifier
     public let filename: String
-    public let typeIdentifier: String
+    public let contentType: UTType
     public let capabilities: NSFileProviderItemCapabilities
 
     // MARK: - NSFileProviderItem Optional
@@ -20,19 +21,18 @@ public final class StratusFileProviderItem: NSObject, NSFileProviderItem, @unche
     public let contentModificationDate: Date?
     public let creationDate: Date?
     public let childItemCount: NSNumber?
-    public let isTrashed: Bool
     public let isDownloaded: Bool
     public let isDownloading: Bool
     public let isUploaded: Bool
     public let isUploading: Bool
     public let uploadingError: Error?
     public let downloadingError: Error?
-    public let versionIdentifier: Data?
+    public let itemVersion: NSFileProviderItemVersion
 
     // MARK: - Custom
 
-    let cloudItem: CloudFileItem
-    let accountID: String
+    public let cloudItem: CloudFileItem
+    public let accountID: String
 
     // MARK: - Init from CloudFileItem
 
@@ -42,21 +42,27 @@ public final class StratusFileProviderItem: NSObject, NSFileProviderItem, @unche
         self.itemIdentifier = NSFileProviderItemIdentifier(item.id)
         self.parentItemIdentifier = parentID
         self.filename = item.name
-        self.typeIdentifier = item.isDirectory
-            ? "public.folder"
-            : UTType(filenameExtension: (item.name as NSString).pathExtension)?.identifier ?? "public.data"
+
+        if item.isDirectory {
+            self.contentType = .folder
+        } else {
+            let ext = (item.name as NSString).pathExtension
+            self.contentType = UTType(filenameExtension: ext) ?? .data
+        }
+
         self.documentSize = item.size.map { NSNumber(value: $0) }
-        self.contentModificationDate = item.modifiedAt
-        self.creationDate = item.createdAt
+        self.contentModificationDate = item.modificationDate
+        self.creationDate = item.creationDate
         self.childItemCount = item.isDirectory ? NSNumber(value: 0) : nil
-        self.isTrashed = false
         self.isDownloaded = true
         self.isDownloading = false
         self.isUploaded = true
         self.isUploading = false
         self.uploadingError = nil
         self.downloadingError = nil
-        self.versionIdentifier = item.etag.flatMap { $0.data(using: .utf8) }
+
+        let versionData = item.etag?.data(using: .utf8) ?? Data()
+        self.itemVersion = NSFileProviderItemVersion(contentVersion: versionData, metadataVersion: versionData)
 
         if item.isDirectory {
             self.capabilities = [.allowsAddingSubItems, .allowsContentEnumerating,
@@ -73,16 +79,5 @@ public final class StratusFileProviderItem: NSObject, NSFileProviderItem, @unche
         let rootItem = CloudFileItem(id: NSFileProviderItemIdentifier.rootContainer.rawValue,
                                      name: "Stratus", path: CloudPath("/"), isDirectory: true)
         return StratusFileProviderItem(item: rootItem, parentID: .rootContainer, accountID: accountID)
-    }
-}
-
-// MARK: - UTType helper
-
-import UniformTypeIdentifiers
-
-private extension UTType {
-    init?(filenameExtension ext: String) {
-        guard !ext.isEmpty else { return nil }
-        self.init(tag: ext, tagClass: .filenameExtension, conformingTo: nil)
     }
 }
