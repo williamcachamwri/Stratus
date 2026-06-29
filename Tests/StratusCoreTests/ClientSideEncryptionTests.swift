@@ -47,7 +47,7 @@ final class ClientSideEncryptionTests: XCTestCase {
         try Data("test".utf8).write(to: plainURL)
         try await encryption.encrypt(fileURL: plainURL, to: encURL)
         let header = try Data(contentsOf: encURL).prefix(4)
-        XCTAssertEqual(Array(header), [0x53, 0x54, 0x52, 0x45])  // "STRE"
+        XCTAssertEqual(Array(header), [0x53, 0x54, 0x52, 0x53])  // "STRS"
     }
 
     func test_wrongKeyFailsDecryption() async throws {
@@ -86,6 +86,34 @@ final class ClientSideEncryptionTests: XCTestCase {
         try await encryption.decrypt(encryptedURL: encURL, to: decURL)
         let decrypted = try Data(contentsOf: decURL)
         XCTAssertEqual(original, decrypted)
+    }
+
+
+    func test_largeFileUsesMultipleAuthenticatedFrames() async throws {
+        let size = 3 * 1024 * 1024 + 17
+        let original = Data(repeating: 0x42, count: size)
+        let plainURL = tempDir.appendingPathComponent("multi-frame.bin")
+        let encURL = tempDir.appendingPathComponent("multi-frame.strs")
+        let decURL = tempDir.appendingPathComponent("multi-frame-dec.bin")
+        try original.write(to: plainURL)
+
+        try await encryption.encrypt(fileURL: plainURL, to: encURL)
+        let encrypted = try Data(contentsOf: encURL)
+
+        var offset = EncryptionHeader.byteLength
+        var frameCount = 0
+        while offset < encrypted.count {
+            XCTAssertGreaterThanOrEqual(encrypted.count - offset, 4)
+            let length = Int(encrypted[offset..<(offset + 4)].withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).bigEndian })
+            offset += 4 + 12 + length
+            frameCount += 1
+        }
+
+        XCTAssertGreaterThan(frameCount, 1, "Large encrypted files must be streamed into independent frames")
+        XCTAssertEqual(offset, encrypted.count)
+
+        try await encryption.decrypt(encryptedURL: encURL, to: decURL)
+        XCTAssertEqual(try Data(contentsOf: decURL), original)
     }
 
     func test_bitflipInCiphertext_causesDecryptionFailure() async throws {
