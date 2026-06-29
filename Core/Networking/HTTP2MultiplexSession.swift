@@ -124,11 +124,11 @@ public actor HTTP2MultiplexSession {
         }
     }
 
-    private func storeTask(_ task: URLSessionTask, id: UUID) {
+    private func storeTask(_ task: URLSessionTask, id: UUID) async {
         activeTasks[id] = task
     }
 
-    private func cancelTask(id: UUID) {
+    private func cancelTask(id: UUID) async {
         activeTasks[id]?.cancel()
         activeTasks.removeValue(forKey: id)
     }
