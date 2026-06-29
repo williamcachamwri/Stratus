@@ -93,7 +93,7 @@ public actor DownloadEngine {
 
     // MARK: - Provider Registration
 
-    public func registerProvider(_ provider: some CloudProvider, account: CloudAccount) {
+    public func registerProvider(_ provider: any CloudProvider, account: CloudAccount) {
         providers[account.id] = provider
         accounts[account.id] = account
         logger.debug("Registered provider \(provider.id) for account \(account.id)")
