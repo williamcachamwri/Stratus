@@ -61,4 +61,34 @@ final class ChunkSlicerTests: XCTestCase {
         XCTAssertEqual(chunks.count, 1)
         XCTAssertEqual(chunks[0].size, 0)
     }
+
+    func test_firstChunk_numberIsZero() {
+        let chunks = ChunkSlicer.slice(fileSize: 100, chunkSize: 5 * 1024 * 1024)
+        XCTAssertEqual(chunks[0].number, 0)
+    }
+
+    func test_allChunks_sequentialNumbers() {
+        let chunkSize = 5 * 1024 * 1024
+        let chunks = ChunkSlicer.slice(fileSize: Int64(chunkSize * 5), chunkSize: chunkSize)
+        for (i, chunk) in chunks.enumerated() {
+            XCTAssertEqual(chunk.number, i, "Chunk numbers must be sequential starting at 0")
+        }
+    }
+
+    func test_onlyLastChunk_isLast() {
+        let chunkSize = 5 * 1024 * 1024
+        let chunks = ChunkSlicer.slice(fileSize: Int64(chunkSize * 3 + 100), chunkSize: chunkSize)
+        XCTAssertEqual(chunks.count, 4)
+        for i in 0..<3 {
+            XCTAssertFalse(chunks[i].isLast, "Chunk \(i) must not be marked last")
+        }
+        XCTAssertTrue(chunks[3].isLast, "Only the final chunk must be marked last")
+    }
+
+    func test_defaultChunkSize_100MB_file() {
+        let size = Int64(100 * 1024 * 1024)
+        let chunkSize = ChunkSlicer.defaultChunkSize(for: size)
+        // 100 MB boundary: uses 16 MB chunks
+        XCTAssertEqual(chunkSize, 16 * 1024 * 1024)
+    }
 }
