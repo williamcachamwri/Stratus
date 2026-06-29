@@ -47,7 +47,7 @@ public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumer
                 }
                 obs.value.didEnumerate(providerItems)
                 if let nextToken = result.nextPageToken {
-                    obs.value.finishEnumerating(upTo: NSFileProviderPage(nextToken.data(using: .utf8)!))
+                    obs.value.finishEnumerating(upTo: NSFileProviderPage(nextToken.data(using: .utf8) ?? Data()))
                 } else {
                     obs.value.finishEnumerating(upTo: nil)
                 }
