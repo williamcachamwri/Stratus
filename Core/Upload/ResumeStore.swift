@@ -17,6 +17,26 @@ public actor ResumeStore {
         self.db = db
     }
 
+    public nonisolated static func makeBookmarkData(for url: URL) throws -> Data? {
+        #if os(macOS)
+        return try url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+        #else
+        return nil
+        #endif
+    }
+
+    public nonisolated func resolvedFileURL(for session: UploadSession) throws -> URL {
+        #if os(macOS)
+        if let bookmark = session.fileBookmark, !bookmark.isEmpty {
+            var stale = false
+            let url = try URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale)
+            guard !stale else { throw UploadError.fileChanged(url) }
+            return url
+        }
+        #endif
+        return URL(fileURLWithPath: session.fileURLString)
+    }
+
     // MARK: - Session Management
 
     public func saveSession(_ session: UploadSession) async throws {
@@ -81,8 +101,6 @@ public actor ResumeStore {
             let etagsStr = (row["etags"] as? String) ?? "{}"
 
             var chunks = (try? JSONDecoder().decode([Int].self, from: Data(chunksStr.utf8))) ?? []
-            var etags = (try? JSONDecoder().decode([String: Int].self, from: Data(etagsStr.utf8)).mapValues { $0 }) ?? [String: Int]()
-
             if !chunks.contains(chunk) {
                 chunks.append(chunk)
                 chunks.sort()
@@ -157,7 +175,7 @@ public actor ResumeStore {
     public func saveBlockManifest(_ manifest: BlockMap, fileURL: URL, providerID: String, accountID: String, remotePath: String) async throws {
         let manifestJSON = try encoder.encode(manifest)
         let manifestStr = String(data: manifestJSON, encoding: .utf8) ?? "{}"
-        let bookmarkStr = (try? fileURL.bookmarkData().base64EncodedString()) ?? fileURL.path
+        let bookmarkStr = bookmarkKey(for: fileURL)
 
         try await db.write { database in
             try database.execute(sql: """
@@ -173,7 +191,7 @@ public actor ResumeStore {
     }
 
     public func loadBlockManifest(fileURL: URL, providerID: String) async throws -> BlockMap? {
-        let bookmarkStr = (try? fileURL.bookmarkData().base64EncodedString()) ?? fileURL.path
+        let bookmarkStr = bookmarkKey(for: fileURL)
         return try await db.read { database in
             guard let row = try Row.fetchOne(database,
                 sql: "SELECT block_map FROM block_manifests WHERE file_bookmark = ? AND provider_id = ?",
@@ -185,6 +203,13 @@ public actor ResumeStore {
     }
 
     // MARK: - Private
+
+    private nonisolated func bookmarkKey(for url: URL) -> String {
+        if let bookmark = try? Self.makeBookmarkData(for: url), !bookmark.isEmpty {
+            return bookmark.base64EncodedString()
+        }
+        return url.path
+    }
 
     private nonisolated func sessionFromRow(_ row: Row) throws -> UploadSession {
         let chunksStr = (row["completed_chunks"] as? String) ?? "[]"
