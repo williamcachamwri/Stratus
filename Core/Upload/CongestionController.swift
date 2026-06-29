@@ -95,6 +95,14 @@ public actor CongestionController {
         return rttSamples.reduce(0, +) / Double(rttSamples.count)
     }
 
+    public var windowSizeForTesting: Double { windowSize }
+    public var ssthreshForTesting: Double { ssthresh }
+
+    public func setWindowForTesting(_ value: Double) {
+        windowSize = value
+        if windowSize >= ssthresh { mode = .avoidance }
+    }
+
     // MARK: - Private
 
     private func clamp(_ value: Double) -> Double {
