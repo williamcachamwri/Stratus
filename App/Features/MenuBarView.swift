@@ -3,18 +3,16 @@ import StratusCore
 
 struct MenuBarView: View {
     @EnvironmentObject private var env: AppEnvironment
-    @State private var snapshot: BWSnapshot?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             HStack(spacing: Spacing.sm) {
                 Image(systemName: "icloud.and.arrow.up")
                     .foregroundColor(.accentColor)
                 Text("Stratus")
                     .font(.stratusHeadline)
                 Spacer()
-                StatusBadge(status: env.activeUploads > 0 ? .active : .idle)
+                StatusBadge(status: isTransferring ? .active : .idle)
             }
             .padding(.horizontal, Spacing.md)
             .padding(.top, Spacing.md)
@@ -22,23 +20,24 @@ struct MenuBarView: View {
 
             Divider()
 
-            // Upload status
-            if env.activeUploads > 0 {
-                HStack(spacing: Spacing.sm) {
-                    ProgressRing(progress: 0.5, size: 16, lineWidth: 2)
-                    Text("\(env.activeUploads) uploading")
-                        .font(.stratusBody)
-                    Spacer()
-                    if let snap = snapshot {
-                        BandwidthLabel(bps: snap.currentBPS)
+            if isTransferring {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    HStack(spacing: Spacing.sm) {
+                        ProgressRing(progress: combinedProgress, size: 16, lineWidth: 2)
+                        Text("↑ \(env.uploadSummary.activeCount) · ↓ \(env.downloadSummary.activeCount)")
+                            .font(.stratusBody)
+                        Spacer()
+                        BandwidthLabel(bps: env.uploadBandwidthSnapshot?.currentBPS ?? env.uploadSummary.currentBPS)
                     }
+                    ProgressView(value: combinedProgress)
+                    Text("\(env.uploadSummary.queuedCount + env.downloadSummary.queuedCount) queued · \(env.uploadSummary.failedCount + env.downloadSummary.failedCount) failed")
+                        .stratusCaption()
                 }
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.sm)
                 Divider()
             }
 
-            // Accounts
             ForEach(env.accounts.prefix(4), id: \.id) { account in
                 HStack(spacing: Spacing.sm) {
                     ProviderIcon(providerID: account.providerID, size: 16)
@@ -61,7 +60,6 @@ struct MenuBarView: View {
 
             Divider()
 
-            // Actions
             Button("Sync All Now") {
                 Task { await env.syncEngine.syncAll() }
             }
@@ -88,15 +86,16 @@ struct MenuBarView: View {
             .padding(.bottom, Spacing.sm)
         }
         .frame(width: 260)
-        .onAppear { listenForBandwidth() }
     }
 
-    private func listenForBandwidth() {
-        Task { @MainActor in
-            let monitor = BandwidthMonitor()
-            for await snap in await monitor.updates {
-                snapshot = snap
-            }
-        }
+    private var isTransferring: Bool {
+        env.uploadSummary.activeCount > 0 || env.downloadSummary.activeCount > 0
+    }
+
+    private var combinedProgress: Double {
+        let transferred = env.uploadSummary.bytesTransferred + env.downloadSummary.bytesReceived
+        let total = env.uploadSummary.totalBytes + env.downloadSummary.totalBytes
+        guard total > 0 else { return 0 }
+        return min(1, Double(transferred) / Double(total))
     }
 }
