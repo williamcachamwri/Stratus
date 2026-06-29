@@ -16,7 +16,7 @@ public actor DropboxChunkedUpload {
     // Step 1: Start session
     public func startSession(accessToken: String) async throws -> String {
         var request = HTTPRequest(
-            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/start")!,
+            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/start") ?? URL(fileURLWithPath: "/"),
             method: .POST
         )
         request.headers["Authorization"] = "Bearer \(accessToken)"
@@ -39,7 +39,7 @@ public actor DropboxChunkedUpload {
         let apiArg = "{\"cursor\":\(cursorJSON),\"close\":\(isLast)}"
 
         var request = HTTPRequest(
-            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/append_v2")!,
+            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/append_v2") ?? URL(fileURLWithPath: "/"),
             method: .POST
         )
         request.headers["Authorization"] = "Bearer \(accessToken)"
@@ -65,7 +65,7 @@ public actor DropboxChunkedUpload {
         let apiArg = "{\"cursor\":\(cursorJSON),\"commit\":\(commitJSON)}"
 
         var request = HTTPRequest(
-            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/finish")!,
+            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/finish") ?? URL(fileURLWithPath: "/"),
             method: .POST
         )
         request.headers["Authorization"] = "Bearer \(accessToken)"
