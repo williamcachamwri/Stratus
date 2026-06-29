@@ -66,6 +66,38 @@ final class UploadQueueTests: XCTestCase {
         XCTAssertEqual(count, 10)
     }
 
+    func test_peek_returnsHighestPriority() async {
+        let queue = UploadQueue()
+        let low = makeTask(priority: .low)
+        let high = makeTask(priority: .high)
+        await queue.enqueue(low)
+        await queue.enqueue(high)
+        let peeked = await queue.peek
+        XCTAssertEqual(peeked?.id, high.id, "peek must return highest priority task without dequeuing")
+    }
+
+    func test_isEmpty_trueWhenNoTasks() async {
+        let queue = UploadQueue()
+        let empty = await queue.isEmpty
+        XCTAssertTrue(empty)
+    }
+
+    func test_taskByID_retrievesCorrectTask() async {
+        let queue = UploadQueue()
+        let t = makeTask(priority: .normal)
+        await queue.enqueue(t)
+        let found = await queue.task(id: t.id)
+        XCTAssertEqual(found?.id, t.id)
+    }
+
+    func test_tasks_returnsAllEnqueued() async {
+        let queue = UploadQueue()
+        let tasks = (0..<5).map { _ in makeTask(priority: .normal) }
+        for t in tasks { await queue.enqueue(t) }
+        let all = await queue.tasks
+        XCTAssertEqual(all.count, 5)
+    }
+
     private func makeTask(priority: TaskPriority, fileSize: Int64 = 1024) -> UploadTask {
         UploadTask(
             sourceURL: URL(fileURLWithPath: "/tmp/\(UUID().uuidString).bin"),
