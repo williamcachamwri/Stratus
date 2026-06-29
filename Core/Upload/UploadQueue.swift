@@ -31,12 +31,21 @@ public actor UploadQueue {
     }
 
     public func remove(taskID: UUID) {
-        guard let idx = heap.firstIndex(where: { $0.id == taskID }) else { return }
+        _ = removeAndReturn(taskID: taskID)
+    }
+
+    @discardableResult
+    public func removeAndReturn(taskID: UUID) -> UploadTask? {
+        guard let idx = heap.firstIndex(where: { $0.id == taskID }) else { return nil }
         heap.swapAt(idx, heap.count - 1)
-        heap.removeLast()
+        let task = heap.removeLast()
         tasksByID.removeValue(forKey: taskID)
-        if idx < heap.count { siftDown(from: idx) }
+        if idx < heap.count {
+            siftDown(from: idx)
+            siftUp(from: idx)
+        }
         notifyObservers()
+        return task
     }
 
     public func reprioritize(taskID: UUID, to priority: TaskPriority) -> Bool {
