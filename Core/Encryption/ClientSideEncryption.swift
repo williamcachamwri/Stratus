@@ -31,7 +31,7 @@ public struct EncryptionHeader: Sendable {
         let iv = data[5..<17]
         let wrappedKey = data[17..<77]
         let sizeBytes = data[77..<85]
-        let size = sizeBytes.withUnsafeBytes { $0.load(as: Int64.self).bigEndian }
+        let size = sizeBytes.withUnsafeBytes { $0.loadUnaligned(as: Int64.self).bigEndian }
         return EncryptionHeader(iv: Data(iv), wrappedFileKey: Data(wrappedKey), originalSize: size)
     }
 }
@@ -73,8 +73,7 @@ public actor ClientSideEncryption {
         // Stream-encrypt in chunks
         var allPlaintext = Data()
         while true {
-            let chunk = try inputHandle.read(upToCount: Self.chunkSize)
-            guard !chunk.isEmpty else { break }
+            guard let chunk = try inputHandle.read(upToCount: Self.chunkSize), !chunk.isEmpty else { break }
             allPlaintext.append(chunk)
         }
 
@@ -92,7 +91,9 @@ public actor ClientSideEncryption {
         let inputHandle = try FileHandle(forReadingFrom: encryptedURL)
         defer { try? inputHandle.close() }
 
-        let headerData = try inputHandle.read(upToCount: EncryptionHeader.byteLength)
+        guard let headerData = try inputHandle.read(upToCount: EncryptionHeader.byteLength) else {
+            throw EncryptionError.decryptionFailed
+        }
         let header = try EncryptionHeader.parse(from: headerData)
 
         let fileKey = try EncryptionKeyDerivation.unwrapKey(header.wrappedFileKey, with: masterKey)
@@ -100,8 +101,7 @@ public actor ClientSideEncryption {
 
         var ciphertextWithTag = nonce.withUnsafeBytes { Data($0) }
         while true {
-            let chunk = try inputHandle.read(upToCount: Self.chunkSize)
-            guard !chunk.isEmpty else { break }
+            guard let chunk = try inputHandle.read(upToCount: Self.chunkSize), !chunk.isEmpty else { break }
             ciphertextWithTag.append(chunk)
         }
 
