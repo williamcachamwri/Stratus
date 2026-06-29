@@ -2,6 +2,13 @@ import Foundation
 import FileProvider
 import os.log
 
+// Wraps a non-Sendable closure so it can be captured in Task closures.
+// Safe here because FileProvider serializes extension calls.
+private final class CB<T>: @unchecked Sendable {
+    let fn: T
+    init(_ fn: T) { self.fn = fn }
+}
+
 // MARK: - StratusFileProviderExtension
 // NSFileProviderReplicatedExtension (macOS 12+ modern API) for virtual filesystem.
 // Each registered cloud account gets its own File Provider domain.
@@ -9,8 +16,8 @@ import os.log
 public final class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
 
     private let domain: NSFileProviderDomain
-    private var provider: (any CloudProvider)?
-    private var account: CloudAccount?
+    private nonisolated(unsafe) var provider: (any CloudProvider)?
+    private nonisolated(unsafe) var account: CloudAccount?
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "FileProviderExtension")
 
     // MARK: - Lifecycle
@@ -22,7 +29,7 @@ public final class StratusFileProviderExtension: NSObject, NSFileProviderReplica
     }
 
     public func invalidate() {
-        logger.info("FileProvider extension invalidated for domain: \(domain.identifier.rawValue)")
+        logger.info("FileProvider extension invalidated for domain: \(self.domain.identifier.rawValue)")
     }
 
     // MARK: - NSFileProviderReplicatedExtension
@@ -35,19 +42,20 @@ public final class StratusFileProviderExtension: NSObject, NSFileProviderReplica
             return Progress()
         }
         let progress = Progress(totalUnitCount: 1)
+        let cb = CB(completionHandler)
         Task {
             do {
                 if identifier == .rootContainer {
-                    completionHandler(StratusFileProviderItem.root(accountID: account.id), nil)
+                    cb.fn(StratusFileProviderItem.root(accountID: account.id), nil)
                 } else {
                     let path = CloudPath(identifier.rawValue)
                     let item = try await provider.fileMetadata(path: path, account: account)
                     let providerItem = StratusFileProviderItem(item: item, parentID: .rootContainer, accountID: account.id)
-                    completionHandler(providerItem, nil)
+                    cb.fn(providerItem, nil)
                 }
                 progress.completedUnitCount = 1
             } catch {
-                completionHandler(nil, error)
+                cb.fn(nil, error)
             }
         }
         return progress
@@ -62,6 +70,7 @@ public final class StratusFileProviderExtension: NSObject, NSFileProviderReplica
             return Progress()
         }
         let progress = Progress(totalUnitCount: 100)
+        let cb = CB(completionHandler)
         Task {
             do {
                 let path = CloudPath(itemIdentifier.rawValue)
@@ -70,9 +79,9 @@ public final class StratusFileProviderExtension: NSObject, NSFileProviderReplica
                 let item = try await provider.fileMetadata(path: path, account: account)
                 let providerItem = StratusFileProviderItem(item: item, parentID: .rootContainer, accountID: account.id)
                 progress.completedUnitCount = 100
-                completionHandler(tempURL, providerItem, nil)
+                cb.fn(tempURL, providerItem, nil)
             } catch {
-                completionHandler(nil, nil, error)
+                cb.fn(nil, nil, error)
             }
         }
         return progress
@@ -88,27 +97,31 @@ public final class StratusFileProviderExtension: NSObject, NSFileProviderReplica
             completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
             return Progress()
         }
+        // Extract Sendable values from ObjC NSFileProviderItem before Task
+        let parentRaw = itemTemplate.parentItemIdentifier.rawValue
+        let filename = itemTemplate.filename
+        let isFolder = itemTemplate.contentType == .folder
         let progress = Progress(totalUnitCount: 100)
+        let cb = CB(completionHandler)
         Task {
             do {
-                let remotePath = CloudPath(itemTemplate.parentItemIdentifier.rawValue)
-                    .appendingComponent(itemTemplate.filename)
+                let remotePath = CloudPath(parentRaw).appendingComponent(filename)
                 let createdItem: NSFileProviderItem
-                if itemTemplate.contentType == .folder {
+                if isFolder {
                     let dir = try await provider.createDirectory(path: remotePath, account: account)
-                    createdItem = StratusFileProviderItem(item: dir, parentID: itemTemplate.parentItemIdentifier, accountID: account.id)
+                    createdItem = StratusFileProviderItem(item: dir, parentID: NSFileProviderItemIdentifier(rawValue: parentRaw), accountID: account.id)
                 } else if let fileURL = url {
                     let data = try Data(contentsOf: fileURL)
-                    let result = try await provider.uploadSmallFile(data: data, remotePath: remotePath, account: account, metadata: UploadMetadata(fileName: itemTemplate.filename, fileSize: Int64(data.count)))
-                    createdItem = StratusFileProviderItem(item: result, parentID: itemTemplate.parentItemIdentifier, accountID: account.id)
+                    let result = try await provider.uploadSmallFile(data: data, remotePath: remotePath, account: account, metadata: UploadMetadata())
+                    createdItem = StratusFileProviderItem(item: result, parentID: NSFileProviderItemIdentifier(rawValue: parentRaw), accountID: account.id)
                 } else {
-                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    cb.fn(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
                 progress.completedUnitCount = 100
-                completionHandler(createdItem, [], false, nil)
+                cb.fn(createdItem, [], false, nil)
             } catch {
-                completionHandler(nil, [], false, error)
+                cb.fn(nil, [], false, error)
             }
         }
         return progress
@@ -125,25 +138,30 @@ public final class StratusFileProviderExtension: NSObject, NSFileProviderReplica
             completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
             return Progress()
         }
+        // Extract Sendable values from ObjC item before Task
+        let itemID = item.itemIdentifier.rawValue
+        let parentID = item.parentItemIdentifier.rawValue
+        let newName = changedFields.contains(.filename) ? (item.filename as String?) : nil
         let progress = Progress(totalUnitCount: 100)
+        let cb = CB(completionHandler)
         Task {
             do {
-                let path = CloudPath(item.itemIdentifier.rawValue)
-                if changedFields.contains(.filename), let newName = item.filename as String? {
-                    let renamed = try await provider.rename(path: path, newName: newName, account: account)
-                    let providerItem = StratusFileProviderItem(item: renamed, parentID: item.parentItemIdentifier, accountID: account.id)
-                    completionHandler(providerItem, [], false, nil)
+                let path = CloudPath(itemID)
+                if let name = newName {
+                    let renamed = try await provider.rename(path: path, newName: name, account: account)
+                    let providerItem = StratusFileProviderItem(item: renamed, parentID: NSFileProviderItemIdentifier(rawValue: parentID), accountID: account.id)
+                    cb.fn(providerItem, [], false, nil)
                 } else if let contentsURL = newContents {
                     let data = try Data(contentsOf: contentsURL)
-                    let result = try await provider.uploadSmallFile(data: data, remotePath: path, account: account, metadata: UploadMetadata(fileName: item.filename, fileSize: Int64(data.count)))
-                    let providerItem = StratusFileProviderItem(item: result, parentID: item.parentItemIdentifier, accountID: account.id)
-                    completionHandler(providerItem, [], false, nil)
+                    let result = try await provider.uploadSmallFile(data: data, remotePath: path, account: account, metadata: UploadMetadata())
+                    let providerItem = StratusFileProviderItem(item: result, parentID: NSFileProviderItemIdentifier(rawValue: parentID), accountID: account.id)
+                    cb.fn(providerItem, [], false, nil)
                 } else {
-                    completionHandler(item, [], false, nil)
+                    cb.fn(nil, [], false, nil)
                 }
                 progress.completedUnitCount = 100
             } catch {
-                completionHandler(nil, [], false, error)
+                cb.fn(nil, [], false, error)
             }
         }
         return progress
@@ -159,14 +177,15 @@ public final class StratusFileProviderExtension: NSObject, NSFileProviderReplica
             return Progress()
         }
         let progress = Progress(totalUnitCount: 1)
+        let cb = CB(completionHandler)
         Task {
             do {
                 let path = CloudPath(identifier.rawValue)
                 try await provider.delete(path: path, account: account)
                 progress.completedUnitCount = 1
-                completionHandler(nil)
+                cb.fn(nil)
             } catch {
-                completionHandler(error)
+                cb.fn(error)
             }
         }
         return progress
