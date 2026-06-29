@@ -17,6 +17,11 @@ struct StratusApp: App {
         .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .appInfo) {
+                Button("About Stratus") {
+                    AboutPanelController.shared.show()
+                }
+            }
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
                     env.appUpdater.checkForUpdates()
