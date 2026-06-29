@@ -36,6 +36,13 @@ public struct S3Configuration: Sendable {
 // Handles AWS S3, Wasabi, Backblaze B2, Cloudflare R2, MinIO, Ceph.
 
 public actor S3Provider: CloudProvider {
+    private struct S3MultipartUploadContext: Codable, Sendable {
+        let key: String
+        let uploadID: String
+    }
+
+    private static let uploadTokenPrefix = "stratus-s3-v1."
+
     public nonisolated let id: String
     public nonisolated let displayName: String
     public nonisolated let iconName: String
@@ -45,6 +52,7 @@ public actor S3Provider: CloudProvider {
     private let http = HTTPClient()
     private let credentialVault = CredentialVault.shared
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "S3Provider")
+    private var activeMultipartUploads: [String: S3MultipartUploadContext] = [:]
 
     public init(id: String = "s3", displayName: String = "Amazon S3",
                 iconName: String = "s3", config: S3Configuration) {
@@ -195,17 +203,21 @@ public actor S3Provider: CloudProvider {
         guard response.isSuccess else {
             throw mapS3Error(response)
         }
-        return try parseUploadID(from: response.data)
+        let nativeUploadID = try parseUploadID(from: response.data)
+        let token = encodeUploadToken(key: key, uploadID: nativeUploadID)
+        activeMultipartUploads[token] = S3MultipartUploadContext(key: key, uploadID: nativeUploadID)
+        logger.info("S3 multipart upload initiated for key=\(key, privacy: .private)")
+        return token
     }
 
     public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
         guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
-        let key = ""  // Would be stored in session in real impl
-        let url = objectURL(key: key, query: "partNumber=\(chunkNumber)&uploadId=\(uploadID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uploadID)")
+        let context = try decodeUploadToken(uploadID)
+        let encodedUploadID = context.uploadID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? context.uploadID
+        let url = objectURL(key: context.key, query: "partNumber=\(chunkNumber)&uploadId=\(encodedUploadID)")
 
-        let md5 = Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
         let md5Base64 = Data(Insecure.MD5.hash(data: data)).base64EncodedString()
 
         var request = URLRequest(url: url)
@@ -230,8 +242,9 @@ public actor S3Provider: CloudProvider {
         guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
-        let key = ""
-        let url = objectURL(key: key, query: "uploadId=\(uploadID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uploadID)")
+        let context = try decodeUploadToken(uploadID)
+        let encodedUploadID = context.uploadID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? context.uploadID
+        let url = objectURL(key: context.key, query: "uploadId=\(encodedUploadID)")
 
         let xmlParts = parts.map { "<Part><PartNumber>\($0.partNumber)</PartNumber><ETag>\($0.etag)</ETag></Part>" }.joined()
         let body = Data("<CompleteMultipartUpload>\(xmlParts)</CompleteMultipartUpload>".utf8)
@@ -249,19 +262,26 @@ public actor S3Provider: CloudProvider {
             from: body
         )
         guard response.isSuccess else { throw mapS3Error(response) }
-        return CloudFileItem(id: key, name: (key as NSString).lastPathComponent, path: CloudPath(key))
+        activeMultipartUploads.removeValue(forKey: uploadID)
+        return CloudFileItem(
+            id: context.key,
+            name: (context.key as NSString).lastPathComponent,
+            path: CloudPath(context.key)
+        )
     }
 
     public func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {
         guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else { return }
-        let key = ""
-        let url = objectURL(key: key, query: "uploadId=\(uploadID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? uploadID)")
+        let context = try decodeUploadToken(uploadID)
+        let encodedUploadID = context.uploadID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? context.uploadID
+        let url = objectURL(key: context.key, query: "uploadId=\(encodedUploadID)")
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         RequestSigner.signV4(request: &request, accessKeyID: cred.accessKeyID,
                               secretAccessKey: cred.secretAccessKey, sessionToken: cred.sessionToken,
                               region: config.region, service: "s3")
         _ = try? await http.data(for: HTTPRequest(url: url, method: .DELETE, headers: request.allHTTPHeaderFields ?? [:]))
+        activeMultipartUploads.removeValue(forKey: uploadID)
     }
 
     // MARK: - Small File Upload
@@ -426,6 +446,33 @@ public actor S3Provider: CloudProvider {
         try await downloadURL(path: path, account: account, expiresIn: 86400)
     }
 
+    // MARK: - Multipart Upload Tokens
+
+    private func encodeUploadToken(key: String, uploadID: String) -> String {
+        let context = S3MultipartUploadContext(key: key, uploadID: uploadID)
+        guard let data = try? JSONEncoder().encode(context) else {
+            return uploadID
+        }
+        return Self.uploadTokenPrefix + data.base64URLEncodedString()
+    }
+
+    private func decodeUploadToken(_ token: String) throws -> S3MultipartUploadContext {
+        if let active = activeMultipartUploads[token] {
+            return active
+        }
+        guard token.hasPrefix(Self.uploadTokenPrefix) else {
+            throw ProviderError.invalidResponse("S3 multipart upload token is missing its remote key context")
+        }
+        let encoded = String(token.dropFirst(Self.uploadTokenPrefix.count))
+        guard let data = Data(base64URLEncoded: encoded),
+              let context = try? JSONDecoder().decode(S3MultipartUploadContext.self, from: data)
+        else {
+            throw ProviderError.invalidResponse("Invalid S3 multipart upload token")
+        }
+        activeMultipartUploads[token] = context
+        return context
+    }
+
     // MARK: - URL Helpers
 
     private func bucketURL() -> URL {
@@ -503,5 +550,24 @@ public actor S3Provider: CloudProvider {
             throw ProviderError.invalidResponse("No UploadId in response")
         }
         return uploadID
+    }
+}
+
+private extension Data {
+    init?(base64URLEncoded value: String) {
+        var base64 = value.replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let padding = base64.count % 4
+        if padding > 0 {
+            base64 += String(repeating: "=", count: 4 - padding)
+        }
+        self.init(base64Encoded: base64)
+    }
+
+    func base64URLEncodedString() -> String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 }
