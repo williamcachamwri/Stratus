@@ -71,7 +71,8 @@ private actor IntegrationMockProvider: CloudProvider {
     func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
         chunkStorage[uploadID, default: [:]][chunkNumber] = data
         chunksReceived[uploadID, default: []].insert(chunkNumber)
-        return ChunkUploadResult(etag: "etag-\(chunkNumber)", checksum: nil, serverConfirmedChecksum: false)
+        let checksum = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return ChunkUploadResult(etag: "etag-\(chunkNumber)", checksum: checksum, serverConfirmedChecksum: true)
     }
 
     func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
