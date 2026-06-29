@@ -170,10 +170,10 @@ public actor AppDatabase {
     // MARK: - Read/Write helpers
 
     public func read<T: Sendable>(_ block: @Sendable (Database) throws -> T) async throws -> T {
-        try await dbWriter.read(block)
+        try dbWriter.read(block)
     }
 
     public func write<T: Sendable>(_ block: @Sendable (Database) throws -> T) async throws -> T {
-        try await dbWriter.write(block)
+        try dbWriter.write(block)
     }
 }
