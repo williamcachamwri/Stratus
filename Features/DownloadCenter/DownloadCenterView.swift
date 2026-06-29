@@ -2,136 +2,203 @@ import SwiftUI
 import StratusCore
 
 public struct DownloadCenterView: View {
-    private let rows: [DownloadRow]
+    @EnvironmentObject private var env: AppEnvironment
 
-    public init(rows: [DownloadRow] = DownloadRow.placeholderRows) {
-        self.rows = rows
-    }
+    public init() {}
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.lg) {
-            HStack {
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text("Download Center")
-                        .font(.stratusTitle)
-                    Text("Range downloads, resume state, and verification are shown per file.")
-                        .stratusCaption()
-                }
-                Spacer()
-                Button("Pause All") {}
-                    .disabled(rows.allSatisfy { $0.phase != .downloading })
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            DownloadSummaryCard(summary: env.downloadSummary)
+                .padding(Spacing.lg)
+                .background(Color.surfacePrimary)
+            Divider()
 
-            VStack(spacing: 0) {
-                ForEach(rows) { row in
-                    DownloadItemRow(row: row)
-                    if row.id != rows.last?.id {
-                        Divider().padding(.leading, 44)
+            if env.downloadRows.isEmpty {
+                EmptyStateView(
+                    icon: "arrow.down.doc",
+                    title: "No download activity",
+                    subtitle: "Real download events from DownloadEngine will appear here with bytes, range segments, speed, ETA, and resume state."
+                )
+                .background(Color.surfaceSecondary)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Spacing.lg) {
+                        DownloadSection(title: "In Progress", rows: rows(.downloading))
+                        DownloadSection(title: "Queued", rows: rows(.queued) + rows(.restored))
+                        DownloadSection(title: "Paused", rows: rows(.paused))
+                        DownloadSection(title: "Failed", rows: rows(.failed))
+                        DownloadSection(title: "Completed", rows: rows(.completed))
                     }
+                    .padding(Spacing.lg)
                 }
+                .background(Color.surfaceSecondary)
             }
-            .background(Color.surfacePrimary)
-            .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
         }
-        .padding(Spacing.lg)
-        .background(Color.surfaceSecondary)
+        .navigationTitle("Download Center")
+        .toolbar {
+            ToolbarItemGroup {
+                Button("Pause All") {
+                    Task { await env.downloadEngine.pauseAll() }
+                }
+                .disabled(env.downloadSummary.activeCount == 0)
+
+                Button("Resume All") {
+                    Task { await env.downloadEngine.resumeAll() }
+                }
+                .disabled(env.downloadSummary.pausedCount == 0)
+
+                Button("Cancel All", role: .destructive) {
+                    Task { await env.downloadEngine.cancelAll() }
+                }
+                .disabled(env.downloadRows.isEmpty)
+            }
+        }
+    }
+
+    private func rows(_ phase: DownloadDisplayPhase) -> [DownloadRowState] {
+        env.downloadRows.filter { $0.phase == phase }
     }
 }
 
-public struct DownloadRow: Identifiable, Equatable, Sendable {
-    public enum Phase: String, Sendable {
-        case queued = "Queued"
-        case downloading = "Downloading"
-        case verifying = "Verifying"
-        case completed = "Completed"
-        case failed = "Failed"
+private struct DownloadSummaryCard: View {
+    let summary: DownloadDashboardSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.lg) {
+                DownloadStatCell(label: "Current", value: formatTransferSpeed(summary.currentBPS))
+                DownloadStatCell(label: "Files", value: "\(summary.activeCount) active · \(summary.queuedCount) queued")
+                DownloadStatCell(label: "ETA", value: formatTransferETA(summary.etaSeconds))
+                Spacer()
+            }
+
+            HStack(spacing: Spacing.md) {
+                ProgressView(value: summary.progress)
+                    .progressViewStyle(.linear)
+                    .accessibilityLabel("Overall download progress")
+                    .accessibilityValue("\(Int(summary.progress * 100)) percent")
+                Text("\(Int(summary.progress * 100))%")
+                    .font(.stratusSmallMono)
+                    .foregroundColor(.textSecondary)
+                    .frame(width: 44, alignment: .trailing)
+            }
+
+            Text("\(formatTransferBytes(summary.bytesReceived)) of \(formatTransferBytes(summary.totalBytes)) · \(summary.failedCount) failed · \(summary.pausedCount) paused · \(summary.completedCount) completed")
+                .stratusCaption()
+        }
     }
+}
 
-    public let id: UUID
-    public let fileName: String
-    public let sourcePath: String
-    public let phase: Phase
-    public let progress: Double
-    public let bytesReceived: Int64
-    public let totalBytes: Int64
-    public let speedBPS: Double
-    public let etaSeconds: Double?
-    public let rangeText: String
+private struct DownloadStatCell: View {
+    let label: String
+    let value: String
 
-    public init(
-        id: UUID = UUID(),
-        fileName: String,
-        sourcePath: String,
-        phase: Phase,
-        progress: Double,
-        bytesReceived: Int64,
-        totalBytes: Int64,
-        speedBPS: Double,
-        etaSeconds: Double?,
-        rangeText: String
-    ) {
-        self.id = id
-        self.fileName = fileName
-        self.sourcePath = sourcePath
-        self.phase = phase
-        self.progress = progress
-        self.bytesReceived = bytesReceived
-        self.totalBytes = totalBytes
-        self.speedBPS = speedBPS
-        self.etaSeconds = etaSeconds
-        self.rangeText = rangeText
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xxs) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.textTertiary)
+                .tracking(0.5)
+            Text(value)
+                .font(.stratusSmallMono)
+                .foregroundColor(.textPrimary)
+        }
     }
+}
 
-    public static let placeholderRows = [
-        DownloadRow(
-            fileName: "archive.zip",
-            sourcePath: "/S3/backups/archive.zip",
-            phase: .queued,
-            progress: 0,
-            bytesReceived: 0,
-            totalBytes: 1_200_000_000,
-            speedBPS: 0,
-            etaSeconds: nil,
-            rangeText: "Waiting for available range slots"
-        )
-    ]
+private struct DownloadSection: View {
+    let title: String
+    let rows: [DownloadRowState]
+
+    var body: some View {
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                HStack {
+                    Text("\(title) (\(rows.count))")
+                        .font(.stratusHeadline)
+                    Spacer()
+                }
+                VStack(spacing: 0) {
+                    ForEach(rows) { row in
+                        DownloadItemRow(row: row)
+                        if row.id != rows.last?.id {
+                            Divider().padding(.leading, 44)
+                        }
+                    }
+                }
+                .background(Color.surfacePrimary)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous))
+            }
+        }
+    }
 }
 
 private struct DownloadItemRow: View {
-    let row: DownloadRow
+    @EnvironmentObject private var env: AppEnvironment
+    let row: DownloadRowState
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.md) {
-            Image(systemName: "arrow.down.doc")
-                .font(.system(size: 22, weight: .regular))
-                .foregroundColor(.secondary)
-                .frame(width: 28)
+            ProviderIcon(providerID: row.providerID, size: 28)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 HStack(spacing: Spacing.sm) {
                     Text(row.fileName)
                         .font(.stratusBody.weight(.medium))
-                    Text(row.phase.rawValue)
+                        .lineLimit(1)
+                    Text(phaseLabel)
                         .stratusCaption()
                 }
                 ProgressView(value: row.progress)
-                Text("\(formatTransferBytes(row.bytesReceived)) / \(formatTransferBytes(row.totalBytes)) · \(row.sourcePath) · \(row.rangeText)")
+                    .accessibilityLabel("\(row.fileName) download progress")
+                    .accessibilityValue("\(Int(row.progress * 100)) percent")
+                Text("\(formatTransferBytes(row.bytesReceived)) / \(formatTransferBytes(row.totalBytes)) · \(row.sourcePath) · \(row.rangeText) · \(row.detailText)")
                     .font(.stratusSmallMono)
                     .foregroundColor(.textSecondary)
                     .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: Spacing.md)
 
             VStack(alignment: .trailing, spacing: Spacing.xs) {
                 Text(formatTransferSpeed(row.speedBPS))
                     .font(.stratusSmallMono)
                 Text(formatTransferETA(row.etaSeconds))
                     .stratusCaption()
+                actionButton
             }
         }
         .padding(.horizontal, Spacing.md)
         .padding(.vertical, Spacing.sm)
+    }
+
+    private var phaseLabel: String {
+        switch row.phase {
+        case .queued, .restored: return "Queued"
+        case .downloading: return "\(Int(row.progress * 100))%"
+        case .paused: return "Paused"
+        case .failed: return "Failed"
+        case .completed: return row.checksumVerified ? "Verified" : "Done"
+        case .cancelled: return "Cancelled"
+        }
+    }
+
+    @ViewBuilder
+    private var actionButton: some View {
+        switch row.phase {
+        case .downloading:
+            Button("Pause") { Task { await env.downloadEngine.pause(taskID: row.id) } }
+                .buttonStyle(.borderless)
+        case .paused:
+            Button("Resume") { Task { await env.downloadEngine.resume(taskID: row.id) } }
+                .buttonStyle(.borderless)
+        case .failed:
+            Button("Retry") { Task { await env.downloadEngine.resume(taskID: row.id) } }
+                .buttonStyle(.borderless)
+        default:
+            EmptyView()
+        }
     }
 }
 
