@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import AuthenticationServices
 import CryptoKit
 import os.log
@@ -38,11 +39,39 @@ public enum OAuthError: Error, Sendable {
     case noAuthorizationCode
     case stateMismatch
     case pkceVerifierMissing
+    case sessionDidNotStart
     case tokenExchangeFailed(statusCode: Int, body: String)
     case invalidTokenResponse(String)
     case refreshFailed(statusCode: Int, body: String)
     case missingRefreshToken
     case sessionCreationFailed(any Error)
+}
+
+extension OAuthError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .userCancelled:
+            return "Authorization was cancelled."
+        case .noAuthorizationCode:
+            return "The provider did not return an authorization code."
+        case .stateMismatch:
+            return "Security check failed: state parameter mismatch. Please try again."
+        case .pkceVerifierMissing:
+            return "Internal error: PKCE verifier not found. Please try again."
+        case .sessionDidNotStart:
+            return "Could not open the authorization window. Make sure the app has a visible window and try again."
+        case .tokenExchangeFailed(let code, let body):
+            return "Token exchange failed (HTTP \(code)): \(body.isEmpty ? "no details" : body)"
+        case .invalidTokenResponse(let detail):
+            return "Invalid token response: \(detail)"
+        case .refreshFailed(let code, let body):
+            return "Token refresh failed (HTTP \(code)): \(body.isEmpty ? "no details" : body)"
+        case .missingRefreshToken:
+            return "No refresh token available. Please re-authorize."
+        case .sessionCreationFailed(let underlying):
+            return "Could not start authorization: \(underlying.localizedDescription)"
+        }
+    }
 }
 
 // MARK: - OAuthManager
@@ -241,11 +270,15 @@ public actor OAuthManager: NSObject {
 
     @MainActor
     private func presentAuthSession(url: URL, callbackScheme: String) async throws -> URL {
-        try await withCheckedThrowingContinuation { continuation in
+        // macOS requires presentationContextProvider (weak var) — keep a local strong ref
+        // captured in the completion closure so it lives until the callback fires.
+        let contextProvider = OAuthPresentationContext()
+        return try await withCheckedThrowingContinuation { continuation in
             let authSession = ASWebAuthenticationSession(
                 url: url,
                 callbackURLScheme: callbackScheme
-            ) { callbackURL, error in
+            ) { [contextProvider] callbackURL, error in
+                _ = contextProvider  // retain provider until callback fires
                 if let error {
                     if let authError = error as? ASWebAuthenticationSessionError,
                        authError.code == .canceledLogin {
@@ -261,8 +294,12 @@ public actor OAuthManager: NSObject {
                 }
                 continuation.resume(returning: callbackURL)
             }
+            authSession.presentationContextProvider = contextProvider
             authSession.prefersEphemeralWebBrowserSession = true
-            authSession.start()
+            guard authSession.start() else {
+                continuation.resume(throwing: OAuthError.sessionDidNotStart)
+                return
+            }
         }
     }
 
@@ -346,6 +383,22 @@ public actor OAuthManager: NSObject {
             scope: scope,
             tokenType: tokenType
         )
+    }
+}
+
+// MARK: - OAuthPresentationContext
+
+// Provides a window anchor for ASWebAuthenticationSession on macOS.
+// presentationContextProvider is weak — callers must retain this object
+// for the duration of the auth session (captured in the completion closure).
+private final class OAuthPresentationContext: NSObject,
+    ASWebAuthenticationPresentationContextProviding,
+    @unchecked Sendable
+{
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        NSApp.windows.first(where: { $0.isKeyWindow })
+            ?? NSApp.windows.first
+            ?? NSWindow()
     }
 }
 
