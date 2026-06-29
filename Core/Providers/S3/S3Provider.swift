@@ -95,7 +95,7 @@ public actor S3Provider: CloudProvider {
     }
 
     public func validateCredentials(account: CloudAccount) async throws -> Bool {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             return false
         }
         var request = URLRequest(url: bucketURL())
@@ -126,7 +126,7 @@ public actor S3Provider: CloudProvider {
     // MARK: - File Listing
 
     public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let prefix = path.path == "/" ? "" : String(path.path.dropFirst())
@@ -158,7 +158,7 @@ public actor S3Provider: CloudProvider {
     }
 
     public func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let key = String(path.path.dropFirst())
@@ -184,7 +184,7 @@ public actor S3Provider: CloudProvider {
     // MARK: - Multipart Upload
 
     public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let key = String(remotePath.path.dropFirst())
@@ -211,7 +211,7 @@ public actor S3Provider: CloudProvider {
     }
 
     public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let context = try decodeUploadToken(uploadID)
@@ -239,7 +239,7 @@ public actor S3Provider: CloudProvider {
     }
 
     public func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let context = try decodeUploadToken(uploadID)
@@ -271,7 +271,7 @@ public actor S3Provider: CloudProvider {
     }
 
     public func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else { return }
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else { return }
         let context = try decodeUploadToken(uploadID)
         let encodedUploadID = context.uploadID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? context.uploadID
         let url = objectURL(key: context.key, query: "uploadId=\(encodedUploadID)")
@@ -287,7 +287,7 @@ public actor S3Provider: CloudProvider {
     // MARK: - Small File Upload
 
     public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let key = String(remotePath.path.dropFirst())
@@ -315,7 +315,7 @@ public actor S3Provider: CloudProvider {
     // MARK: - Download
 
     public func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let key = String(path.path.dropFirst())
@@ -328,7 +328,7 @@ public actor S3Provider: CloudProvider {
     }
 
     public func downloadRange(path: CloudPath, range: ClosedRange<Int64>, account: CloudAccount) async throws -> Data {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let key = String(path.path.dropFirst())
@@ -357,7 +357,7 @@ public actor S3Provider: CloudProvider {
     }
 
     public func copy(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let destKey = String(to.path.dropFirst())
@@ -375,7 +375,7 @@ public actor S3Provider: CloudProvider {
     }
 
     public func delete(path: CloudPath, account: CloudAccount) async throws {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else {
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else {
             throw ProviderError.authenticationFailed("No credentials")
         }
         let key = String(path.path.dropFirst())
@@ -407,7 +407,7 @@ public actor S3Provider: CloudProvider {
     public nonisolated var supportsBlockManifest: Bool { true }
 
     public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
-        guard try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) != nil else { return nil }
+        guard let cred = try await credentialVault.loadAPIKeyCredential(providerID: id, accountID: account.id) else { return nil }
         let manifestKey = String(path.path.dropFirst()) + ".stratus_manifest"
         let url = objectURL(key: manifestKey)
         var request = URLRequest(url: url)
