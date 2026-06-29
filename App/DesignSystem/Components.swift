@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - ProviderIcon
 
@@ -7,36 +10,87 @@ public struct ProviderIcon: View {
     var size: CGFloat = 32
 
     public var body: some View {
+        Group {
+            if hasAssetLogo {
+                assetLogo
+                    .resizable()
+                    .scaledToFit()
+                    .padding(size * 0.08)
+            } else {
+                fallbackIcon
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityLabel(Text(accessibilityName))
+    }
+
+    private var assetLogo: Image {
+        #if os(macOS)
+        if let image = NSImage(named: assetName) {
+            return Image(nsImage: image)
+        }
+        #endif
+        return Image(assetName)
+    }
+
+    private var hasAssetLogo: Bool {
+        #if os(macOS)
+        return NSImage(named: assetName) != nil
+        #else
+        return true
+        #endif
+    }
+
+    private var fallbackIcon: some View {
         ZStack {
             RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                .fill(backgroundColor)
-                .frame(width: size, height: size)
+                .fill(Color(nsColor: .controlBackgroundColor))
             Image(systemName: systemImage)
                 .resizable()
                 .scaledToFit()
-                .padding(size * 0.2)
-                .foregroundColor(.white)
+                .padding(size * 0.22)
+                .foregroundColor(.secondary)
         }
     }
 
-    private var backgroundColor: Color {
+    private var assetName: String {
         switch providerID {
-        case "s3", "wasabi", "backblaze_b2", "cloudflare_r2", "minio": return .s3Orange
-        case "gdrive": return .googleBlue
-        case "dropbox": return .dropboxBlue
-        case "onedrive": return .oneDriveBlue
-        case "sftp": return .sftpGray
-        case "webdav": return .webdavPurple
-        default: return .gray
+        case "s3": return "ProviderLogoAmazonAWS"
+        case "wasabi": return "ProviderLogoWasabi"
+        case "backblaze_b2": return "ProviderLogoBackblaze"
+        case "cloudflare_r2": return "ProviderLogoCloudflare"
+        case "gdrive": return "ProviderLogoGoogleDrive"
+        case "dropbox": return "ProviderLogoDropbox"
+        case "onedrive": return "ProviderLogoOneDrive"
+        case "box": return "ProviderLogoBox"
+        case "icloud": return "ProviderLogoICloud"
+        default: return ""
+        }
+    }
+
+    private var accessibilityName: String {
+        switch providerID {
+        case "s3": return "Amazon S3"
+        case "wasabi": return "Wasabi"
+        case "backblaze_b2": return "Backblaze B2"
+        case "cloudflare_r2": return "Cloudflare R2"
+        case "gdrive": return "Google Drive"
+        case "dropbox": return "Dropbox"
+        case "onedrive": return "OneDrive"
+        case "box": return "Box"
+        case "icloud": return "iCloud Drive"
+        case "sftp": return "SFTP"
+        case "webdav": return "WebDAV"
+        case "ftp": return "FTP / FTPS"
+        default: return "Cloud provider"
         }
     }
 
     private var systemImage: String {
         switch providerID {
         case "s3", "wasabi", "backblaze_b2", "cloudflare_r2", "minio": return "server.rack"
-        case "gdrive": return "doc.on.doc"
-        case "dropbox": return "shippingbox"
-        case "onedrive": return "icloud"
+        case "gdrive", "dropbox", "box": return "externaldrive"
+        case "onedrive", "icloud": return "icloud"
         case "sftp": return "network"
         case "webdav": return "globe"
         default: return "cloud"
