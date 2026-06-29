@@ -24,7 +24,9 @@ public actor BoxAuth {
         let (verifier, challenge) = generatePKCE()
         let state = UUID().uuidString
 
-        var components = URLComponents(string: Self.authURL)!
+        guard var components = URLComponents(string: Self.authURL) else {
+            throw ProviderError.authenticationFailed("Invalid Box auth URL")
+        }
         components.queryItems = [
             .init(name: "client_id",             value: Self.clientID),
             .init(name: "redirect_uri",           value: Self.redirectURI),
@@ -33,7 +35,9 @@ public actor BoxAuth {
             .init(name: "code_challenge",         value: challenge),
             .init(name: "code_challenge_method",  value: "S256"),
         ]
-        let authorizationURL = components.url!
+        guard let authorizationURL = components.url else {
+            throw ProviderError.authenticationFailed("Could not build Box authorization URL")
+        }
 
         let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
             let session = ASWebAuthenticationSession(
@@ -59,7 +63,10 @@ public actor BoxAuth {
     // MARK: - Exchange Code
 
     private func exchangeCode(_ code: String, verifier: String) async throws -> OAuthCredential {
-        var request = URLRequest(url: URL(string: Self.tokenURL)!)
+        guard let tokenURLValue = URL(string: Self.tokenURL) else {
+            throw ProviderError.authenticationFailed("Invalid token URL")
+        }
+        var request = URLRequest(url: tokenURLValue)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = [
