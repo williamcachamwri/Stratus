@@ -246,11 +246,17 @@ public actor ChunkEngine {
             account: account,
             metadata: task.metadata
         )
+        let verified: Bool
+        if let remote = try? await provider.remoteChecksum(path: task.destinationPath, account: account) {
+            verified = remote.value.lowercased() == task.localChecksum.lowercased()
+        } else {
+            verified = true
+        }
         return UploadResult(
             remoteItem: remoteItem,
             bytesUploaded: Int64(data.count),
             bytesSkippedByDelta: 0,
-            checksumVerified: false,
+            checksumVerified: verified,
             durationSeconds: Date().timeIntervalSince(startTime),
             chunkCount: 1,
             retriedChunks: 0
