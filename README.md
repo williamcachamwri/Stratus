@@ -29,13 +29,20 @@ A production-grade native macOS cloud drive manager built with Swift 6 + SwiftUI
 ```bash
 git clone https://github.com/williamcachamwri/Stratus.git
 cd Stratus
-swift build
+swift build --product Stratus
+```
+
+Build an unsigned `.app` bundle for local testing:
+
+```bash
+Scripts/build_unsigned_release.sh
+open dist/Stratus.app
 ```
 
 ## Test
 
 ```bash
-swift test
+Scripts/test.sh
 ```
 
 120+ unit tests and 20+ integration tests with mock providers.
@@ -79,6 +86,10 @@ App/
 
 MIT — see [LICENSE](LICENSE).
 
+## Development
+
+See [DEVELOP.md](DEVELOP.md) for local setup, unsigned packaging, Sparkle appcast generation, and troubleshooting.
+
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Every changed file must be committed separately with the required co-author trailer.
