@@ -229,7 +229,7 @@ public actor SFTPProvider: CloudProvider {
         switch method {
         case .password(let pw):
             return .passwordBased(username: username, password: pw)
-        case .privateKey(let keyData, let passphrase):
+        case .privateKey(_, let passphrase):
             // Citadel supports ED25519 and RSA keys
             return .passwordBased(username: username, password: passphrase ?? "")  // Simplified
         }
