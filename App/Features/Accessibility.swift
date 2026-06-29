@@ -1,4 +1,5 @@
 import SwiftUI
+import StratusCore
 import AppKit
 
 // MARK: - Accessibility View Modifiers
