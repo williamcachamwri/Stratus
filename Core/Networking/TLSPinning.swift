@@ -97,7 +97,7 @@ public final class TLSPinningDelegate: NSObject, URLSessionDelegate, @unchecked 
         }
 
         // Walk the evaluated chain looking for at least one matching pinned hash.
-        let certificates = SecTrustCopyCertificateChain(serverTrust) as [SecCertificate]
+        let certificates = (SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate]) ?? []
         guard !certificates.isEmpty else {
             logger.error("Empty certificate chain for \(challenge.protectionSpace.host)")
             completionHandler(.cancelAuthenticationChallenge, nil)
