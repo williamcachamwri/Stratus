@@ -100,7 +100,7 @@ public actor S3Provider: CloudProvider {
             region: config.region,
             service: "s3"
         )
-        let response = try await http.data(for: HTTPRequest(url: request.url!, method: .HEAD, headers: request.allHTTPHeaderFields ?? [:]))
+        let response = try await http.data(for: HTTPRequest(url: request.url ?? URL(fileURLWithPath: "/"), method: .HEAD, headers: request.allHTTPHeaderFields ?? [:]))
         return response.isSuccess || response.statusCode == 403  // 403 = bucket exists, no list permission
     }
 
@@ -132,12 +132,15 @@ public actor S3Provider: CloudProvider {
         if let token = pageToken {
             components.queryItems?.append(URLQueryItem(name: "continuation-token", value: token))
         }
-        var request = URLRequest(url: components.url!)
+        guard let listURL = components.url else {
+            throw ProviderError.invalidResponse("Could not build S3 list URL")
+        }
+        var request = URLRequest(url: listURL)
         RequestSigner.signV4(request: &request, accessKeyID: cred.accessKeyID,
                               secretAccessKey: cred.secretAccessKey, sessionToken: cred.sessionToken,
                               region: config.region, service: "s3")
 
-        let response = try await http.data(for: HTTPRequest(url: request.url!, headers: request.allHTTPHeaderFields ?? [:]))
+        let response = try await http.data(for: HTTPRequest(url: request.url ?? URL(fileURLWithPath: "/"), headers: request.allHTTPHeaderFields ?? [:]))
         guard response.isSuccess else {
             throw ProviderError.serverError(statusCode: response.statusCode, message: String(data: response.data, encoding: .utf8) ?? "")
         }
