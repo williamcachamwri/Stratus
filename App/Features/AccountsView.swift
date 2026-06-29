@@ -111,7 +111,7 @@ private struct AddAccountSheet: View {
                     ProviderPickerView { choice in
                         selectedProviderID = choice.id
                         displayName = choice.title
-                        oauthScopes = defaultScopes(for: choice.id)
+                        applySharedDefaults(for: choice.id)
                     }
                 }
             }
@@ -196,6 +196,8 @@ private struct AddAccountSheet: View {
                     TextField("Client ID", text: $oauthClientID)
                     TextField("Redirect URI", text: $oauthRedirectURI)
                     TextField("Scopes", text: $oauthScopes)
+                    Text("Defaults load from shared/oauth.config, shared/*.local.config, or matching environment variables.")
+                        .stratusCaption()
                     Button(isAuthorizing ? "Authorizing…" : "Authorize in Browser") {
                         Task { await authorizeOAuth(definition: definition) }
                     }
@@ -331,6 +333,37 @@ private struct AddAccountSheet: View {
             usePathStyleURL: usePathStyleURL,
             useTransferAcceleration: useTransferAcceleration
         )
+    }
+
+    private func applySharedDefaults(for providerID: String) {
+        oauthClientID = SharedConfig.string("CLIENT_ID", providerID: providerID) ?? ""
+        oauthRedirectURI = SharedConfig.string("REDIRECT_URI", providerID: providerID) ?? defaultRedirectURI(for: providerID)
+        oauthScopes = SharedConfig.string("SCOPES", providerID: providerID) ?? defaultScopes(for: providerID)
+
+        endpointURL = SharedConfig.string("ENDPOINT_URL", providerID: providerID) ?? ""
+        region = SharedConfig.string("REGION", providerID: providerID) ?? "us-east-1"
+        bucket = SharedConfig.string("BUCKET", providerID: providerID) ?? ""
+        host = SharedConfig.string("HOST", providerID: providerID) ?? ""
+        port = SharedConfig.string("PORT", providerID: providerID) ?? ""
+        username = SharedConfig.string("USERNAME", providerID: providerID) ?? ""
+        password = SharedConfig.string("PASSWORD", providerID: providerID) ?? ""
+        accessKeyID = SharedConfig.string("ACCESS_KEY_ID", providerID: providerID) ?? ""
+        secretAccessKey = SharedConfig.string("SECRET_ACCESS_KEY", providerID: providerID) ?? ""
+        sessionToken = SharedConfig.string("SESSION_TOKEN", providerID: providerID) ?? ""
+        basePath = SharedConfig.string("BASE_PATH", providerID: providerID) ?? "/"
+        useTLS = SharedConfig.bool("USE_TLS", providerID: providerID)
+        usePathStyleURL = SharedConfig.bool("USE_PATH_STYLE_URL", providerID: providerID)
+        useTransferAcceleration = SharedConfig.bool("USE_TRANSFER_ACCELERATION", providerID: providerID)
+    }
+
+    private func defaultRedirectURI(for providerID: String) -> String {
+        switch providerID {
+        case "gdrive": return "com.stratus.cloudmanager:/oauth2callback"
+        case "dropbox": return "com.stratus.cloudmanager:/dropbox/callback"
+        case "onedrive": return "com.stratus.cloudmanager://auth/onedrive"
+        case "box": return "stratus://oauth/box"
+        default: return "stratus://oauth/callback"
+        }
     }
 
     private func isS3(_ definition: ProviderDefinition) -> Bool {
