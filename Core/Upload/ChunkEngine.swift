@@ -86,71 +86,92 @@ public actor ChunkEngine {
         var retriedChunks = 0
 
         // 7. Parallel chunk upload with dynamic concurrency
-        try await withThrowingTaskGroup(of: (Int, ChunkUploadResult).self) { group in
-            var inFlight = 0
-            var pendingIterator = pendingChunks.makeIterator()
-            var maxConcurrent = await congestionController.recommendedParallelism
+        do {
+            try await withThrowingTaskGroup(of: (Int, ChunkUploadResult, Int).self) { group in
+                var inFlight = 0
+                var pendingIterator = pendingChunks.makeIterator()
+                var maxConcurrent = await congestionController.recommendedParallelism
 
-            // Seed initial slots
-            while inFlight < maxConcurrent, let chunk = pendingIterator.next() {
-                group.addTask { [chunk] in
-                    let result = try await self.uploadChunk(chunk: chunk, task: task, uploadID: uploadID,
-                                                            provider: provider, account: account,
-                                                            fileHandle: fileHandle,
-                                                            bandwidthMonitor: bandwidthMonitor)
-                    return (chunk.number, result)
-                }
-                inFlight += 1
-            }
-
-            // Drain results and add more work
-            for try await (chunkNumber, result) in group {
-                inFlight -= 1
-                etags[chunkNumber] = result.etag ?? ""
-                bytesTransferred += Int64(chunks[chunkNumber].size)
-
-                // Persist checkpoint
-                try await resumeStore.markChunkComplete(
-                    sessionID: task.id.uuidString,
-                    chunk: chunkNumber,
-                    etag: result.etag ?? ""
-                )
-
-                // Update congestion window
-                await congestionController.onChunkSuccess(rtt: 0.05)
-                maxConcurrent = await congestionController.recommendedParallelism
-
-                // Throttle delay
-                let delay = await throttle.delayBetweenChunks(chunkSize: config.chunkSize, activeConcurrency: inFlight)
-                if delay > 0 {
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                }
-
-                // Report progress to UI
-                let completed = etags.count
-                progressStream.yield(ChunkProgress(
-                    total: totalChunks,
-                    completed: completed,
-                    inFlight: inFlight,
-                    failed: 0,
-                    bytesTransferred: bytesTransferred,
-                    totalBytes: task.fileSize,
-                    currentSpeedBPS: await bandwidthMonitor.currentBPS,
-                    estimatedSecondsRemaining: await bandwidthMonitor.estimatedTimeRemaining(bytesLeft: task.fileSize - bytesTransferred)
-                ))
-
-                // Schedule next chunk
-                if let next = pendingIterator.next(), inFlight < maxConcurrent {
-                    group.addTask { [next] in
-                        let result = try await self.uploadChunk(chunk: next, task: task, uploadID: uploadID,
-                                                                provider: provider, account: account,
-                                                                fileHandle: fileHandle,
-                                                                bandwidthMonitor: bandwidthMonitor)
-                        return (next.number, result)
+                // Seed initial slots
+                while inFlight < maxConcurrent, let chunk = pendingIterator.next() {
+                    group.addTask { [chunk] in
+                        let (result, retryCount) = try await self.uploadChunk(
+                            chunk: chunk,
+                            uploadID: uploadID,
+                            provider: provider,
+                            account: account,
+                            fileHandle: fileHandle,
+                            bandwidthMonitor: bandwidthMonitor,
+                            congestionController: congestionController
+                        )
+                        return (chunk.number, result, retryCount)
                     }
                     inFlight += 1
                 }
+
+                // Drain results and add more work
+                for try await (chunkNumber, result, retryCount) in group {
+                    inFlight -= 1
+                    retriedChunks += retryCount
+                    etags[chunkNumber] = result.etag ?? ""
+                    bytesTransferred += Int64(chunks[chunkNumber].size)
+
+                    // Persist checkpoint
+                    try await resumeStore.markChunkComplete(
+                        sessionID: task.id.uuidString,
+                        chunk: chunkNumber,
+                        etag: result.etag ?? ""
+                    )
+
+                    // Update congestion window
+                    await congestionController.onChunkSuccess(rtt: 0.05)
+                    maxConcurrent = await congestionController.recommendedParallelism
+
+                    // Throttle delay
+                    let delay = await throttle.delayBetweenChunks(chunkSize: config.chunkSize, activeConcurrency: inFlight)
+                    if delay > 0 {
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    }
+
+                    // Report progress to UI
+                    let completed = etags.count
+                    progressStream.yield(ChunkProgress(
+                        total: totalChunks,
+                        completed: completed,
+                        inFlight: inFlight,
+                        failed: 0,
+                        bytesTransferred: bytesTransferred,
+                        totalBytes: task.fileSize,
+                        currentSpeedBPS: await bandwidthMonitor.currentBPS,
+                        estimatedSecondsRemaining: await bandwidthMonitor.estimatedTimeRemaining(bytesLeft: task.fileSize - bytesTransferred)
+                    ))
+
+                    // Schedule next chunk
+                    if let next = pendingIterator.next(), inFlight < maxConcurrent {
+                        group.addTask { [next] in
+                            let (result, retryCount) = try await self.uploadChunk(
+                                chunk: next,
+                                uploadID: uploadID,
+                                provider: provider,
+                                account: account,
+                                fileHandle: fileHandle,
+                                bandwidthMonitor: bandwidthMonitor,
+                                congestionController: congestionController
+                            )
+                            return (next.number, result, retryCount)
+                        }
+                        inFlight += 1
+                    }
+                }
             }
+        } catch {
+            try? await resumeStore.updateSessionState(
+                task.id.uuidString,
+                state: "failed",
+                error: String(describing: error)
+            )
+            try? await provider.abortMultipartUpload(uploadID: uploadID, account: account)
+            throw error
         }
 
         // 8. Complete multipart upload
@@ -213,24 +234,69 @@ public actor ChunkEngine {
 
     private func uploadChunk(
         chunk: ChunkDescriptor,
-        task: UploadTask,
         uploadID: String,
         provider: any CloudProvider,
         account: CloudAccount,
         fileHandle: FileHandle,
-        bandwidthMonitor: BandwidthMonitor
-    ) async throws -> ChunkUploadResult {
+        bandwidthMonitor: BandwidthMonitor,
+        congestionController: CongestionController
+    ) async throws -> (ChunkUploadResult, Int) {
         let data = try ChunkSlicer.readChunk(fileHandle: fileHandle, offset: chunk.offset, size: chunk.size)
-        let t0 = Date()
-        let result = try await provider.uploadChunk(
-            uploadID: uploadID,
-            chunkNumber: chunk.number + 1,  // providers use 1-based part numbers
-            data: data,
-            account: account
-        )
-        let elapsed = Date().timeIntervalSince(t0)
-        await bandwidthMonitor.recordBytes(Int64(chunk.size), elapsed: elapsed)
-        return result
+        let maxAttempts = 6
+        var attempt = 1
+        var retries = 0
+
+        while true {
+            let t0 = Date()
+            do {
+                let result = try await provider.uploadChunk(
+                    uploadID: uploadID,
+                    chunkNumber: chunk.number + 1,  // providers use 1-based part numbers
+                    data: data,
+                    account: account
+                )
+                let elapsed = Date().timeIntervalSince(t0)
+                await bandwidthMonitor.recordBytes(Int64(chunk.size), elapsed: elapsed)
+                return (result, retries)
+            } catch {
+                if !isRetriable(error) || attempt >= maxAttempts {
+                    await congestionController.onChunkError()
+                    throw UploadError.chunkExhausted(chunkNumber: chunk.number + 1, attempts: attempt)
+                }
+
+                retries += 1
+                attempt += 1
+                if case ProviderError.rateLimited(let retryAfter) = error {
+                    await congestionController.onChunkRateLimited(retryAfter: retryAfter)
+                    try await Task.sleep(nanoseconds: UInt64(max(0, retryAfter) * 1_000_000_000))
+                } else {
+                    await congestionController.onChunkTimeout()
+                    try await Task.sleep(nanoseconds: retryDelayNanoseconds(forAttempt: attempt))
+                }
+            }
+        }
+    }
+
+    private func isRetriable(_ error: Error) -> Bool {
+        switch error {
+        case ProviderError.rateLimited, ProviderError.networkUnavailable:
+            return true
+        case ProviderError.serverError(let statusCode, _):
+            return [408, 429, 500, 502, 503, 504].contains(statusCode)
+        case ProviderError.accessDenied, ProviderError.authenticationFailed, ProviderError.fileNotFound,
+             ProviderError.quotaExceeded, ProviderError.sessionExpired, ProviderError.unsupportedOperation,
+             ProviderError.checksumMismatch, ProviderError.invalidResponse, ProviderError.providerSpecific:
+            return false
+        default:
+            return true
+        }
+    }
+
+    private func retryDelayNanoseconds(forAttempt attempt: Int) -> UInt64 {
+        let retryIndex = max(0, attempt - 2)
+        let base = min(pow(2.0, Double(retryIndex)), 16.0)
+        let jitter = Double.random(in: -0.25...0.25) * base
+        return UInt64(max(0.25, base + jitter) * 1_000_000_000)
     }
 
     private func uploadSmallFile(
