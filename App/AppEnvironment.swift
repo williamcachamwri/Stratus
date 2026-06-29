@@ -149,6 +149,7 @@ public final class AppEnvironment: ObservableObject {
     @Published public var uploadRows: [UploadRowState] = []
     @Published public var uploadSummary: UploadDashboardSummary = .empty
     @Published public var uploadBandwidthSnapshot: BWSnapshot?
+    @Published public var uploadSpeedHistory: [Double] = []
     @Published public var downloadRows: [DownloadRowState] = []
     @Published public var downloadSummary: DownloadDashboardSummary = .empty
     @Published public var isOnline: Bool = true
@@ -203,6 +204,7 @@ public final class AppEnvironment: ObservableObject {
         uploadBandwidthTask = Task { @MainActor [weak self] in
             for await snapshot in await self?.uploadEngine.bandwidthUpdates ?? AsyncStream { _ in } {
                 self?.uploadBandwidthSnapshot = snapshot
+                self?.recordUploadSpeed(snapshot.currentBPS)
                 self?.publishUploadState()
             }
         }
@@ -393,6 +395,13 @@ public final class AppEnvironment: ObservableObject {
             checksumVerified: existing.checksumVerified,
             updatedAt: Date()
         )
+    }
+
+    private func recordUploadSpeed(_ bps: Double) {
+        uploadSpeedHistory.append(max(0, bps))
+        if uploadSpeedHistory.count > 240 {
+            uploadSpeedHistory.removeFirst(uploadSpeedHistory.count - 240)
+        }
     }
 
     private func publishUploadState() {
