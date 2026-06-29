@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test unsigned app
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      SWIFT_STRICT_CONCURRENCY: complete
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify toolchain
+        run: Scripts/ci_bootstrap.sh
+
+      - name: Resolve dependencies
+        run: swift package resolve
+
+      - name: Build package
+        run: swift build --product Stratus -c debug
+
+      - name: Run tests
+        run: Scripts/test.sh
+
+      - name: Build unsigned app bundle
+        run: Scripts/build_unsigned_release.sh
+
+      - name: Upload unsigned artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stratus-unsigned-${{ github.sha }}
+          path: |
+            dist/*.app
+            dist/*.zip
+            dist/*.dmg
+          if-no-files-found: error
