@@ -54,9 +54,7 @@ let package = Package(
             name: "StratusFileProviderExtension",
             dependencies: ["StratusCore"],
             path: "FileProviderExtension",
-            resources: [
-                .copy("Info.plist"),
-            ],
+            exclude: ["Info.plist"],
             swiftSettings: [
                 .unsafeFlags(["-strict-concurrency=complete"]),
             ]
