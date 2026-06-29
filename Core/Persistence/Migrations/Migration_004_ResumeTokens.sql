@@ -1,6 +1,7 @@
 -- Migration 004: Resume Tokens
 -- Creates the download_sessions table for DownloadResumeStore and the
--- block_manifests table for DeltaSync.
+-- block_manifests table for DeltaSync.  Block manifests are keyed by the same
+-- security-scoped bookmark identifier used by ResumeStore.
 
 CREATE TABLE IF NOT EXISTS download_sessions (
     id                 TEXT    NOT NULL PRIMARY KEY,
@@ -11,9 +12,9 @@ CREATE TABLE IF NOT EXISTS download_sessions (
     local_path         TEXT    NOT NULL,
     file_size          INTEGER,
     file_checksum      TEXT,
-    segment_size       INTEGER NOT NULL DEFAULT 8388608, -- 8 MiB
+    segment_size       INTEGER NOT NULL DEFAULT 8388608,
     total_segments     INTEGER NOT NULL DEFAULT 0,
-    completed_segments TEXT    NOT NULL DEFAULT '[]',   -- JSON array
+    completed_segments TEXT    NOT NULL DEFAULT '[]',
     created_at         REAL    NOT NULL,
     updated_at         REAL    NOT NULL,
     state              TEXT    NOT NULL DEFAULT 'pending',
@@ -37,13 +38,13 @@ CREATE INDEX IF NOT EXISTS idx_download_sessions_updated_at
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS block_manifests (
-    file_url    TEXT NOT NULL PRIMARY KEY,
-    provider_id TEXT NOT NULL,
-    account_id  TEXT NOT NULL,
-    remote_path TEXT NOT NULL,
-    block_map   TEXT NOT NULL,  -- JSON blob
-    created_at  REAL NOT NULL,
-    updated_at  REAL NOT NULL
+    id            TEXT NOT NULL PRIMARY KEY,
+    file_bookmark TEXT NOT NULL UNIQUE,
+    provider_id   TEXT NOT NULL,
+    account_id    TEXT NOT NULL,
+    remote_path   TEXT NOT NULL,
+    block_map     TEXT NOT NULL,
+    updated_at    REAL NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_block_manifests_account_id
