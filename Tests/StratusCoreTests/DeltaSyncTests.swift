@@ -1,6 +1,47 @@
 import XCTest
 @testable import StratusCore
 
+// Minimal mock provider for DeltaSync tests
+actor MockCloudProvider: CloudProvider {
+    nonisolated var id: String { "mock" }
+    nonisolated var displayName: String { "Mock" }
+    nonisolated var iconName: String { "mock" }
+    nonisolated var capabilities: ProviderCapabilities { ProviderCapabilities() }
+    nonisolated var supportsBlockManifest: Bool { false }
+
+    func authenticate(account: CloudAccount) async throws {}
+    func refreshCredentials(account: CloudAccount) async throws {}
+    func validateCredentials(account: CloudAccount) async throws -> Bool { false }
+    func revokeCredentials(account: CloudAccount) async throws {}
+    func quota(for account: CloudAccount) async throws -> StorageQuota { StorageQuota(totalBytes: nil, usedBytes: 0, availableBytes: nil) }
+    func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> { PagedResult(items: []) }
+    func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem { throw ProviderError.fileNotFound(path) }
+    func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String { "" }
+    func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult { ChunkUploadResult(etag: nil) }
+    func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: CloudPath("/")) }
+    func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {}
+    func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: CloudPath("/")) }
+    func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL { throw ProviderError.unsupportedOperation("") }
+    func downloadRange(path: CloudPath, range: ClosedRange<Int64>, account: CloudAccount) async throws -> Data { Data() }
+    func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: path, isDirectory: true) }
+    func move(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: to) }
+    func copy(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: to) }
+    func delete(path: CloudPath, account: CloudAccount) async throws {}
+    func rename(path: CloudPath, newName: String, account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: newName, path: path) }
+    func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? { nil }
+    func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? { nil }
+    func storeBlockManifest(_ manifest: BlockMap, path: CloudPath, account: CloudAccount) async throws {}
+    func trash(path: CloudPath, account: CloudAccount) async throws {}
+    func listTrash(account: CloudAccount) async throws -> [CloudFileItem] { [] }
+    func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {}
+    func emptyTrash(account: CloudAccount) async throws {}
+    func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] { [] }
+    func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
+    func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink { throw ProviderError.unsupportedOperation("") }
+    func revokeShareLink(link: ShareLink, account: CloudAccount) async throws {}
+    func streamingURL(path: CloudPath, account: CloudAccount) async throws -> URL { throw ProviderError.unsupportedOperation("") }
+}
+
 final class DeltaSyncTests: XCTestCase {
 
     private var tempDir: URL!
@@ -33,7 +74,6 @@ final class DeltaSyncTests: XCTestCase {
         try data.write(to: url)
         let local = try await deltaSync.computeBlockMap(url: url)
 
-        // Modify first block
         data[0] = 0xFF
         try data.write(to: url)
         let modified = try await deltaSync.computeBlockMap(url: url)
@@ -48,7 +88,7 @@ final class DeltaSyncTests: XCTestCase {
         let url = tempDir.appendingPathComponent("exact.bin")
         try data.write(to: url)
         let blockMap = try await deltaSync.computeBlockMap(url: url)
-        XCTAssertEqual(blockMap.blocks.count, 3)
+        XCTAssertEqual(blockMap.checksums.count, 3)
     }
 
     func test_blockCount_withRemainder() async throws {
@@ -57,24 +97,24 @@ final class DeltaSyncTests: XCTestCase {
         let url = tempDir.appendingPathComponent("remainder.bin")
         try data.write(to: url)
         let blockMap = try await deltaSync.computeBlockMap(url: url)
-        XCTAssertEqual(blockMap.blocks.count, 3)
-        XCTAssertEqual(blockMap.blocks[2].size, 100)
+        XCTAssertEqual(blockMap.checksums.count, 3)
+        XCTAssertEqual(blockMap.fileSize, Int64(blockSize * 2 + 100))
     }
 
     func test_shouldUseDelta_smallFile_false() async throws {
         let url = tempDir.appendingPathComponent("small.bin")
         try Data(repeating: 0, count: 1024).write(to: url)
-        let useDelta = await deltaSync.shouldUseDelta(fileSize: 1024, provider: "s3", fileURL: url)
+        let provider = MockCloudProvider()
+        let useDelta = await deltaSync.shouldUseDelta(fileSize: 1024, provider: provider, fileURL: url)
         XCTAssertFalse(useDelta)
     }
 
-    func test_shouldUseDelta_largeFile_true() async throws {
+    func test_shouldUseDelta_largeFile_noManifest_false() async throws {
         let url = tempDir.appendingPathComponent("large.bin")
         let size = 60 * 1024 * 1024
-        let largeData = Data(repeating: 0, count: size)
-        try largeData.write(to: url)
-        let useDelta = await deltaSync.shouldUseDelta(fileSize: Int64(size), provider: "s3", fileURL: url)
-        // Returns true only if a manifest exists; without one, false
-        XCTAssertFalse(useDelta)  // No prior manifest
+        try Data(repeating: 0, count: size).write(to: url)
+        let provider = MockCloudProvider()
+        let useDelta = await deltaSync.shouldUseDelta(fileSize: Int64(size), provider: provider, fileURL: url)
+        XCTAssertFalse(useDelta)  // False: provider doesn't support block manifest
     }
 }
