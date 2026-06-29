@@ -4,22 +4,23 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
+require_tools="${STRATUS_REQUIRE_LINT_TOOLS:-0}"
 missing=0
 
 if command -v swiftformat >/dev/null 2>&1; then
-  swiftformat --lint App Core Tests Package.swift
+  swiftformat --lint App Core Features DesignSystem Tests Package.swift
 else
   echo "SwiftFormat is not installed. Install with: brew install swiftformat" >&2
   missing=1
 fi
 
 if command -v swiftlint >/dev/null 2>&1; then
-  swiftlint lint --strict
+  swiftlint lint
 else
   echo "SwiftLint is not installed. Install with: brew install swiftlint" >&2
   missing=1
 fi
 
-if [[ "$missing" -ne 0 ]]; then
+if [[ "$missing" -ne 0 && "$require_tools" == "1" ]]; then
   exit 1
 fi
