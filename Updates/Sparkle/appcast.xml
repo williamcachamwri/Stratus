@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Stratus Updates</title>
+    <link>https://github.com/williamcachamwri/Stratus/releases</link>
+    <description>Direct unsigned Stratus release feed. Release automation replaces this template with a generated Sparkle appcast when Sparkle tooling is available.</description>
+    <language>en</language>
+  </channel>
+</rss>
