@@ -1,4 +1,5 @@
 import SwiftUI
+import StratusCore
 import AppKit
 
 @main
