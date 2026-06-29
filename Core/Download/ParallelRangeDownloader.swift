@@ -158,10 +158,8 @@ public actor ParallelRangeDownloader {
                     inFlight -= 1
                 }
             }
-        } catch let err as DownloadError {
+        } catch let err {
             throw err
-        } catch {
-            throw DownloadError.unknown(error.localizedDescription)
         }
 
         // Assemble in order.
@@ -257,10 +255,8 @@ public actor ParallelRangeDownloader {
                     inFlight -= 1
                 }
             }
-        } catch let err as DownloadError {
+        } catch let err {
             throw err
-        } catch {
-            throw DownloadError.localIOError(error.localizedDescription)
         }
 
         return destination
