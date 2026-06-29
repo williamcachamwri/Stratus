@@ -131,28 +131,54 @@ public struct ChunkSlicer: Sendable {
         )
     }
 
-    // Read a chunk safely using pread (thread-safe, no seek required)
+    // Read a chunk safely using pread (thread-safe, no seek required).
+    //
+    // pread(2) is allowed to return fewer bytes than requested even when the
+    // file has not reached EOF.  A production upload engine must loop until the
+    // exact descriptor size has been read; otherwise a transient short read can
+    // silently upload a truncated part while the chunk map still says the full
+    // byte range was transferred.
     public static func readChunk(
         fileHandle: FileHandle,
         offset: Int64,
         size: Int
     ) throws -> Data {
-        // pread is thread-safe unlike seek+read
+        guard offset >= 0 else { throw ChunkSlicerError.invalidOffset }
+        guard size >= 0 else { throw ChunkSlicerError.invalidSize(size) }
+        guard size > 0 else { return Data() }
+
         let fd = fileHandle.fileDescriptor
         var buffer = Data(count: size)
-        let bytesRead = buffer.withUnsafeMutableBytes { ptr -> Int in
-            guard let base = ptr.baseAddress else { return 0 }
-            return pread(fd, base, size, offset)
+        var totalRead = 0
+
+        while totalRead < size {
+            let bytesRead = buffer.withUnsafeMutableBytes { rawBuffer -> Int in
+                guard let baseAddress = rawBuffer.baseAddress else { return 0 }
+                let destination = baseAddress.advanced(by: totalRead)
+                let currentOffset = offset + Int64(totalRead)
+                return pread(fd, destination, size - totalRead, currentOffset)
+            }
+
+            if bytesRead < 0 {
+                if errno == EINTR { continue }
+                throw ChunkSlicerError.readFailed(errno: errno)
+            }
+
+            guard bytesRead > 0 else {
+                throw ChunkSlicerError.shortRead(expected: size, actual: totalRead)
+            }
+
+            totalRead += bytesRead
         }
-        guard bytesRead >= 0 else {
-            throw ChunkSlicerError.readFailed(errno: errno)
-        }
-        return buffer.prefix(bytesRead)
+
+        return buffer
     }
 }
 
-public enum ChunkSlicerError: Error, Sendable {
+public enum ChunkSlicerError: Error, Sendable, Equatable {
     case readFailed(errno: Int32)
     case invalidOffset
+    case invalidSize(Int)
+    case shortRead(expected: Int, actual: Int)
     case fileTooLarge
 }
