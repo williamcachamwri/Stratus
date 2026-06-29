@@ -186,7 +186,7 @@ public actor ResumeStore {
 
     // MARK: - Private
 
-    private func sessionFromRow(_ row: Row) throws -> UploadSession {
+    private nonisolated func sessionFromRow(_ row: Row) throws -> UploadSession {
         let chunksStr = (row["completed_chunks"] as? String) ?? "[]"
         let etagsStr = (row["etags"] as? String) ?? "{}"
         let chunks = (try? JSONDecoder().decode([Int].self, from: Data(chunksStr.utf8))) ?? []
