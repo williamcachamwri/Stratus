@@ -53,7 +53,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     private func currentUser(account: CloudAccount) async throws -> [String: Any] {
-        let url = URL(string: "\(Self.apiBase)/users/me")!
+        let url = URL(string: "\(Self.apiBase)/users/me") ?? URL(fileURLWithPath: "/")
         let response = try await http.data(for: HTTPRequest(url: url, headers: try await authHeaders(account: account)))
         return (try? JSONSerialization.jsonObject(with: response.data) as? [String: Any]) ?? [:]
     }
@@ -62,13 +62,14 @@ public actor BoxProvider: CloudProvider {
 
     public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
         let folderID = path.path == "/" ? "0" : path.path
-        var components = URLComponents(string: "\(Self.apiBase)/folders/\(folderID)/items")!
+        var components = URLComponents(string: "\(Self.apiBase)/folders/\(folderID)/items") ?? URLComponents()
         components.queryItems = [
             .init(name: "fields", value: "id,name,type,size,modified_at,etag,sha1"),
             .init(name: "limit", value: "1000"),
         ]
         if let token = pageToken { components.queryItems?.append(.init(name: "marker", value: token)) }
-        let response = try await http.data(for: HTTPRequest(url: components.url!, headers: try await authHeaders(account: account)))
+        guard let listURL = components.url else { throw ProviderError.invalidResponse("Could not build URL") }
+        let response = try await http.data(for: HTTPRequest(url: listURL, headers: try await authHeaders(account: account)))
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
               let entries = json["entries"] as? [[String: Any]] else { return PagedResult(items: []) }
         let items = entries.compactMap { parseItem($0, basePath: path) }
@@ -78,7 +79,7 @@ public actor BoxProvider: CloudProvider {
 
     public func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let fileID = path.path
-        let url = URL(string: "\(Self.apiBase)/files/\(fileID)?fields=id,name,type,size,modified_at,etag,sha1")!
+        let url = URL(string: "\(Self.apiBase)/files/\(fileID)?fields=id,name,type,size,modified_at,etag,sha1") ?? URL(fileURLWithPath: "/")
         let response = try await http.data(for: HTTPRequest(url: url, headers: try await authHeaders(account: account)))
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
             throw ProviderError.fileNotFound(path)
@@ -90,7 +91,7 @@ public actor BoxProvider: CloudProvider {
 
     public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String {
         let parentID = "0"  // TODO: resolve from path
-        let url = URL(string: "\(Self.uploadBase)/files/upload_sessions")!
+        let url = URL(string: "\(Self.uploadBase)/files/upload_sessions") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
         let body = try JSONSerialization.data(withJSONObject: [
@@ -108,7 +109,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
-        let url = URL(string: "\(Self.uploadBase)/files/upload_sessions/\(uploadID)")!
+        let url = URL(string: "\(Self.uploadBase)/files/upload_sessions/\(uploadID)") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/octet-stream"
         headers["Digest"] = "sha=\(data.sha1Base64())"
@@ -119,7 +120,7 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
-        let url = URL(string: "\(Self.uploadBase)/files/upload_sessions/\(uploadID)/commit")!
+        let url = URL(string: "\(Self.uploadBase)/files/upload_sessions/\(uploadID)/commit") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
         let partsList = parts.map { ["part_id": $0.partNumber, "offset": 0, "size": 0] }
@@ -135,13 +136,13 @@ public actor BoxProvider: CloudProvider {
     }
 
     public func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {
-        let url = URL(string: "\(Self.uploadBase)/files/upload_sessions/\(uploadID)")!
+        let url = URL(string: "\(Self.uploadBase)/files/upload_sessions/\(uploadID)") ?? URL(fileURLWithPath: "/")
         let request = HTTPRequest(url: url, method: .DELETE, headers: try await authHeaders(account: account))
         _ = try await http.data(for: request)
     }
 
     public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
-        let url = URL(string: "\(Self.uploadBase)/files/content")!
+        let url = URL(string: "\(Self.uploadBase)/files/content") ?? URL(fileURLWithPath: "/")
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "multipart/form-data; boundary=box_upload"
         let boundary = "box_upload"
@@ -281,7 +282,7 @@ public actor BoxProvider: CloudProvider {
 private extension Data {
     func sha1Base64() -> String {
         var digest = [UInt8](repeating: 0, count: 20)
-        self.withUnsafeBytes { ptr in
+        _ = self.withUnsafeBytes { ptr in
             CC_SHA1(ptr.baseAddress, CC_LONG(count), &digest)
         }
         return Data(digest).base64EncodedString()
