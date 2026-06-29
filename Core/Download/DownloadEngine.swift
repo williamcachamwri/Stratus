@@ -349,12 +349,6 @@ public actor DownloadEngine {
         // The progress handler is called from within the downloader's actor
         // context; we hop back to the engine actor to update shared state.
         let taskID = task.id
-        let totalBytesAtStart: Int64 = alreadyCompleted.isEmpty ? 0 : {
-            // Estimate bytes already on disk from prior segments.
-            let cfg = self.configuration.rangeDownloaderConfiguration
-            return Int64(alreadyCompleted.count) * cfg.segmentSize
-        }()
-
         let segmentSize = configuration.rangeDownloaderConfiguration.segmentSize
         let segmentsUsed = Int((fileSize + segmentSize - 1) / segmentSize)
 
