@@ -33,7 +33,7 @@ public actor DropboxProvider: CloudProvider {
     public func refreshCredentials(account: CloudAccount) async throws {}
     public func validateCredentials(account: CloudAccount) async throws -> Bool {
         guard let cred = try await vault.loadOAuthCredential(providerID: id, accountID: account.id) else { return false }
-        let request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/users/get_current_account")!,
+        let request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/users/get_current_account") ?? URL(fileURLWithPath: "/"),
                                   method: .POST, headers: ["Authorization": "Bearer \(cred.accessToken)"])
         let response = try await http.data(for: request)
         return response.isSuccess
@@ -44,7 +44,7 @@ public actor DropboxProvider: CloudProvider {
 
     public func quota(for account: CloudAccount) async throws -> StorageQuota {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/users/get_space_usage")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/users/get_space_usage") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         let response = try await http.data(for: request)
         guard response.isSuccess,
@@ -63,14 +63,16 @@ public actor DropboxProvider: CloudProvider {
             ? ["path": path.path == "/" ? "" : path.path, "recursive": false, "limit": 1000]
             : [:]
         let url = pageToken == nil
-            ? URL(string: "https://api.dropboxapi.com/2/files/list_folder")!
-            : URL(string: "https://api.dropboxapi.com/2/files/list_folder/continue")!
+            ? URL(string: "https://api.dropboxapi.com/2/files/list_folder") ?? URL(fileURLWithPath: "/")
+            : URL(string: "https://api.dropboxapi.com/2/files/list_folder/continue") ?? URL(fileURLWithPath: "/")
         var request = HTTPRequest(url: url, method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
-        request.body = pageToken == nil
-            ? try JSONSerialization.data(withJSONObject: body)
-            : try JSONSerialization.data(withJSONObject: ["cursor": pageToken!])
+        if let cursor = pageToken {
+            request.body = try JSONSerialization.data(withJSONObject: ["cursor": cursor])
+        } else {
+            request.body = try JSONSerialization.data(withJSONObject: body)
+        }
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
@@ -95,7 +97,7 @@ public actor DropboxProvider: CloudProvider {
 
     public func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/get_metadata")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/get_metadata") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["path": path.path])
@@ -133,7 +135,7 @@ public actor DropboxProvider: CloudProvider {
 
     public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://content.dropboxapi.com/2/files/upload")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "https://content.dropboxapi.com/2/files/upload") ?? URL(fileURLWithPath: "/"), method: .POST)
         let apiArg = "{\"path\":\"\(remotePath.path)\",\"mode\":\"overwrite\"}"
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Dropbox-API-Arg"] = apiArg
@@ -150,7 +152,7 @@ public actor DropboxProvider: CloudProvider {
 
     public func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/get_temporary_link")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/get_temporary_link") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["path": path.path])
@@ -173,7 +175,7 @@ public actor DropboxProvider: CloudProvider {
 
     public func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/create_folder_v2")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/create_folder_v2") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["path": path.path])
@@ -189,7 +191,7 @@ public actor DropboxProvider: CloudProvider {
 
     public func move(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/move_v2")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/move_v2") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["from_path": from.path, "to_path": to.path])
@@ -200,7 +202,7 @@ public actor DropboxProvider: CloudProvider {
 
     public func copy(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/copy_v2")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/copy_v2") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["from_path": from.path, "to_path": to.path])
@@ -211,7 +213,7 @@ public actor DropboxProvider: CloudProvider {
 
     public func delete(path: CloudPath, account: CloudAccount) async throws {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/delete_v2")!, method: .POST)
+        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/delete_v2") ?? URL(fileURLWithPath: "/"), method: .POST)
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["path": path.path])
