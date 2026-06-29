@@ -24,19 +24,24 @@ public actor UploadScheduler {
     // MARK: - Queue Management
 
     public func enqueue(_ task: UploadTask, priority: TaskPriority = .normal) async {
-        queue.enqueue(task)
-        logger.debug("Enqueued \(task.sourceURL.lastPathComponent) — queue size: \(await self.queue.count)")
+        await queue.enqueue(task)
+        let count = await queue.count
+        logger.debug("Enqueued \(task.sourceURL.lastPathComponent) — queue size: \(count)")
         notifySlotAvailable()
     }
 
     public func dequeue(taskID: UUID) async {
-        queue.remove(taskID: taskID)
+        await queue.remove(taskID: taskID)
         activeTasks.removeValue(forKey: taskID)
         notifySlotAvailable()
     }
 
-    public func reprioritize(taskID: UUID, to priority: TaskPriority) {
-        _ = queue.reprioritize(taskID: taskID, to: priority)
+    public func reprioritize(taskID: UUID, to priority: TaskPriority) async {
+        _ = await queue.reprioritize(taskID: taskID, to: priority)
+    }
+
+    public func setMaxConcurrentFiles(_ n: Int) {
+        maxConcurrentFiles = n
     }
 
     public func pauseAll() {
