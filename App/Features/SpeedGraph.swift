@@ -1,4 +1,5 @@
 import SwiftUI
+import StratusCore
 
 // MARK: - SpeedGraph
 // A tiny sparkline-style bandwidth graph for the upload center header.
