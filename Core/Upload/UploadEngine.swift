@@ -35,6 +35,7 @@ public actor UploadEngine {
     private var eventContinuations: [UUID: AsyncStream<UploadEngineEvent>.Continuation] = [:]
     private var runLoopTask: Task<Void, Never>?
     private var progressStreams: [UUID: AsyncStream<ChunkProgress>.Continuation] = [:]
+    private var activeUploadTasks: [UUID: Task<Void, Never>] = [:]
 
     private init() {}
 
@@ -60,17 +61,22 @@ public actor UploadEngine {
             // Re-queue pending sessions (they will resume from saved chunk state)
             for session in sessions {
                 if let account = accounts[session.accountID] {
-                    let task = UploadTask(
-                        id: UUID(uuidString: session.id) ?? UUID(),
-                        sourceURL: URL(fileURLWithPath: session.fileURLString),
-                        destinationPath: CloudPath(session.remotePath),
-                        accountID: session.accountID,
-                        providerID: session.providerID,
-                        fileSize: session.fileSize,
-                        localChecksum: session.fileChecksum,
-                        state: .paused(resumeToken: session.uploadID)
-                    )
-                    await scheduler.enqueue(task, priority: .normal)
+                    do {
+                        let sourceURL = try resumeStore.resolvedFileURL(for: session)
+                        let task = UploadTask(
+                            id: UUID(uuidString: session.id) ?? UUID(),
+                            sourceURL: sourceURL,
+                            destinationPath: CloudPath(session.remotePath),
+                            accountID: session.accountID,
+                            providerID: session.providerID,
+                            fileSize: session.fileSize,
+                            localChecksum: session.fileChecksum,
+                            state: .paused(resumeToken: session.uploadID)
+                        )
+                        await scheduler.enqueue(task, priority: .normal)
+                    } catch {
+                        try? await resumeStore.updateSessionState(session.id, state: "failed", error: "Could not resolve security-scoped bookmark: \(error)")
+                    }
                 }
             }
         }
@@ -122,6 +128,11 @@ public actor UploadEngine {
     }
 
     public func pause(taskID: UUID) async {
+        activeUploadTasks[taskID]?.cancel()
+        if let task = await scheduler.allTasks.first(where: { $0.id == taskID }) {
+            task.transition(to: .paused(resumeToken: task.uploadID))
+        }
+        try? await resumeStore.updateSessionState(taskID.uuidString, state: "paused")
         emit(.taskPaused(taskID))
     }
 
@@ -139,9 +150,10 @@ public actor UploadEngine {
                 return
             }
 
+            let sourceURL = try resumeStore.resolvedFileURL(for: session)
             let task = UploadTask(
                 id: taskID,
-                sourceURL: URL(fileURLWithPath: session.fileURLString),
+                sourceURL: sourceURL,
                 destinationPath: CloudPath(session.remotePath),
                 accountID: session.accountID,
                 providerID: session.providerID,
@@ -159,11 +171,21 @@ public actor UploadEngine {
     }
 
     public func cancel(taskID: UUID) async {
+        activeUploadTasks[taskID]?.cancel()
+        activeUploadTasks.removeValue(forKey: taskID)
+        progressStreams[taskID]?.finish()
+        progressStreams.removeValue(forKey: taskID)
         await scheduler.dequeue(taskID: taskID)
+        try? await resumeStore.updateSessionState(taskID.uuidString, state: "cancelled")
         emit(.taskCancelled(taskID))
     }
 
     public func pauseAll() async {
+        for id in activeUploadTasks.keys {
+            activeUploadTasks[id]?.cancel()
+            try? await resumeStore.updateSessionState(id.uuidString, state: "paused")
+            emit(.taskPaused(id))
+        }
         await scheduler.pauseAll()
     }
 
@@ -172,6 +194,13 @@ public actor UploadEngine {
     }
 
     public func cancelAll() async {
+        for id in activeUploadTasks.keys {
+            activeUploadTasks[id]?.cancel()
+            progressStreams[id]?.finish()
+            emit(.taskCancelled(id))
+        }
+        activeUploadTasks.removeAll()
+        progressStreams.removeAll()
         await scheduler.cancelAll()
     }
 
@@ -223,7 +252,7 @@ public actor UploadEngine {
             }
 
             // Execute upload
-            Task { [weak self] in
+            let uploadTask = Task { [weak self] in
                 let chunkEngine = ChunkEngine()
                 do {
                     let result = try await chunkEngine.upload(
@@ -236,18 +265,28 @@ public actor UploadEngine {
                     )
                     progressContinuation.finish()
                     await self?.removeProgressStream(forKey: taskID)
+                    await self?.removeActiveUploadTask(forKey: taskID)
                     await self?.scheduler.markComplete(taskID: taskID)
                     await self?.emit(.taskCompleted(task, result))
                     await self?.logger.info("Completed \(task.sourceURL.lastPathComponent) — \(result.bytesUploaded) bytes in \(String(format: "%.1f", result.durationSeconds))s")
+                } catch UploadError.cancelled {
+                    progressContinuation.finish()
+                    await self?.removeProgressStream(forKey: taskID)
+                    await self?.removeActiveUploadTask(forKey: taskID)
+                    await self?.scheduler.markFailed(taskID: taskID)
+                    task.transition(to: .paused(resumeToken: task.uploadID))
+                    await self?.emit(.taskPaused(taskID))
                 } catch {
                     progressContinuation.finish()
                     await self?.removeProgressStream(forKey: taskID)
+                    await self?.removeActiveUploadTask(forKey: taskID)
                     await self?.scheduler.markFailed(taskID: taskID)
                     let uploadError = error as? UploadError ?? .unknown(error.localizedDescription)
                     await self?.emit(.taskFailed(task, uploadError))
                     await self?.logger.error("Failed \(task.sourceURL.lastPathComponent): \(error)")
                 }
             }
+            activeUploadTasks[taskID] = uploadTask
         }
     }
 
@@ -265,5 +304,9 @@ public actor UploadEngine {
 
     private func removeProgressStream(forKey id: UUID) {
         progressStreams.removeValue(forKey: id)
+    }
+
+    private func removeActiveUploadTask(forKey id: UUID) {
+        activeUploadTasks.removeValue(forKey: id)
     }
 }
