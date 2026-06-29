@@ -4,7 +4,7 @@ import StratusCore
 public struct MountManagerView: View {
     public let mounts: [MountRow]
 
-    public init(mounts: [MountRow] = MountRow.defaultRows) {
+    public init(mounts: [MountRow] = []) {
         self.mounts = mounts
     }
 
@@ -21,9 +21,17 @@ public struct MountManagerView: View {
                 Button("Mount Account") {}
             }
 
-            LazyVStack(spacing: Spacing.sm) {
-                ForEach(mounts) { mount in
-                    MountItemView(row: mount)
+            if mounts.isEmpty {
+                EmptyStateView(
+                    icon: "externaldrive.badge.questionmark",
+                    title: "No mounted accounts",
+                    subtitle: "Mount rows will be populated from File Provider mount state, not placeholder demo data."
+                )
+            } else {
+                LazyVStack(spacing: Spacing.sm) {
+                    ForEach(mounts) { mount in
+                        MountItemView(row: mount)
+                    }
                 }
             }
         }
@@ -68,18 +76,6 @@ public struct MountRow: Identifiable, Equatable, Sendable {
         self.quotaTotal = quotaTotal
         self.cacheUsed = cacheUsed
     }
-
-    public static let defaultRows = [
-        MountRow(
-            accountName: "No mounted accounts",
-            providerID: "cloud",
-            mountPath: "~/Library/CloudStorage/Stratus",
-            status: .offline,
-            quotaUsed: 0,
-            quotaTotal: nil,
-            cacheUsed: 0
-        )
-    ]
 }
 
 private struct MountItemView: View {
