@@ -1,4 +1,5 @@
 import SwiftUI
+import StratusCore
 
 struct MenuBarView: View {
     @EnvironmentObject private var env: AppEnvironment
