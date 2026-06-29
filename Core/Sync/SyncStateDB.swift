@@ -4,8 +4,8 @@ import os.log
 
 // MARK: - SyncFileRecord
 
-struct SyncFileRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
-    static let databaseTableName = "sync_file_state"
+public struct SyncFileRecord: Codable, FetchableRecord, PersistableRecord, Sendable {
+    public static let databaseTableName = "sync_file_state"
 
     var pairID: String
     var remotePath: String
@@ -63,8 +63,8 @@ public actor SyncStateDB {
             pairID: pairID.uuidString,
             remotePath: remotePath.path,
             localPath: localURL.path,
-            localModifiedAt: localItem.modifiedAt ?? Date(),
-            remoteModifiedAt: remoteItem.modifiedAt ?? Date(),
+            localModifiedAt: localItem.modificationDate ?? Date(),
+            remoteModifiedAt: remoteItem.modificationDate ?? Date(),
             localSize: localItem.size ?? 0,
             remoteSize: remoteItem.size ?? 0,
             localChecksum: localItem.etag,
