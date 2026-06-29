@@ -100,11 +100,21 @@ public actor ChangeJournal {
 
 // MARK: - FSEventsMonitor
 
+// Box to hold callback context — passed via info pointer to C FSEventStreamCallback.
+private final class FSEventsCallbackBox {
+    let pairID: UUID
+    let onEvent: (ChangeEvent) -> Void
+    init(pairID: UUID, onEvent: @escaping (ChangeEvent) -> Void) {
+        self.pairID = pairID
+        self.onEvent = onEvent
+    }
+}
+
 private final class FSEventsMonitor: @unchecked Sendable {
     let pairID: UUID
     let rootURL: URL
     private var streamRef: FSEventStreamRef?
-    private var callback: ((ChangeEvent) -> Void)?
+    private var callbackBox: FSEventsCallbackBox?
     private let queue = DispatchQueue(label: "com.stratus.fsevents", qos: .utility)
 
     init(pairID: UUID, rootURL: URL) {
@@ -113,29 +123,32 @@ private final class FSEventsMonitor: @unchecked Sendable {
     }
 
     func start(onEvent: @escaping (ChangeEvent) -> Void) {
-        self.callback = onEvent
+        let box = FSEventsCallbackBox(pairID: pairID, onEvent: onEvent)
+        self.callbackBox = box  // keep alive for stream duration
+
         let paths = [rootURL.path] as CFArray
-        let pairIDCopy = pairID
-        var ctx = FSEventStreamContext(version: 0, info: nil, retain: nil, release: nil, copyDescription: nil)
+        let infoPtr = Unmanaged.passUnretained(box).toOpaque()
+        var ctx = FSEventStreamContext(version: 0, info: infoPtr, retain: nil, release: nil, copyDescription: nil)
+
+        // Non-capturing C function pointer: uses info to access box
+        let fsCallback: FSEventStreamCallback = { _, infoPtr, numEvents, eventPaths, eventFlags, _ in
+            guard let infoPtr else { return }
+            let box = Unmanaged<FSEventsCallbackBox>.fromOpaque(infoPtr).takeUnretainedValue()
+            let paths = unsafeBitCast(eventPaths, to: NSArray.self) as! [String]
+            let flags = UnsafeBufferPointer(start: eventFlags, count: numEvents)
+            for (path, flag) in zip(paths, flags) {
+                let url = URL(fileURLWithPath: path)
+                let changeType: ChangeType
+                if flag & UInt32(kFSEventStreamEventFlagItemRenamed) != 0 { changeType = .renamed }
+                else if flag & UInt32(kFSEventStreamEventFlagItemCreated) != 0 { changeType = .created }
+                else if flag & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 { changeType = .deleted }
+                else { changeType = .modified }
+                box.onEvent(ChangeEvent(pairID: box.pairID, localURL: url, changeType: changeType))
+            }
+        }
+
         let stream = FSEventStreamCreate(
-            nil,
-            { _, info, numEvents, eventPaths, eventFlags, _ in
-                guard let pathsPtr = eventPaths else { return }
-                let paths = unsafeBitCast(pathsPtr, to: NSArray.self) as! [String]
-                let flags = UnsafeBufferPointer(start: eventFlags, count: numEvents)
-                for (path, flag) in zip(paths, flags) {
-                    let url = URL(fileURLWithPath: path)
-                    let type: ChangeType
-                    if flag & UInt32(kFSEventStreamEventFlagItemRenamed) != 0 { type = .renamed }
-                    else if flag & UInt32(kFSEventStreamEventFlagItemCreated) != 0 { type = .created }
-                    else if flag & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 { type = .deleted }
-                    else { type = .modified }
-                    // info ptr approach doesn't work for capturing; use notification instead
-                    _ = ChangeEvent(pairID: pairIDCopy, localURL: url, changeType: type)
-                }
-            },
-            &ctx,
-            paths,
+            nil, fsCallback, &ctx, paths,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
             1.0,
             FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
@@ -153,5 +166,6 @@ private final class FSEventsMonitor: @unchecked Sendable {
         FSEventStreamInvalidate(stream)
         FSEventStreamRelease(stream)
         streamRef = nil
+        callbackBox = nil
     }
 }
