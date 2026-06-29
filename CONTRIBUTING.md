@@ -1,71 +1,123 @@
 # Contributing to Stratus
 
-Thank you for your interest in contributing to Stratus!
+Thank you for contributing to Stratus. This project is a production-grade native macOS cloud drive manager, so contributions must preserve correctness, resumability, security, and the macOS-first user experience.
 
-## Getting Started
+## Requirements
 
-### Requirements
 - macOS 15.0+
-- Xcode 16.0+ or Swift 6.0+ toolchain
-- Swift Package Manager (no Xcode project file)
+- Xcode 16.3+ with Swift 6
+- Swift Package Manager only
+- Optional local tools: SwiftFormat, SwiftLint, Sparkle `generate_appcast`
+- No Apple Developer ID certificate is required for normal development
 
-### Build
+## Setup
+
 ```bash
-swift build
+git clone https://github.com/williamcachamwri/Stratus.git
+cd Stratus
+Scripts/ci_bootstrap.sh
+swift package resolve
 ```
 
-### Test
+## Build, test, lint
+
 ```bash
-swift test
+swift build --product Stratus
+Scripts/test.sh
+Scripts/lint.sh
+Scripts/build_unsigned_release.sh
 ```
 
-### Run
+`Scripts/build_unsigned_release.sh` creates an unsigned `.app` bundle and release archives under `dist/`. Do not add mandatory signing, notarization, provisioning profile, or certificate requirements to normal builds.
+
+## Branch strategy
+
+Use short-lived branches from `main`:
+
 ```bash
-swift run Stratus
+git checkout -b feat/provider-health-checks
 ```
 
-## Code Style
+Keep branches focused. A branch can contain many commits, but every commit must touch exactly one completed file.
 
-- **Swift 6 strict concurrency** — `-strict-concurrency=complete` is enforced
-- **Zero force-unwraps** — `!` is a SwiftLint error in production code
-- **Zero `try!`** — also a SwiftLint error
-- **Typed errors** — all `async throws` functions use typed error enums
-- **Actors** — all shared mutable state must be actor-isolated
-- Run `swiftformat .` before committing
+## Mandatory per-file commit rule
 
-## Commit Convention
+Every created, edited, generated, formatted, or fixed file must be committed separately.
 
+```bash
+git status --short
+# edit exactly one file
+swiftformat <file> || true
+swiftlint --strict --path <file> || true
+git diff -- <file>
+git add -- <file>
+git commit -m "type(scope): message" \
+  -m "Co-Authored-By: williamcachamwri <2741582+williamcachamwri@users.noreply.github.com>"
+git status --short
 ```
-feat():     new feature
-fix():      bug fix
-refactor(): code restructuring without behavior change
-test():     test-only changes
-chore():    build system, CI, documentation
+
+Rules:
+
+- One changed file = one commit.
+- Never use `git add .`, `git add -A`, or broad wildcard staging.
+- Stage exactly one file with `git add -- <path>`.
+- Do not squash commits.
+- Do not create mega-commits such as `initial implementation`.
+- Use Conventional Commits.
+- Every commit must include exactly this trailer:
+
+```text
+Co-Authored-By: williamcachamwri <2741582+williamcachamwri@users.noreply.github.com>
 ```
 
-Each file change in its own commit. No `(Phase X)` suffix.
+## Conventional Commits
 
-## Pull Request Process
+Use clear scopes:
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/my-feature`
-3. Make your changes following the code style above
-4. Ensure `swift build` and `swift test` both pass
-5. Open a pull request with a clear description
+```text
+feat(upload): add multipart resume recovery
+fix(sync): preserve conflict queue ordering
+test(upload): add chunk slicer boundary tests
+ci(github): add unsigned release workflow
+docs(develop): document local setup
+chore(resources): add provider definitions
+```
 
-## Architecture
+## Code standards
 
-See `CLAUDE.md` for a full architecture overview and the module breakdown.
+- Swift 6 strict concurrency is required.
+- Prefer actors for shared mutable state.
+- New async code should use `async`/`await`, `TaskGroup`, `AsyncStream`, and actors.
+- Do not introduce `DispatchQueue` or completion-handler based APIs for new code.
+- No force unwraps or `try!` in production code.
+- No cleartext secrets, OAuth client secrets, access keys, private Sparkle keys, Apple certificates, or provisioning profiles.
+- Errors must explain what failed and how a user can recover.
+- UI should use native semantic colors, SF Symbols, system materials, and measured progress data.
 
-## Reporting Bugs
+## Issue flow
 
-Open an issue with:
-- macOS version
-- Stratus version / commit hash
-- Steps to reproduce
-- Expected vs actual behavior
-- Any relevant log output (Stratus → Help → Export Diagnostics)
+Use the provided GitHub templates:
 
-## Questions
+- Bug reports must include macOS version, Xcode/Swift version, Stratus version or commit, provider type, reproduction steps, expected/actual behavior, logs, and screenshots when relevant.
+- Feature requests must include the product area, provider if relevant, user problem, proposed behavior, and acceptance tests.
+- Security reports must avoid public secrets and use private security advisories for sensitive vulnerabilities.
 
-Open a discussion in the GitHub Discussions tab.
+## Pull request requirements
+
+A PR should include:
+
+- Summary of user-visible behavior or internal change.
+- Validation commands and results.
+- Explanation for any validation that could not run locally.
+- Confirmation that each file is committed separately.
+- Confirmation that unsigned builds still work without Apple signing credentials.
+
+## Sparkle and release policy
+
+Sparkle appcast files live under `Updates/Sparkle/`. Generate appcasts with:
+
+```bash
+SPARKLE_GENERATE_APPCAST=/path/to/generate_appcast Scripts/generate_appcast.sh dist/releases
+```
+
+Only public Sparkle keys may be committed. Private update signing keys must stay out of the repository.
