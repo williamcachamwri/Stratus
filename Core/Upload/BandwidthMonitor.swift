@@ -99,7 +99,7 @@ public actor BandwidthMonitor {
         previousEWMA = ewmaValue
         ewmaValue = alpha * instantBPS + (1.0 - alpha) * ewmaValue
 
-        if ewmaValue > peakBPS { peakBPS = ewmaValue }
+        if instantBPS > peakBPS { peakBPS = instantBPS }
 
         // Emit UI update at 250ms intervals
         let now = Date()
@@ -137,6 +137,8 @@ public actor BandwidthMonitor {
         guard theoreticalMaxBPS.isFinite, theoreticalMaxBPS > 0 else { return 0 }
         return min(1.0, ewmaValue / theoreticalMaxBPS)
     }
+
+    public func currentSnapshot() -> BWSnapshot { makeSnapshot() }
 
     public func estimatedTimeRemaining(bytesLeft: Int64) -> TimeInterval {
         guard bytesLeft > 0, ewmaValue > 0 else { return TimeInterval.infinity }
