@@ -13,8 +13,7 @@ public actor AppDatabase {
             do {
                 return try AppDatabase(inMemory: true)
             } catch {
-                fputs("Stratus in-memory database fallback failed: \(error)\n", stderr)
-                abort()
+                preconditionFailure("Stratus in-memory database fallback failed: \(error)")
             }
         }
     }()
