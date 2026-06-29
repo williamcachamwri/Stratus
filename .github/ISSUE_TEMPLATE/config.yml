@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security policy
+    url: https://github.com/williamcachamwri/Stratus/security/advisories/new
+    about: Report sensitive vulnerabilities privately when possible.
+  - name: Questions and ideas
+    url: https://github.com/williamcachamwri/Stratus/discussions
+    about: Use discussions for general questions that are not actionable bugs or feature requests.
