@@ -25,7 +25,6 @@ public extension View {
             .padding(Spacing.lg)
             .background(Color.surfacePrimary)
             .clipShape(RoundedRectangle(cornerRadius: CornerRadius.card, style: .continuous))
-            .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
     }
 
     func insetGroupedStyle() -> some View {
