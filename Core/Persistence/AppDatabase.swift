@@ -141,6 +141,17 @@ public actor AppDatabase {
                 )
             """)
         }
+        migrator.registerMigration("005_provider_account_configs") { db in
+            try db.execute(sql: """
+                CREATE TABLE provider_account_configs (
+                    account_id TEXT PRIMARY KEY NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    provider_id TEXT NOT NULL,
+                    config_json TEXT NOT NULL,
+                    updated_at REAL NOT NULL DEFAULT (unixepoch('now'))
+                )
+            """)
+            try db.execute(sql: "CREATE INDEX idx_provider_account_configs_provider ON provider_account_configs(provider_id)")
+        }
 
         try migrator.migrate(dbWriter)
     }
