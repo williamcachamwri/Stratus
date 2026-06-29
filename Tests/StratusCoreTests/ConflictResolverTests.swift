@@ -60,7 +60,7 @@ final class ConflictResolverTests: XCTestCase {
     }
 
     private func makeAccount() -> CloudAccount {
-        CloudAccount(id: "test", providerID: "s3", displayName: "Test", username: nil)
+        CloudAccount(id: "test", providerID: "s3", displayName: "Test", email: nil)
     }
 }
 
