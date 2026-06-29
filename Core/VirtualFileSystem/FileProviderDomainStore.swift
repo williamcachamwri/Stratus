@@ -89,7 +89,7 @@ public actor FileProviderDomainStore {
     }
 
     public nonisolated static func finderDisplayName(for account: CloudAccount) -> String {
-        "Stratus - \(account.displayName)"
+        account.displayName
     }
 
     public func save(_ record: FileProviderDomainRecord) throws {
