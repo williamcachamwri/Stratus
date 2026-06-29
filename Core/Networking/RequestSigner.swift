@@ -132,18 +132,33 @@ public struct RequestSigner: Sendable {
     }
 
     private static func canonicalQueryString(from url: URL?) -> String {
-        guard let comps = url.flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false) }),
-              let items = comps.queryItems, !items.isEmpty else { return "" }
-        return items
-            .map { item in
-                let name = awsPercentEncode(item.name)
-                let value = awsPercentEncode(item.value ?? "")
-                return (name: name, value: value)
+        guard
+            let url,
+            let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+            let items = comps.queryItems,
+            !items.isEmpty
+        else {
+            return ""
+        }
+
+        var encodedItems: [(name: String, value: String)] = []
+        encodedItems.reserveCapacity(items.count)
+
+        for item in items {
+            let encodedName = awsPercentEncode(item.name)
+            let encodedValue = awsPercentEncode(item.value ?? "")
+            encodedItems.append((name: encodedName, value: encodedValue))
+        }
+
+        encodedItems.sort { lhs, rhs in
+            if lhs.name == rhs.name {
+                return lhs.value < rhs.value
             }
-            .sorted { lhs, rhs in
-                lhs.name == rhs.name ? lhs.value < rhs.value : lhs.name < rhs.name
-            }
-            .map { "\($0.name)=\($0.value)" }
+            return lhs.name < rhs.name
+        }
+
+        return encodedItems
+            .map { item in "\(item.name)=\(item.value)" }
             .joined(separator: "&")
     }
 
