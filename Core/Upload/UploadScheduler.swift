@@ -36,6 +36,12 @@ public actor UploadScheduler {
         notifySlotAvailable()
     }
 
+    public func takeQueuedTask(taskID: UUID) async -> UploadTask? {
+        let task = await queue.removeAndReturn(taskID: taskID)
+        if task != nil { notifySlotAvailable() }
+        return task
+    }
+
     @discardableResult
     public func reprioritize(taskID: UUID, to priority: TaskPriority) async -> Bool {
         let changed = await queue.reprioritize(taskID: taskID, to: priority)
