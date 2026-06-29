@@ -1,6 +1,7 @@
 import SwiftUI
 import StratusCore
 import QuickLook
+import UniformTypeIdentifiers
 
 struct FileBrowserView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -11,6 +12,8 @@ struct FileBrowserView: View {
     @State private var error: String?
     @State private var selectedItem: CloudFileItem?
     @State private var pathHistory: [CloudPath] = []
+    @State private var isDraggingOver = false
+    @State private var uploadFeedback: String?
 
     var body: some View {
         HSplitView {
@@ -27,33 +30,67 @@ struct FileBrowserView: View {
             .frame(minWidth: 150, idealWidth: 180)
 
             // File list
-            VStack(spacing: 0) {
-                PathBar(path: currentPath, history: pathHistory) { path in
-                    navigate(to: path)
-                }
-                .padding(.horizontal, Spacing.md)
-                .padding(.vertical, Spacing.sm)
-                .background(Color.surfacePrimary)
-                Divider()
-
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let err = error {
-                    EmptyStateView(icon: "exclamationmark.triangle", title: "Load Failed", subtitle: err)
-                } else if items.isEmpty {
-                    EmptyStateView(icon: "folder", title: "Empty Folder", subtitle: "This directory has no files.")
-                } else {
-                    List(items, id: \.id, selection: $selectedItem) { item in
-                        FileItemRow(item: item)
-                            .tag(item)
-                            .onTapGesture(count: 2) {
-                                if item.isDirectory { navigate(to: item.path) }
-                            }
+            ZStack {
+                VStack(spacing: 0) {
+                    PathBar(path: currentPath, history: pathHistory) { path in
+                        navigate(to: path)
                     }
-                    .listStyle(.inset)
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.vertical, Spacing.sm)
+                    .background(Color.surfacePrimary)
+                    Divider()
+
+                    if isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let err = error {
+                        EmptyStateView(icon: "exclamationmark.triangle", title: "Load Failed", subtitle: err)
+                    } else if items.isEmpty {
+                        EmptyStateView(
+                            icon: "folder",
+                            title: "Empty Folder",
+                            subtitle: selectedAccount == nil
+                                ? "Select an account to browse files."
+                                : "Drop files here to upload them."
+                        )
+                    } else {
+                        List(items, id: \.id, selection: $selectedItem) { item in
+                            FileItemRow(item: item)
+                                .tag(item)
+                                .onTapGesture(count: 2) {
+                                    if item.isDirectory { navigate(to: item.path) }
+                                }
+                        }
+                        .listStyle(.inset)
+                    }
+
+                    if let feedback = uploadFeedback {
+                        HStack {
+                            Image(systemName: "arrow.up.circle")
+                            Text(feedback)
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, Spacing.xs)
+                        .transition(.opacity)
+                    }
+                }
+
+                // Drop-target overlay
+                if isDraggingOver {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.accentColor, lineWidth: 2)
+                        .background(Color.accentColor.opacity(0.08).cornerRadius(8))
+                        .overlay {
+                            Label("Drop to upload", systemImage: "arrow.up.to.line")
+                                .font(.title3.weight(.medium))
+                                .foregroundColor(.accentColor)
+                        }
+                        .padding(Spacing.md)
+                        .allowsHitTesting(false)
                 }
             }
+            .onDrop(of: [.fileURL], isTargeted: $isDraggingOver, perform: handleDrop)
         }
         .navigationTitle("Files")
         .onChange(of: selectedAccount) { _, _ in
@@ -95,6 +132,41 @@ struct FileBrowserView: View {
                 }
             }
         }
+    }
+
+    @discardableResult
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard let account = selectedAccount else { return false }
+        let destination = currentPath
+        let accountID = account.id
+
+        for provider in providers {
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                guard
+                    let data = item as? Data,
+                    let url = URL(dataRepresentation: data, relativeTo: nil)
+                else { return }
+
+                Task { @MainActor in
+                    do {
+                        _ = try await env.uploadEngine.upload(
+                            fileURL: url,
+                            destination: destination,
+                            accountID: accountID
+                        )
+                        let name = url.lastPathComponent
+                        uploadFeedback = "Queued \(name) for upload"
+                        try? await Task.sleep(for: .seconds(3))
+                        uploadFeedback = nil
+                    } catch {
+                        uploadFeedback = "Upload failed: \(error.localizedDescription)"
+                        try? await Task.sleep(for: .seconds(4))
+                        uploadFeedback = nil
+                    }
+                }
+            }
+        }
+        return true
     }
 }
 
