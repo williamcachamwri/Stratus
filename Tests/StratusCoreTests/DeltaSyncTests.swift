@@ -117,4 +117,46 @@ final class DeltaSyncTests: XCTestCase {
         let useDelta = await deltaSync.shouldUseDelta(fileSize: Int64(size), provider: provider, fileURL: url)
         XCTAssertFalse(useDelta)  // False: provider doesn't support block manifest
     }
+
+    func test_allBlocksChanged_allBlocksReturned() async throws {
+        let blockSize = DeltaSync.defaultBlockSize
+        let url1 = tempDir.appendingPathComponent("all_a.bin")
+        let url2 = tempDir.appendingPathComponent("all_b.bin")
+        try Data(repeating: 0x00, count: blockSize * 3).write(to: url1)
+        try Data(repeating: 0xFF, count: blockSize * 3).write(to: url2)
+        let map1 = try await deltaSync.computeBlockMap(url: url1)
+        let map2 = try await deltaSync.computeBlockMap(url: url2)
+        let diff = await deltaSync.diffBlockMaps(local: map1, remote: map2)
+        XCTAssertEqual(diff.changedBlocks.count, 3, "All 3 blocks differ → all 3 must appear in changedBlocks")
+    }
+
+    func test_emptyFile_zeroBlocks() async throws {
+        let url = tempDir.appendingPathComponent("empty_delta.bin")
+        try Data().write(to: url)
+        let blockMap = try await deltaSync.computeBlockMap(url: url)
+        XCTAssertEqual(blockMap.checksums.count, 0)
+        XCTAssertEqual(blockMap.fileSize, 0)
+    }
+
+    func test_blockChecksums_deterministicForSameData() async throws {
+        let data = Data(repeating: 0x42, count: DeltaSync.defaultBlockSize * 2)
+        let url = tempDir.appendingPathComponent("determ.bin")
+        try data.write(to: url)
+        let map1 = try await deltaSync.computeBlockMap(url: url)
+        let map2 = try await deltaSync.computeBlockMap(url: url)
+        XCTAssertEqual(map1.checksums, map2.checksums)
+        XCTAssertEqual(map1.sha256, map2.sha256)
+    }
+
+    func test_diff_addedBlocks_whenLocalHasMoreBlocks() async throws {
+        let blockSize = DeltaSync.defaultBlockSize
+        let smallURL = tempDir.appendingPathComponent("diff_small.bin")
+        let largeURL = tempDir.appendingPathComponent("diff_large.bin")
+        try Data(repeating: 0x11, count: blockSize).write(to: smallURL)
+        try Data(repeating: 0x11, count: blockSize * 3).write(to: largeURL)
+        let smallMap = try await deltaSync.computeBlockMap(url: smallURL)
+        let largeMap = try await deltaSync.computeBlockMap(url: largeURL)
+        let diff = await deltaSync.diffBlockMaps(local: largeMap, remote: smallMap)
+        XCTAssertEqual(diff.addedBlocks.count, 2, "Local has 3 blocks, remote has 1 → 2 added blocks")
+    }
 }
