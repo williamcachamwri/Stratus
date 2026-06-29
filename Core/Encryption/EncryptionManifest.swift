@@ -81,7 +81,7 @@ public actor EncryptedChunkPipeline {
         destination: CloudPath,
         accountID: String,
         priority: TaskPriority = .normal
-    ) async throws -> UploadTask {
+    ) async throws -> UUID {
         let encFileName = fileURL.lastPathComponent + ".stre"
         let encURL = tempDir.appendingPathComponent(encFileName)
         try await encryption.encrypt(fileURL: fileURL, to: encURL)
