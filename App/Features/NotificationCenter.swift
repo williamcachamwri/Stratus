@@ -10,7 +10,10 @@ import os.log
 @MainActor
 public final class StratusNotificationCenter: ObservableObject {
     public static let shared = StratusNotificationCenter()
-    private let center = UNUserNotificationCenter.current()
+    private var center: UNUserNotificationCenter? {
+        guard Bundle.main.bundleIdentifier != nil else { return nil }
+        return UNUserNotificationCenter.current()
+    }
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "Notifications")
 
     private init() {}
@@ -18,6 +21,7 @@ public final class StratusNotificationCenter: ObservableObject {
     // MARK: - Permission
 
     public func requestAuthorization() async {
+        guard let center else { return }
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
             logger.info("Notification permission granted: \(granted)")
@@ -78,6 +82,7 @@ public final class StratusNotificationCenter: ObservableObject {
     // MARK: - Register Notification Categories
 
     public func registerCategories() {
+        guard let center else { return }
         let retryAction = UNNotificationAction(identifier: "RETRY", title: "Retry", options: [])
         let openAction  = UNNotificationAction(identifier: "OPEN",  title: "Open Stratus", options: [.foreground])
         let resolveAction = UNNotificationAction(identifier: "RESOLVE", title: "Resolve", options: [.foreground])
@@ -100,6 +105,7 @@ public final class StratusNotificationCenter: ObservableObject {
     // MARK: - Private
 
     private func schedule(content: UNMutableNotificationContent, id: String) {
+        guard let center else { return }
         let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
         center.add(request) { [weak self] error in
             if let error { self?.logger.error("Failed to schedule notification \(id): \(error)") }
