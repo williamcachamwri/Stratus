@@ -60,4 +60,54 @@ final class BandwidthMonitorTests: XCTestCase {
         let snap = await monitor.currentSnapshot()
         XCTAssertGreaterThan(snap.averageBPS, 0)
     }
+
+    func test_currentBPS_zeroWhenNoSamples() async {
+        let monitor = BandwidthMonitor()
+        let bps = await monitor.currentBPS
+        XCTAssertEqual(bps, 0.0)
+    }
+
+    func test_estimatedTimeRemaining_infinityWhenNoSamples() async {
+        let monitor = BandwidthMonitor()
+        let eta = await monitor.estimatedTimeRemaining(bytesLeft: 1_000_000)
+        XCTAssertTrue(eta.isInfinite, "No bandwidth → ETA must be infinite")
+    }
+
+    func test_estimatedTimeRemaining_ratioBytesOverSpeed() async {
+        let monitor = BandwidthMonitor()
+        for _ in 0..<20 {
+            await monitor.recordBytes(1_000_000, elapsed: 1.0)  // 1 MB/s
+        }
+        let eta = await monitor.estimatedTimeRemaining(bytesLeft: 10_000_000)
+        XCTAssertEqual(eta, 10.0, accuracy: 1.0, "10 MB at 1 MB/s ≈ 10 seconds")
+    }
+
+    func test_trendStable_afterConstantRateSamples() async {
+        let monitor = BandwidthMonitor()
+        for _ in 0..<20 {
+            await monitor.recordBytes(2_000_000, elapsed: 1.0)  // constant 2 MB/s
+        }
+        let snap = await monitor.currentSnapshot()
+        XCTAssertEqual(snap.trend, .stable)
+    }
+
+    func test_reset_zeroesCurrentBPS() async {
+        let monitor = BandwidthMonitor()
+        for _ in 0..<5 {
+            await monitor.recordBytes(5_000_000, elapsed: 1.0)
+        }
+        await monitor.reset()
+        let bps = await monitor.currentBPS
+        XCTAssertEqual(bps, 0.0, "After reset, BPS must be zero")
+    }
+
+    func test_utilization_halfOfTheoreticalMax() async {
+        let maxBPS = 10_000_000.0  // 10 MB/s
+        let monitor = BandwidthMonitor(theoreticalMaxBPS: maxBPS)
+        for _ in 0..<20 {
+            await monitor.recordBytes(5_000_000, elapsed: 1.0)  // 5 MB/s
+        }
+        let snap = await monitor.currentSnapshot()
+        XCTAssertEqual(snap.utilization, 0.5, accuracy: 0.05)
+    }
 }
