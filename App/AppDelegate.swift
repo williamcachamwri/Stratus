@@ -1,4 +1,5 @@
 import AppKit
+import StratusCore
 import os.log
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
