@@ -147,7 +147,7 @@ public actor UploadEngine {
                 providerID: session.providerID,
                 fileSize: session.fileSize,
                 localChecksum: session.fileChecksum,
-                priority: TaskPriority(rawValue: session.retryCount) ?? .normal,
+                priority: .normal,
                 state: .paused(resumeToken: session.uploadID)
             )
             task.setUploadID(session.uploadID ?? "")
