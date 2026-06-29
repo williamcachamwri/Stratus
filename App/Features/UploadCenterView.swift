@@ -82,7 +82,12 @@ struct UploadCenterView: View {
 // MARK: - Summary Card
 
 private struct UploadSummaryCard: View {
+    @EnvironmentObject private var env: AppEnvironment
     let summary: UploadDashboardSummary
+
+    private var speedSamples: [Double] {
+        env.uploadSpeedHistory.isEmpty ? [summary.currentBPS] : env.uploadSpeedHistory
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -92,7 +97,7 @@ private struct UploadSummaryCard: View {
                 StatCell(label: "Files", value: "\(summary.activeCount) active · \(summary.queuedCount) queued")
                 StatCell(label: "ETA", value: formatETA(summary.etaSeconds))
                 Spacer(minLength: Spacing.lg)
-                SpeedGraph(samples: [summary.currentBPS, summary.peakBPS, summary.currentBPS])
+                SpeedGraph(samples: speedSamples)
                     .frame(width: 180, height: 40)
                     .accessibilityLabel("Upload speed graph")
             }
