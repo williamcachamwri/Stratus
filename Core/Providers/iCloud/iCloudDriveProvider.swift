@@ -67,8 +67,8 @@ public actor iCloudDriveProvider: CloudProvider {
                 name: url.lastPathComponent,
                 path: CloudPath(relative),
                 size: isDir ? nil : size,
-                isDirectory: isDir,
-                modifiedAt: mod
+                modificationDate: mod,
+                isDirectory: isDir
             )
         }
         return PagedResult(items: items)
@@ -83,8 +83,8 @@ public actor iCloudDriveProvider: CloudProvider {
             name: url.lastPathComponent,
             path: path,
             size: (rv.fileSize).map(Int64.init),
-            isDirectory: rv.isDirectory ?? false,
-            modifiedAt: rv.contentModificationDate
+            modificationDate: rv.contentModificationDate,
+            isDirectory: rv.isDirectory ?? false
         )
     }
 
