@@ -57,8 +57,25 @@ public final class AppEnvironment: ObservableObject {
         uploadEvents.append(event)
         if uploadEvents.count > 200 { uploadEvents.removeFirst() }
         switch event {
-        case .taskStarted: activeUploads += 1
-        case .taskCompleted, .taskFailed, .taskCancelled: activeUploads = max(0, activeUploads - 1)
+        case .taskStarted:
+            activeUploads += 1
+        case .taskCompleted(let task):
+            activeUploads = max(0, activeUploads - 1)
+            StratusNotificationCenter.shared.notifyUploadComplete(
+                fileName: task.fileURL.lastPathComponent,
+                providerName: task.accountID
+            )
+            DockProgressManager.shared.updateUploadProgress(
+                activeUploads > 0 ? 0.5 : 0, activeCount: activeUploads
+            )
+        case .taskFailed(let task, let error):
+            activeUploads = max(0, activeUploads - 1)
+            StratusNotificationCenter.shared.notifyUploadFailed(
+                fileName: task.fileURL.lastPathComponent,
+                error: error.localizedDescription
+            )
+        case .taskCancelled:
+            activeUploads = max(0, activeUploads - 1)
         default: break
         }
     }
@@ -66,9 +83,20 @@ public final class AppEnvironment: ObservableObject {
     private func handleSyncEvent(_ event: SyncEngineEvent) {
         if case .conflictDetected(let conflict) = event {
             pendingConflicts.append(conflict)
+            StratusNotificationCenter.shared.notifySyncConflict(
+                fileName: conflict.localURL.lastPathComponent,
+                pairID: conflict.pairID
+            )
+            DockProgressManager.shared.updateConflictBadge(pendingConflicts.count)
         }
         if case .conflictResolved(let conflict, _) = event {
             pendingConflicts.removeAll { $0.id == conflict.id }
+            DockProgressManager.shared.updateConflictBadge(pendingConflicts.count)
+        }
+        if case .syncCompleted(_, let up, let down, _) = event {
+            StratusNotificationCenter.shared.notifySyncComplete(
+                pairName: "Stratus", uploaded: up, downloaded: down
+            )
         }
     }
 

@@ -6,7 +6,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        Task {
+        Task { @MainActor in
+            await StratusNotificationCenter.shared.requestAuthorization()
+            StratusNotificationCenter.shared.registerCategories()
             await AppEnvironment.shared.syncScheduler.onAppLaunch()
         }
         logger.info("Stratus launched")
