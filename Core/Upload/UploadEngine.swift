@@ -126,12 +126,36 @@ public actor UploadEngine {
     }
 
     public func resume(taskID: UUID) async {
-        emit(.taskResumed(taskID))
-        await scheduler.enqueue(
-            UploadTask(id: taskID, sourceURL: URL(fileURLWithPath: ""), destinationPath: CloudPath("/"),
-                       accountID: "", providerID: "", fileSize: 0, localChecksum: ""),
-            priority: .normal
-        )
+        if let inMemoryTask = await scheduler.allTasks.first(where: { $0.id == taskID }) {
+            inMemoryTask.transition(to: .queued(priority: inMemoryTask.priority))
+            await scheduler.enqueue(inMemoryTask, priority: inMemoryTask.priority)
+            emit(.taskResumed(taskID))
+            return
+        }
+
+        do {
+            guard let session = try await resumeStore.loadSession(taskID.uuidString) else {
+                logger.warning("Resume requested for unknown upload task \(taskID)")
+                return
+            }
+
+            let task = UploadTask(
+                id: taskID,
+                sourceURL: URL(fileURLWithPath: session.fileURLString),
+                destinationPath: CloudPath(session.remotePath),
+                accountID: session.accountID,
+                providerID: session.providerID,
+                fileSize: session.fileSize,
+                localChecksum: session.fileChecksum,
+                priority: TaskPriority(rawValue: session.retryCount) ?? .normal,
+                state: .paused(resumeToken: session.uploadID)
+            )
+            task.setUploadID(session.uploadID ?? "")
+            await scheduler.enqueue(task, priority: task.priority)
+            emit(.taskResumed(taskID))
+        } catch {
+            logger.error("Failed to resume upload task \(taskID): \(error.localizedDescription)")
+        }
     }
 
     public func cancel(taskID: UUID) async {
