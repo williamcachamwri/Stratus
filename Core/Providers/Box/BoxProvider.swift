@@ -1,4 +1,5 @@
 import Foundation
+import CommonCrypto
 import os.log
 
 // MARK: - BoxProvider
@@ -95,13 +96,13 @@ public actor BoxProvider: CloudProvider {
         let body = try JSONSerialization.data(withJSONObject: [
             "folder_id": parentID,
             "file_name": remotePath.lastComponent,
-            "file_size": metadata.fileSize as Any
+            "file_size": 0
         ])
         let request = HTTPRequest(url: url, method: .POST, headers: headers, body: body)
         let response = try await http.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
               let sessionID = json["id"] as? String else {
-            throw ProviderError.uploadFailed("Failed to create Box upload session")
+            throw ProviderError.invalidResponse("Failed to create Box upload session")
         }
         return sessionID
     }
@@ -128,7 +129,7 @@ public actor BoxProvider: CloudProvider {
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
               let entries = json["entries"] as? [[String: Any]],
               let file = entries.first else {
-            throw ProviderError.uploadFailed("Box commit upload session failed")
+            throw ProviderError.invalidResponse("Box commit upload session failed")
         }
         return parseItem(file, basePath: CloudPath("/")) ?? CloudFileItem(id: uploadID, name: uploadID, path: CloudPath(uploadID))
     }
@@ -158,7 +159,7 @@ public actor BoxProvider: CloudProvider {
         let response = try await http.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
               let entries = (json["entries"] as? [[String: Any]])?.first else {
-            throw ProviderError.uploadFailed("Box small upload failed")
+            throw ProviderError.invalidResponse("Box small upload failed")
         }
         return parseItem(entries, basePath: remotePath.deletingLastComponent) ?? CloudFileItem(id: "", name: remotePath.lastComponent, path: remotePath)
     }
@@ -167,7 +168,7 @@ public actor BoxProvider: CloudProvider {
         let url = URL(string: "\(Self.apiBase)/files/\(path.path)/content")!
         let response = try await http.data(for: HTTPRequest(url: url, headers: try await authHeaders(account: account)))
         guard let location = response.headers["Location"], let downloadURL = URL(string: location) else {
-            throw ProviderError.downloadFailed("Box did not return a download URL")
+            throw ProviderError.invalidResponse("Box did not return a download URL")
         }
         return downloadURL
     }
@@ -236,7 +237,7 @@ public actor BoxProvider: CloudProvider {
         let url = URL(string: "\(Self.apiBase)/shared_links/files/\(path.path)")!
         var headers = try await authHeaders(account: account)
         headers["Content-Type"] = "application/json"
-        let shareAccess = options.allowPublicAccess ? "open" : "collaborators"
+        let shareAccess = options.password == nil ? "open" : "collaborators"
         let body = try JSONSerialization.data(withJSONObject: ["shared_link": ["access": shareAccess]])
         let response = try await http.data(for: HTTPRequest(url: url, method: .PUT, headers: headers, body: body))
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
