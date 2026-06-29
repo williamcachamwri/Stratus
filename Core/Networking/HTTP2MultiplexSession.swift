@@ -107,7 +107,7 @@ public actor HTTP2MultiplexSession {
                         let httpResponse = response as? HTTPURLResponse
                     else {
                         continuation.resume(
-                            throwing: HTTP2MultiplexError.invalidResponse(request.url ?? URL(string: "about:blank")!)
+                            throwing: HTTP2MultiplexError.invalidResponse(request.url ?? URL(fileURLWithPath: "/"))
                         )
                         return
                     }
