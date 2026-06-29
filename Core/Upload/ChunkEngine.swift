@@ -258,6 +258,7 @@ public actor ChunkEngine {
             account: account,
             metadata: task.metadata
         )
+        task.setUploadID(uploadID)
         let newSession = UploadSession(
             id: task.id.uuidString,
             fileBookmark: try ResumeStore.makeBookmarkData(for: task.sourceURL),
