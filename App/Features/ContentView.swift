@@ -11,6 +11,7 @@ struct ContentView: View {
         case uploads   = "Uploads"
         case downloads = "Downloads"
         case sync      = "Sync"
+        case mounts    = "Mounts"
         case browse    = "Files"
         case prefs     = "Preferences"
 
@@ -22,6 +23,7 @@ struct ContentView: View {
             case .uploads:  return "arrow.up.circle"
             case .downloads: return "arrow.down.circle"
             case .sync:     return "arrow.triangle.2.circlepath"
+            case .mounts:   return "externaldrive"
             case .browse:   return "folder"
             case .prefs:    return "gearshape"
             }
@@ -48,6 +50,12 @@ struct ContentView: View {
                                 .foregroundColor(.primary)
                         }
                     }
+                }
+
+                Section("Finder") {
+                    Label("\(env.mountRows.count) mounted", systemImage: "externaldrive")
+                    Label("Open Mount Manager", systemImage: "sidebar.left")
+                        .tag(AppTab.mounts)
                 }
 
                 Section("Transfers") {
@@ -120,6 +128,7 @@ struct ContentView: View {
         case .uploads:  UploadCenterView()
         case .downloads: DownloadCenterView()
         case .sync:     SyncManagerView()
+        case .mounts:   MountManagerView()
         case .browse:   FileBrowserView()
         case .prefs:    PreferencesView()
         }
