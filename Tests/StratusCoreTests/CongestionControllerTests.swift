@@ -52,4 +52,44 @@ final class CongestionControllerTests: XCTestCase {
         let window = await cc.windowSizeForTesting
         XCTAssertGreaterThanOrEqual(window, 1.0)
     }
+
+    func test_recoveryMode_addsOnePerRTT() async {
+        let cc = CongestionController(maxConcurrentStreams: 100)
+        await cc.setWindowForTesting(16.0)
+        await cc.onChunkRateLimited(retryAfter: 0)  // enters recovery, halves window to 8
+        let before = await cc.windowSizeForTesting
+        await cc.onChunkSuccess(rtt: 0.05)           // recovery: +1.0
+        let after = await cc.windowSizeForTesting
+        XCTAssertEqual(after, before + 1.0, accuracy: 0.001)
+    }
+
+    func test_onChunkError_halvesWindow() async {
+        let cc = CongestionController(maxConcurrentStreams: 100)
+        await cc.setWindowForTesting(16.0)
+        await cc.onChunkError()
+        let window = await cc.windowSizeForTesting
+        XCTAssertEqual(window, 8.0, accuracy: 0.001)
+    }
+
+    func test_smoothedRTT_zeroInitially() async {
+        let cc = CongestionController()
+        let rtt = await cc.smoothedRTT
+        XCTAssertEqual(rtt, 0.0)
+    }
+
+    func test_smoothedRTT_averagesLastSamples() async {
+        let cc = CongestionController()
+        await cc.onChunkSuccess(rtt: 0.1)
+        await cc.onChunkSuccess(rtt: 0.3)
+        let rtt = await cc.smoothedRTT
+        XCTAssertEqual(rtt, 0.2, accuracy: 0.001)
+    }
+
+    func test_slowStart_capsAtSsthresh() async {
+        let cc = CongestionController(maxConcurrentStreams: 100)
+        await cc.setWindowForTesting(20.0)  // 20 < default ssthresh(32) → slowStart
+        await cc.onChunkSuccess(rtt: 0.05)  // doubles to 40, capped at ssthresh(32)
+        let window = await cc.windowSizeForTesting
+        XCTAssertLessThanOrEqual(window, 32.0)
+    }
 }
