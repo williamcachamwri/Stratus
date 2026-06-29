@@ -96,17 +96,16 @@ public final class TLSPinningDelegate: NSObject, URLSessionDelegate, @unchecked 
             return
         }
 
-        // Walk the chain looking for at least one matching pinned hash.
-        let count = SecTrustGetCertificateCount(serverTrust)
-        guard count > 0 else {
+        // Walk the evaluated chain looking for at least one matching pinned hash.
+        let certificates = SecTrustCopyCertificateChain(serverTrust) as [SecCertificate]
+        guard !certificates.isEmpty else {
             logger.error("Empty certificate chain for \(challenge.protectionSpace.host)")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
 
-        for index in 0..<count {
-            guard let cert = SecTrustGetCertificateAtIndex(serverTrust, index) else { continue }
-            if let hash = publicKeyHash(of: cert), pinnedHashes.contains(hash) {
+        for (index, certificate) in certificates.enumerated() {
+            if let hash = publicKeyHash(of: certificate), pinnedHashes.contains(hash) {
                 logger.debug("TLS pin matched at chain index \(index) for \(challenge.protectionSpace.host)")
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
                 return
