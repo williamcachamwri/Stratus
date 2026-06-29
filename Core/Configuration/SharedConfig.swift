@@ -88,10 +88,28 @@ public enum SharedConfig {
             urls.append(URL(fileURLWithPath: override, isDirectory: true))
         }
 
+        // Current working directory (and one level up) — works when cwd is the project root.
         let current = URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true)
         urls.append(current.appendingPathComponent("shared", isDirectory: true))
         urls.append(current.deletingLastPathComponent().appendingPathComponent("shared", isDirectory: true))
 
+        // Walk upward from the executable — handles running the raw binary from
+        // .build/debug/ or .build/release/ where cwd-relative search misses the root.
+        if let execURL = Bundle.main.executableURL {
+            var dir = execURL.deletingLastPathComponent()
+            for _ in 0..<6 {
+                let candidate = dir.appendingPathComponent("shared", isDirectory: true)
+                if fileManager.fileExists(atPath: candidate.path) {
+                    urls.append(candidate)
+                    break
+                }
+                let parent = dir.deletingLastPathComponent()
+                guard parent.path != dir.path else { break }
+                dir = parent
+            }
+        }
+
+        // .app bundle Resources/shared — used when config is bundled for distribution.
         if let resourceURL = Bundle.main.resourceURL {
             urls.append(resourceURL.appendingPathComponent("shared", isDirectory: true))
             urls.append(resourceURL.appendingPathComponent("Resources/shared", isDirectory: true))
