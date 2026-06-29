@@ -57,8 +57,9 @@ public actor DeltaSync {
         }
 
         let localMap = try await computeBlockMap(url: fileURL)
-        let remoteMap = try await provider.fetchBlockManifest(path: remotePath, account: account)
-            ?? resumeStore.loadBlockManifest(fileURL: fileURL, providerID: provider.id)
+        let providerMap = try await provider.fetchBlockManifest(path: remotePath, account: account)
+        let localCachedMap = try await resumeStore.loadBlockManifest(fileURL: fileURL, providerID: provider.id)
+        let remoteMap = providerMap ?? localCachedMap
 
         guard let remoteMap else {
             return .uploadFull(localMap: localMap, diff: nil, reason: "No previous block manifest exists for this object.")
