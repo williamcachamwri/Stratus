@@ -10,7 +10,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift", from: "6.0.0"),
-        .package(url: "https://github.com/Lakr233/Citadel", from: "0.8.0"),
+        .package(url: "https://github.com/orlandos-nl/Citadel", from: "0.12.0"),
         .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.15.0"),
     ],
     targets: [
