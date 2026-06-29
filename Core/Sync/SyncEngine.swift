@@ -164,7 +164,7 @@ public actor SyncEngine {
                 for (name, remoteItem) in remoteByName {
                     guard let localURL = localByName[name] else { continue }
                     let localMod = (try? localURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
-                    let remoteMod = remoteItem.modifiedAt ?? Date.distantPast
+                    let remoteMod = remoteItem.modificationDate ?? Date.distantPast
 
                     let localChanged = abs(localMod.timeIntervalSinceNow) < 86400
                     let remoteChanged = abs(remoteMod.timeIntervalSinceNow) < 86400
