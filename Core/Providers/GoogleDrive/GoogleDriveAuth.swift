@@ -38,7 +38,9 @@ public actor GoogleDriveAuth {
             URLQueryItem(name: "prompt", value: "consent"),
         ]
 
-        let authURL = comps.url!
+        guard let authURL = comps.url else {
+            throw AuthError.pkceGenerationFailed
+        }
         let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, any Error>) in
             let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "com.stratus.cloudmanager") { url, error in
                 if let error { continuation.resume(throwing: error) }
@@ -61,7 +63,7 @@ public actor GoogleDriveAuth {
     public func refreshToken(credential: OAuthCredential, clientID: String) async throws -> OAuthCredential {
         guard let refreshToken = credential.refreshToken else { throw AuthError.noRefreshToken }
 
-        var request = URLRequest(url: URL(string: Self.tokenURL)!)
+        var request = URLRequest(url: URL(string: Self.tokenURL) ?? URL(fileURLWithPath: "/"))
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = "client_id=\(clientID)&grant_type=refresh_token&refresh_token=\(refreshToken)"
@@ -74,7 +76,7 @@ public actor GoogleDriveAuth {
     // MARK: - Private
 
     private func exchangeCode(code: String, codeVerifier: String, clientID: String) async throws -> OAuthCredential {
-        var request = URLRequest(url: URL(string: Self.tokenURL)!)
+        var request = URLRequest(url: URL(string: Self.tokenURL) ?? URL(fileURLWithPath: "/"))
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = "client_id=\(clientID)&redirect_uri=\(Self.redirectURI)&grant_type=authorization_code&code=\(code)&code_verifier=\(codeVerifier)"
