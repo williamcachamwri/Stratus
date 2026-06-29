@@ -116,7 +116,7 @@ public actor FTPProvider: CloudProvider {
         request.httpBody = data
         let (_, response) = try await urlSession(config: config).data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode < 400 else {
-            throw ProviderError.uploadFailed("FTP upload failed for \(remotePath.path)")
+            throw ProviderError.invalidResponse("FTP upload failed for \(remotePath.path)")
         }
         return CloudFileItem(id: remotePath.path, name: remotePath.lastComponent, path: remotePath, size: Int64(data.count))
     }
