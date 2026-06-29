@@ -12,11 +12,15 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift", from: "6.0.0"),
         .package(url: "https://github.com/orlandos-nl/Citadel", from: "0.12.0"),
         .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.15.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.7.0"),
     ],
     targets: [
         .executableTarget(
             name: "Stratus",
-            dependencies: ["StratusCore"],
+            dependencies: [
+                "StratusCore",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             path: "App",
             swiftSettings: [
                 .unsafeFlags(["-strict-concurrency=complete"]),
