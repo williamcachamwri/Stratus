@@ -60,7 +60,11 @@ public actor ChunkEngine {
         var session = try await resumeStore.loadSession(task.id.uuidString)
         let uploadID: String
         if let existing = session, existing.fileChecksum == task.localChecksum {
-            uploadID = existing.uploadID ?? (try await startMultipart(task: task, provider: provider, account: account, session: &session, chunks: chunks))
+            if let existingID = existing.uploadID {
+                uploadID = existingID
+            } else {
+                uploadID = try await startMultipart(task: task, provider: provider, account: account, session: &session, chunks: chunks)
+            }
             logger.info("Resuming upload \(task.id) from chunk \(existing.completedChunks.count)/\(totalChunks)")
         } else {
             uploadID = try await startMultipart(task: task, provider: provider, account: account, session: &session, chunks: chunks)
@@ -76,7 +80,9 @@ public actor ChunkEngine {
         defer { try? fileHandle.close() }
 
         var etags = session?.etags ?? [:]
-        var bytesTransferred = Int64(completedSet.reduce(0) { $0 + (chunks.first(where: { $0.number == $1 })?.size ?? 0) })
+        var bytesTransferred = Int64(completedSet.reduce(0) { acc, chunkNum in
+            acc + Int(chunks.first(where: { $0.number == chunkNum })?.size ?? 0)
+        })
         var retriedChunks = 0
 
         // 7. Parallel chunk upload with dynamic concurrency
