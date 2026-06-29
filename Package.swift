@@ -27,6 +27,9 @@ let package = Package(
                 "DesignSystem",
                 "Features",
             ],
+            resources: [
+                .copy("Resources"),
+            ],
             swiftSettings: [
                 .unsafeFlags(["-strict-concurrency=complete"]),
             ]
