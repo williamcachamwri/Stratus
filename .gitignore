@@ -1,0 +1,64 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Xcode
+*.xcuserdata/
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.xcbuildstate
+*.xcactivitylog
+
+# Swift Package Manager
+.build/
+.swiftpm/
+*.resolved
+
+# SPM dependencies (checked in separately via Package.resolved when needed)
+# Package.resolved  — keep this checked in for reproducible builds
+
+# Sensitive
+*.p12
+*.pem
+*.key
+Secrets.swift
+Secrets.plist
+*.xcconfig.secret
+.env
+.env.*
+
+# Editor artifacts
+*.orig
+*.bak
+*~
+\#*\#
+.idea/
+*.iml
+
+# Test output
+TestResults/
+coverage/
+*.lcov
+
+# Archives
+*.xcarchive/
+
+# Temporary
+*.tmp
+*.temp
+/tmp/

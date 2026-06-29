@@ -1,0 +1,23 @@
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf
+
+# Swift source files
+*.swift text eol=lf diff=swift
+
+# Xcode / SPM
+*.pbxproj merge=union
+*.xcworkspacedata merge=union
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf
