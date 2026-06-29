@@ -224,8 +224,15 @@ open class StratusFileProviderExtension: NSObject, NSFileProviderReplicatedExten
         if error is StratusFileProviderDomainResolverError {
             return NSFileProviderError(.notAuthenticated)
         }
-        if case ProviderError.fileNotFound = error {
-            return NSFileProviderError(.noSuchItem)
+        if let providerError = error as? ProviderError {
+            switch providerError {
+            case .fileNotFound:
+                return NSFileProviderError(.noSuchItem)
+            case .authenticationFailed, .accessDenied:
+                return NSFileProviderError(.notAuthenticated)
+            default:
+                break
+            }
         }
         return error
     }
