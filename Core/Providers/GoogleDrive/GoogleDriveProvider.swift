@@ -162,7 +162,7 @@ public actor GoogleDriveProvider: CloudProvider {
 
     public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var body: [String: Any] = ["name": remotePath.lastComponent]
+        let body: [String: Any] = ["name": remotePath.lastComponent]
         let bodyData = try JSONSerialization.data(withJSONObject: body)
 
         var comps = URLComponents(string: "https://www.googleapis.com/upload/drive/v3/files") ?? URLComponents()
