@@ -1,4 +1,5 @@
 import SwiftUI
+import StratusCore
 import QuickLook
 
 struct FileBrowserView: View {
@@ -69,7 +70,7 @@ struct FileBrowserView: View {
 
     private func loadItems() {
         guard let account = selectedAccount,
-              let provider = env.providerRegistry.provider(for: account.id) else { return }
+              let provider = env.providerRegistry.provider(id: account.id) else { return }
         isLoading = true
         error = nil
         Task {
@@ -115,7 +116,7 @@ private struct PathBar: View {
                                     .font(.caption)
                                     .foregroundColor(.textTertiary)
                             }
-                            Button(component.name) {
+                            Button(component.lastComponent) {
                                 onNavigate(component)
                             }
                             .buttonStyle(.borderless)
@@ -156,7 +157,7 @@ private struct FileItemRow: View {
                 Text(formatSize(size))
                     .stratusCaption()
             }
-            if let date = item.modifiedAt {
+            if let date = item.modificationDate {
                 Text(date, style: .relative)
                     .stratusCaption()
                     .frame(width: 80, alignment: .trailing)
