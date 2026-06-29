@@ -594,6 +594,33 @@ final class UploadPipelineIntegrationTests: XCTestCase {
         let smallUploads = await provider.smallFileUploads
         XCTAssertEqual(smallUploads, 1, "File just under threshold must use single-part upload")
     }
+
+    // MARK: - Test: Progress stream emits events during multipart upload
+
+    func test_progressStream_yieldsUpdatesPerChunk() async throws {
+        // 20 MB → 3 chunks at 8 MB default chunk size → 3 progress events
+        let url = try makeFileURL(size: 20 * 1024 * 1024, name: "progress_test.bin")
+        let task = try await makeTask(fileURL: url)
+        let (stream, cont) = AsyncStream<ChunkProgress>.makeStream()
+
+        let result = try await chunkEngine.upload(
+            task: task,
+            provider: provider,
+            account: account,
+            bandwidthMonitor: bandwidthMonitor,
+            congestionController: congestionController,
+            progressStream: cont
+        )
+        cont.finish()
+        try await ResumeStore.shared.deleteSession(task.id.uuidString)
+
+        var updates: [ChunkProgress] = []
+        for await p in stream { updates.append(p) }
+
+        XCTAssertFalse(updates.isEmpty, "Multipart upload must emit at least one progress event")
+        XCTAssertEqual(result.chunkCount, 3, "20 MB at 8 MB chunk size = 3 chunks")
+        XCTAssertTrue(updates.allSatisfy { $0.total == 3 }, "Each progress event must report correct total")
+    }
 }
 
 // MARK: - Data Extension
