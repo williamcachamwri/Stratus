@@ -44,7 +44,7 @@ public actor OneDriveLargeFileUpload {
         account: CloudAccount,
         httpClient: HTTPClient
     ) async throws -> String {
-        guard var comps = URLComponents(string: "\(Self.graphBase)/root:\(remotePath.path):/createUploadSession") else {
+        guard let comps = URLComponents(string: "\(Self.graphBase)/root:\(remotePath.path):/createUploadSession") else {
             throw OneDriveLargeFileUploadError.invalidUploadURL("\(Self.graphBase)/root:\(remotePath.path):/createUploadSession")
         }
         guard let url = comps.url else {
