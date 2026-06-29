@@ -24,6 +24,7 @@ let package = Package(
             path: ".",
             sources: [
                 "App",
+                "DesignSystem",
                 "Features",
             ],
             swiftSettings: [
