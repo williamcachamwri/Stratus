@@ -55,6 +55,7 @@ private struct ProviderDefinitionFile: Codable, Sendable {
 
 // MARK: - ProviderDefinitionCatalog
 
+@MainActor
 public final class ProviderDefinitionCatalog: ObservableObject {
     public static let shared = ProviderDefinitionCatalog()
 
