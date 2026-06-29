@@ -1,4 +1,5 @@
 import SwiftUI
+import StratusCore
 import os.log
 
 // MARK: - AppEnvironment
@@ -46,8 +47,8 @@ public final class AppEnvironment: ObservableObject {
         }
 
         Task { @MainActor [weak self] in
-            let reachability = NetworkReachability()
-            for await isConnected in await reachability.changes {
+            let reachability = NetworkReachability.shared
+            for await isConnected in await reachability.statusStream {
                 self?.isOnline = isConnected
             }
         }
@@ -59,10 +60,10 @@ public final class AppEnvironment: ObservableObject {
         switch event {
         case .taskStarted:
             activeUploads += 1
-        case .taskCompleted(let task):
+        case .taskCompleted(let task, _):
             activeUploads = max(0, activeUploads - 1)
             StratusNotificationCenter.shared.notifyUploadComplete(
-                fileName: task.fileURL.lastPathComponent,
+                fileName: task.sourceURL.lastPathComponent,
                 providerName: task.accountID
             )
             DockProgressManager.shared.updateUploadProgress(
@@ -71,7 +72,7 @@ public final class AppEnvironment: ObservableObject {
         case .taskFailed(let task, let error):
             activeUploads = max(0, activeUploads - 1)
             StratusNotificationCenter.shared.notifyUploadFailed(
-                fileName: task.fileURL.lastPathComponent,
+                fileName: task.sourceURL.lastPathComponent,
                 error: error.localizedDescription
             )
         case .taskCancelled:
