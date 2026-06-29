@@ -7,7 +7,7 @@ let package = Package(
     products: [
         .executable(name: "Stratus", targets: ["Stratus"]),
         .library(name: "StratusCore", targets: ["StratusCore"]),
-        .library(name: "StratusFileProviderExtension", targets: ["StratusFileProviderExtension"]),
+        .executable(name: "StratusFileProviderExtension", targets: ["StratusFileProviderExtension"]),
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift", from: "6.0.0"),
@@ -50,7 +50,7 @@ let package = Package(
                 .unsafeFlags(["-strict-concurrency=complete"]),
             ]
         ),
-        .target(
+        .executableTarget(
             name: "StratusFileProviderExtension",
             dependencies: ["StratusCore"],
             path: "FileProviderExtension",

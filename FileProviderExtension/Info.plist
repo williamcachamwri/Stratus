@@ -7,7 +7,7 @@
     <key>CFBundleDisplayName</key>
     <string>Stratus File Provider</string>
     <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
+    <string>StratusFileProviderExtension</string>
     <key>CFBundleIdentifier</key>
     <string>com.stratus.cloudmanager.fileprovider</string>
     <key>CFBundleInfoDictionaryVersion</key>
@@ -27,7 +27,7 @@
         <key>NSExtensionPointIdentifier</key>
         <string>com.apple.fileprovider-nonui</string>
         <key>NSExtensionPrincipalClass</key>
-        <string>$(PRODUCT_MODULE_NAME).FileProviderExtension</string>
+        <string>FileProviderExtension</string>
     </dict>
 </dict>
 </plist>
