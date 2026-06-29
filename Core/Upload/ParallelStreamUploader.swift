@@ -73,7 +73,7 @@ public final class ParallelStreamUploader: @unchecked Sendable {
                 return result
             } catch let error as ChunkUploaderError {
                 switch error {
-                case .nonRetryableStatus(let code, _):
+                case .nonRetryableStatus(_, _):
                     throw error  // 400/401/403/404/409 — do not retry
                 case .rateLimited(let retryAfter):
                     let waitTime = retryAfter ?? Self.retryDelays[min(attempt, Self.retryDelays.count - 1)]
