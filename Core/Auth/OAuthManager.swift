@@ -270,30 +270,18 @@ public actor OAuthManager: NSObject {
 
     @MainActor
     private func presentAuthSession(url: URL, callbackScheme: String) async throws -> URL {
-        // macOS requires presentationContextProvider (weak var) — keep a local strong ref
-        // captured in the completion closure so it lives until the callback fires.
         let contextProvider = OAuthPresentationContext()
         return try await withCheckedThrowingContinuation { continuation in
+            // Completion handler is created via a file-scope (nonisolated) function so
+            // Swift 6 does NOT infer @MainActor on it.  ASWebAuth calls it back on an
+            // internal XPC thread; running an @MainActor closure there causes a
+            // dispatch_assert_queue_fail SIGTRAP (see crash log Thread 3).
+            let handler = makeASWebAuthHandler(continuation: continuation, retaining: contextProvider)
             let authSession = ASWebAuthenticationSession(
                 url: url,
-                callbackURLScheme: callbackScheme
-            ) { [contextProvider] callbackURL, error in
-                _ = contextProvider  // retain provider until callback fires
-                if let error {
-                    if let authError = error as? ASWebAuthenticationSessionError,
-                       authError.code == .canceledLogin {
-                        continuation.resume(throwing: OAuthError.userCancelled)
-                    } else {
-                        continuation.resume(throwing: OAuthError.sessionCreationFailed(error))
-                    }
-                    return
-                }
-                guard let callbackURL else {
-                    continuation.resume(throwing: OAuthError.noAuthorizationCode)
-                    return
-                }
-                continuation.resume(returning: callbackURL)
-            }
+                callbackURLScheme: callbackScheme,
+                completionHandler: handler
+            )
             authSession.presentationContextProvider = contextProvider
             authSession.prefersEphemeralWebBrowserSession = true
             guard authSession.start() else {
@@ -399,6 +387,35 @@ private final class OAuthPresentationContext: NSObject,
         NSApp.windows.first(where: { $0.isKeyWindow })
             ?? NSApp.windows.first
             ?? NSWindow()
+    }
+}
+
+// MARK: - ASWebAuth completion handler (file-scope, no actor isolation)
+
+// Must live at file scope so Swift 6 does NOT infer @MainActor on it.
+// ASWebAuthenticationSession invokes the completion on an internal XPC
+// thread; a @MainActor-isolated closure there triggers
+// dispatch_assert_queue_fail → EXC_BREAKPOINT.
+private func makeASWebAuthHandler(
+    continuation: CheckedContinuation<URL, any Error>,
+    retaining contextProvider: OAuthPresentationContext
+) -> (URL?, (any Error)?) -> Void {
+    { callbackURL, error in
+        _ = contextProvider  // keep provider alive until callback fires
+        if let error {
+            if let authError = error as? ASWebAuthenticationSessionError,
+               authError.code == .canceledLogin {
+                continuation.resume(throwing: OAuthError.userCancelled)
+            } else {
+                continuation.resume(throwing: OAuthError.sessionCreationFailed(error))
+            }
+            return
+        }
+        guard let callbackURL else {
+            continuation.resume(throwing: OAuthError.noAuthorizationCode)
+            return
+        }
+        continuation.resume(returning: callbackURL)
     }
 }
 
