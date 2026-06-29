@@ -7,7 +7,7 @@ final class KeyDerivationTests: XCTestCase {
     // MARK: - deriveKey determinism
 
     func test_derive_key_is_deterministic() throws {
-        let salt = EncryptionKeyDerivation.generateSalt()
+        let salt = try EncryptionKeyDerivation.generateSalt()
         let k1 = try EncryptionKeyDerivation.deriveKey(password: "correct-horse-battery-staple", salt: salt)
         let k2 = try EncryptionKeyDerivation.deriveKey(password: "correct-horse-battery-staple", salt: salt)
         XCTAssertEqual(k1.bitCount, k2.bitCount)
@@ -18,7 +18,7 @@ final class KeyDerivationTests: XCTestCase {
     }
 
     func test_different_passwords_produce_different_keys() throws {
-        let salt = EncryptionKeyDerivation.generateSalt()
+        let salt = try EncryptionKeyDerivation.generateSalt()
         let k1 = try EncryptionKeyDerivation.deriveKey(password: "password1", salt: salt)
         let k2 = try EncryptionKeyDerivation.deriveKey(password: "password2", salt: salt)
         let d1 = k1.withUnsafeBytes { Data($0) }
@@ -27,8 +27,8 @@ final class KeyDerivationTests: XCTestCase {
     }
 
     func test_different_salts_produce_different_keys() throws {
-        let s1 = EncryptionKeyDerivation.generateSalt()
-        let s2 = EncryptionKeyDerivation.generateSalt()
+        let s1 = try EncryptionKeyDerivation.generateSalt()
+        let s2 = try EncryptionKeyDerivation.generateSalt()
         let k1 = try EncryptionKeyDerivation.deriveKey(password: "same-password", salt: s1)
         let k2 = try EncryptionKeyDerivation.deriveKey(password: "same-password", salt: s2)
         let d1 = k1.withUnsafeBytes { Data($0) }
@@ -38,14 +38,14 @@ final class KeyDerivationTests: XCTestCase {
 
     // MARK: - generateSalt
 
-    func test_generate_salt_length() {
-        let salt = EncryptionKeyDerivation.generateSalt()
+    func test_generate_salt_length() throws {
+        let salt = try EncryptionKeyDerivation.generateSalt()
         XCTAssertEqual(salt.count, 32, "Salt should be 32 bytes (256 bits)")
     }
 
-    func test_generate_salt_is_random() {
-        let s1 = EncryptionKeyDerivation.generateSalt()
-        let s2 = EncryptionKeyDerivation.generateSalt()
+    func test_generate_salt_is_random() throws {
+        let s1 = try EncryptionKeyDerivation.generateSalt()
+        let s2 = try EncryptionKeyDerivation.generateSalt()
         XCTAssertNotEqual(s1, s2, "Consecutive salt generations must differ (CSPRNG)")
     }
 
@@ -82,7 +82,7 @@ final class KeyDerivationTests: XCTestCase {
     // MARK: - key length
 
     func test_derived_key_is_256_bits() throws {
-        let salt = EncryptionKeyDerivation.generateSalt()
+        let salt = try EncryptionKeyDerivation.generateSalt()
         let key = try EncryptionKeyDerivation.deriveKey(password: "test", salt: salt)
         XCTAssertEqual(key.bitCount, 256, "Derived key must be 256 bits (AES-256)")
     }
@@ -101,12 +101,15 @@ final class KeyDerivationTests: XCTestCase {
         let errors: [EncryptionError] = [
             .invalidSaltLength(expected: 32, got: 16),
             .keyDerivationFailed(-1),
+            .secureRandomFailed(-1),
+            .invalidRandomByteCount(-1),
+            .unsupportedVersion(255),
             .encryptionFailed,
             .decryptionFailed,
             .integrityCheckFailed,
             .manifestNotFound,
             .missingFileKey("some-key-id"),
         ]
-        XCTAssertEqual(errors.count, 7)
+        XCTAssertEqual(errors.count, 10)
     }
 }
