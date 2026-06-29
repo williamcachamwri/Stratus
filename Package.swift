@@ -1,0 +1,45 @@
+// swift-tools-version: 6.0
+import PackageDescription
+
+let package = Package(
+    name: "Stratus",
+    platforms: [.macOS(.v15)],
+    products: [
+        .executable(name: "Stratus", targets: ["Stratus"]),
+        .library(name: "StratusCore", targets: ["StratusCore"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/groue/GRDB.swift", from: "6.0.0"),
+        .package(url: "https://github.com/Lakr233/Citadel", from: "0.8.0"),
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.15.0"),
+    ],
+    targets: [
+        .executableTarget(
+            name: "Stratus",
+            dependencies: ["StratusCore"],
+            path: "App",
+            swiftSettings: [
+                .unsafeFlags(["-strict-concurrency=complete"]),
+            ]
+        ),
+        .target(
+            name: "StratusCore",
+            dependencies: [
+                .product(name: "GRDB", package: "GRDB.swift"),
+                .product(name: "Citadel", package: "Citadel"),
+            ],
+            path: "Core",
+            swiftSettings: [
+                .unsafeFlags(["-strict-concurrency=complete"]),
+            ]
+        ),
+        .testTarget(
+            name: "StratusCoreTests",
+            dependencies: [
+                "StratusCore",
+                .product(name: "SnapshotTesting", package: "swift-snapshot-testing"),
+            ],
+            path: "Tests"
+        ),
+    ]
+)
