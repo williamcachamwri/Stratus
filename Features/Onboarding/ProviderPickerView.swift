@@ -10,43 +10,51 @@ public struct ProviderPickerView: View {
         providers ?? catalog.providerChoices()
     }
 
+    public let showsHeader: Bool
+
     public init(
         providers: [ProviderChoice]? = nil,
+        showsHeader: Bool = true,
         onSelect: @escaping (ProviderChoice) -> Void = { _ in }
     ) {
         self.providers = providers
+        self.showsHeader = showsHeader
         self.onSelect = onSelect
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.lg) {
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text("Connect a Cloud Account")
-                    .font(.stratusTitle)
-                Text("Providers are loaded from ProviderDefinitions.json so the onboarding UI matches the real backend capabilities.")
-                    .stratusCaption()
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                if showsHeader {
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text("Connect a Cloud Account")
+                            .font(.stratusTitle)
+                        Text("Providers are loaded from ProviderDefinitions.json so the onboarding UI matches the real backend capabilities.")
+                            .stratusCaption()
+                    }
+                }
 
-            if visibleProviders.isEmpty {
-                EmptyStateView(
-                    icon: "externaldrive.badge.questionmark",
-                    title: "No Provider Definitions",
-                    subtitle: "ProviderDefinitions.json was not found in the app bundle or repository Resources folder."
-                )
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: Spacing.md)], spacing: Spacing.md) {
-                    ForEach(visibleProviders) { provider in
-                        Button {
-                            onSelect(provider)
-                        } label: {
-                            ProviderChoiceCard(provider: provider)
+                if visibleProviders.isEmpty {
+                    EmptyStateView(
+                        icon: "externaldrive.badge.questionmark",
+                        title: "No Provider Definitions",
+                        subtitle: "ProviderDefinitions.json was not found in the app bundle or repository Resources folder."
+                    )
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: Spacing.md)], spacing: Spacing.md) {
+                        ForEach(visibleProviders) { provider in
+                            Button {
+                                onSelect(provider)
+                            } label: {
+                                ProviderChoiceCard(provider: provider)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
+            .padding(Spacing.xl)
         }
-        .padding(Spacing.xl)
         .background(Color.surfaceSecondary)
     }
 }
