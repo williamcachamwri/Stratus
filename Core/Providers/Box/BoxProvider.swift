@@ -146,15 +146,15 @@ public actor BoxProvider: CloudProvider {
         headers["Content-Type"] = "multipart/form-data; boundary=box_upload"
         let boundary = "box_upload"
         var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"attributes\"\r\n\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)\r\n".data(using: .utf8) ?? Data())
+        body.append("Content-Disposition: form-data; name=\"attributes\"\r\n\r\n".data(using: .utf8) ?? Data())
         let attrs = try JSONSerialization.data(withJSONObject: ["name": remotePath.lastComponent, "parent": ["id": "0"]])
         body.append(attrs)
-        body.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(remotePath.lastComponent)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append("\r\n--\(boundary)\r\n".data(using: .utf8) ?? Data())
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(remotePath.lastComponent)\"\r\n".data(using: .utf8) ?? Data())
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8) ?? Data())
         body.append(data)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8) ?? Data())
         let request = HTTPRequest(url: url, method: .POST, headers: headers, body: body)
         let response = try await http.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
