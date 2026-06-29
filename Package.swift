@@ -29,6 +29,9 @@ let package = Package(
                 .product(name: "Citadel", package: "Citadel"),
             ],
             path: "Core",
+            resources: [
+                .copy("Persistence/Migrations"),
+            ],
             swiftSettings: [
                 .unsafeFlags(["-strict-concurrency=complete"]),
             ]
