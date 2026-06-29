@@ -75,6 +75,7 @@ public enum EncryptionError: Error, Sendable {
     case keyDerivationFailed(Int)
     case secureRandomFailed(Int)
     case invalidRandomByteCount(Int)
+    case unsupportedVersion(UInt8)
     case encryptionFailed
     case decryptionFailed
     case integrityCheckFailed
