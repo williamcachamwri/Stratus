@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 import StratusCore
 
 struct PreferencesView: View {
@@ -69,9 +70,16 @@ private struct BandwidthPrefsTab: View {
 // MARK: - Encryption Prefs
 
 private struct EncryptionPrefsTab: View {
+    @AppStorage("encryptionEnabled") private var encryptionEnabled = false
+    @AppStorage("encryptionPasswordSet") private var passwordIsSet = false
     @State private var password = ""
     @State private var confirm = ""
-    @State private var encryptionEnabled = false
+    @State private var isSaving = false
+    @State private var feedback: Feedback?
+
+    private enum Feedback {
+        case success(String), failure(String)
+    }
 
     var body: some View {
         Form {
@@ -79,16 +87,55 @@ private struct EncryptionPrefsTab: View {
             if encryptionEnabled {
                 SecureField("Master password", text: $password)
                 SecureField("Confirm password", text: $confirm)
-                Button("Set Master Password") {
-                    // Derive and store key in Keychain
+                Button(isSaving ? "Saving…" : (passwordIsSet ? "Update Master Password" : "Set Master Password")) {
+                    Task { await saveMasterPassword() }
                 }
-                .disabled(password.isEmpty || password != confirm)
+                .disabled(password.isEmpty || password != confirm || isSaving)
+                switch feedback {
+                case .success(let msg):
+                    Label(msg, systemImage: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                case .failure(let msg):
+                    Label(msg, systemImage: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                case nil:
+                    EmptyView()
+                }
             }
             Text("Files are encrypted with AES-256-GCM before upload. Your password never leaves this device.")
                 .font(.stratusCaption)
                 .foregroundColor(.textSecondary)
         }
         .padding(Spacing.lg)
+    }
+
+    private func saveMasterPassword() async {
+        isSaving = true
+        feedback = nil
+        defer { isSaving = false }
+        do {
+            let salt = try EncryptionKeyDerivation.generateSalt()
+            let masterKey = try EncryptionKeyDerivation.deriveKey(password: password, salt: salt)
+            try await KeychainStore.shared.saveSecret(
+                salt,
+                service: "com.stratus.encryption.master",
+                account: "salt"
+            )
+            // Wrap a sentinel key so the password can be verified on next unlock
+            let sentinelKey = SymmetricKey(size: .bits256)
+            let wrapped = try EncryptionKeyDerivation.wrapKey(sentinelKey, with: masterKey)
+            try await KeychainStore.shared.saveSecret(
+                wrapped,
+                service: "com.stratus.encryption.master",
+                account: "verification"
+            )
+            passwordIsSet = true
+            password = ""
+            confirm = ""
+            feedback = .success("Master password saved.")
+        } catch {
+            feedback = .failure(error.localizedDescription)
+        }
     }
 }
 
