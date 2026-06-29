@@ -56,7 +56,7 @@ public actor AppDatabase {
 
     // MARK: - Migrations
 
-    private func migrate() throws {
+    nonisolated private func migrate() throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("001_accounts") { db in
             try db.execute(sql: """
