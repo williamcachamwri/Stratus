@@ -17,7 +17,9 @@ public actor DropboxAuth {
         let (verifier, challenge) = generatePKCE()
         let state = UUID().uuidString
 
-        var comps = URLComponents(string: Self.authURL)!
+        guard var comps = URLComponents(string: Self.authURL) else {
+            throw AuthError.invalidTokenResponse
+        }
         comps.queryItems = [
             URLQueryItem(name: "client_id", value: appKey),
             URLQueryItem(name: "redirect_uri", value: Self.redirectURI),
@@ -27,9 +29,12 @@ public actor DropboxAuth {
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "token_access_type", value: "offline"),
         ]
+        guard let authURL = comps.url else {
+            throw AuthError.invalidTokenResponse
+        }
 
         let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, any Error>) in
-            let session = ASWebAuthenticationSession(url: comps.url!, callbackURLScheme: "com.stratus.cloudmanager") { url, error in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "com.stratus.cloudmanager") { url, error in
                 if let error { continuation.resume(throwing: error) }
                 else if let url { continuation.resume(returning: url) }
                 else { continuation.resume(throwing: AuthError.cancelled) }
@@ -44,7 +49,7 @@ public actor DropboxAuth {
             throw AuthError.noAuthorizationCode
         }
 
-        var request = URLRequest(url: URL(string: Self.tokenURL)!)
+        var request = URLRequest(url: URL(string: Self.tokenURL) ?? URL(fileURLWithPath: "/"))
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = "code=\(code)&grant_type=authorization_code&client_id=\(appKey)&redirect_uri=\(Self.redirectURI)&code_verifier=\(verifier)"
@@ -64,7 +69,7 @@ public actor DropboxAuth {
 
     public func refreshToken(credential: OAuthCredential, appKey: String) async throws -> OAuthCredential {
         guard let refreshToken = credential.refreshToken else { throw AuthError.noRefreshToken }
-        var request = URLRequest(url: URL(string: Self.tokenURL)!)
+        var request = URLRequest(url: URL(string: Self.tokenURL) ?? URL(fileURLWithPath: "/"))
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let body = "grant_type=refresh_token&refresh_token=\(refreshToken)&client_id=\(appKey)"
