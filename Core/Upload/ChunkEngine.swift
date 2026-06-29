@@ -135,7 +135,11 @@ public actor ChunkEngine {
             try await withThrowingTaskGroup(of: ChunkOutcome.self) { group in
                 var inFlight = 0
                 var pendingIterator = pendingChunks.makeIterator()
-                var maxConcurrent = min(await congestionController.recommendedParallelism, provider.capabilities.maxConcurrentUploads)
+                var maxConcurrent = await effectiveChunkConcurrency(
+                    config: config,
+                    provider: provider,
+                    congestionController: congestionController
+                )
 
                 while inFlight < maxConcurrent, let chunk = pendingIterator.next() {
                     try Task.checkCancellation()
@@ -170,7 +174,11 @@ public actor ChunkEngine {
                     )
 
                     await congestionController.onChunkSuccess(rtt: 0.05)
-                    maxConcurrent = min(await congestionController.recommendedParallelism, provider.capabilities.maxConcurrentUploads)
+                    maxConcurrent = await effectiveChunkConcurrency(
+                        config: config,
+                        provider: provider,
+                        congestionController: congestionController
+                    )
 
                     let delay = await throttle.delayBetweenChunks(chunkSize: config.chunkSize, activeConcurrency: inFlight)
                     if delay > 0 {
@@ -259,6 +267,17 @@ public actor ChunkEngine {
     }
 
     // MARK: - Private Helpers
+
+    private func effectiveChunkConcurrency(
+        config: ParallelismConfig,
+        provider: any CloudProvider,
+        congestionController: CongestionController
+    ) async -> Int {
+        let providerLimit = max(1, provider.capabilities.maxConcurrentUploads)
+        let congestionLimit = max(1, await congestionController.recommendedParallelism)
+        let configLimit = max(1, config.maxConcurrentChunks)
+        return max(1, min(providerLimit, congestionLimit, configLimit))
+    }
 
     private func startMultipart(
         task: UploadTask,
