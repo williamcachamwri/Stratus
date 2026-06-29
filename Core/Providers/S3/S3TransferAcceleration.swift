@@ -46,19 +46,11 @@ public struct S3TransferAcceleration: Sendable {
             comps.host = "s3.\(region).amazonaws.com"
             comps.path = "/"
         }
-        // URLComponents.url is only nil when the components are malformed
-        // (e.g. a nil scheme).  Both branches above set a valid scheme and
-        // host, so the fallback below is unreachable in practice.
-        guard let url = comps.url else {
-            // Construct a safe fallback without force-unwrap.
-            var fallback = URLComponents()
-            fallback.scheme = "https"
-            fallback.host = isEnabled ? "\(bucket).s3-accelerate.amazonaws.com" : "s3.\(region).amazonaws.com"
-            fallback.path = "/"
-            // Both host strings are statically valid, so url is non-nil here.
-            return fallback.url ?? URL(string: "https://s3.amazonaws.com").unsafelyUnwrapped
-        }
-        return url
+        // URLComponents.url is only nil when the components are malformed.
+        // Both branches above set a valid scheme and host, so comps.url is
+        // never nil here.  The fallback URL is expressed as a fileURLWithPath
+        // to avoid any optional-URL construction.
+        return comps.url ?? URL(fileURLWithPath: "/")  // unreachable; satisfies compiler
     }
 
     /// Convenience: returns the virtual-hosted style object URL.
