@@ -124,17 +124,33 @@ public struct RequestSigner: Sendable {
     }
 
     private static func canonicalURI(from url: URL?) -> String {
-        let path = url?.path ?? "/"
-        return path.isEmpty ? "/" : path
+        guard let path = url?.path, !path.isEmpty else { return "/" }
+        return path
+            .split(separator: "/", omittingEmptySubsequences: false)
+            .map { awsPercentEncode(String($0)) }
+            .joined(separator: "/")
     }
 
     private static func canonicalQueryString(from url: URL?) -> String {
         guard let comps = url.flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false) }),
               let items = comps.queryItems, !items.isEmpty else { return "" }
         return items
-            .sorted { $0.name < $1.name }
-            .map { "\($0.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0.name)=\(($0.value ?? "").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }
+            .map { item in
+                let name = awsPercentEncode(item.name)
+                let value = awsPercentEncode(item.value ?? "")
+                return (name: name, value: value)
+            }
+            .sorted { lhs, rhs in
+                lhs.name == rhs.name ? lhs.value < rhs.value : lhs.name < rhs.name
+            }
+            .map { "\($0.name)=\($0.value)" }
             .joined(separator: "&")
+    }
+
+    private static func awsPercentEncode(_ value: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 
     private static func sortedSignedHeaders(from request: URLRequest) -> [(key: String, value: String)] {
