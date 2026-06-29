@@ -98,7 +98,7 @@ public actor HTTP2MultiplexSession {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Data, HTTPURLResponse), any Error>) in
                 let task = self.session.dataTask(with: request) { data, response, error in
                     if let error {
-                        let mapped = self.mapError(error)
+                        let mapped = Self.mapError(error)
                         continuation.resume(throwing: mapped)
                         return
                     }
@@ -133,7 +133,7 @@ public actor HTTP2MultiplexSession {
         activeTasks.removeValue(forKey: id)
     }
 
-    private func mapError(_ error: any Error) -> any Error {
+    private nonisolated static func mapError(_ error: any Error) -> any Error {
         if let urlError = error as? URLError {
             switch urlError.code {
             case .timedOut:
