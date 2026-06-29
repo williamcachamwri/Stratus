@@ -359,7 +359,16 @@ private struct AddAccountSheet: View {
 
     private func defaultRedirectURI(for providerID: String) -> String {
         switch providerID {
-        case "gdrive": return "com.stratus.cloudmanager:/oauth2callback"
+        case "gdrive":
+            // Google native-app clients use a reversed-client-ID URI scheme.
+            // Derive it from the configured CLIENT_ID so it matches what
+            // Google Cloud Console generates automatically for Desktop/iOS clients.
+            if let clientID = SharedConfig.string("CLIENT_ID", providerID: providerID),
+               clientID.hasSuffix(".apps.googleusercontent.com") {
+                let prefix = clientID.replacingOccurrences(of: ".apps.googleusercontent.com", with: "")
+                return "com.googleusercontent.apps.\(prefix):/oauth2redirect"
+            }
+            return "com.stratus.cloudmanager:/oauth2callback"
         case "dropbox": return "com.stratus.cloudmanager:/dropbox/callback"
         case "onedrive": return "com.stratus.cloudmanager://auth/onedrive"
         case "box": return "stratus://oauth/box"
