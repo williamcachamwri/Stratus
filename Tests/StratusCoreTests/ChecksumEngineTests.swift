@@ -10,7 +10,7 @@ final class ChecksumEngineTests: XCTestCase {
     override func setUp() async throws {
         tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        engine = ChecksumEngine()
+        engine = ChecksumEngine.shared
     }
 
     override func tearDown() async throws {
@@ -21,9 +21,7 @@ final class ChecksumEngineTests: XCTestCase {
         let data = Data("hello world".utf8)
         let hash = await engine.sha256(of: data)
         // Known SHA-256 of "hello world"
-        XCTAssertEqual(hash, "b94d27b9934d3e08a52e52d7da7dabfac484efe04294e576e94e47a86cf3c5ece"
-            .replacingOccurrences(of: " ", with: ""))
-        // Note: real SHA-256("hello world") = b94d27b9934d3e08a52e52d7da7dabfac484efe04294e576e94e47a86cf3c5ece
+        XCTAssertEqual(hash, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")
     }
 
     func test_sha256Stream_matchesSha256OfData() async throws {
