@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 struct AccountsView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -156,7 +156,6 @@ private struct AddAccountSheet: View {
         .frame(width: 520, height: 620)
     }
 
-    @ViewBuilder
     private func accountForm(definition: ProviderDefinition) -> some View {
         Form {
             Section("Account") {
@@ -212,8 +211,10 @@ private struct AddAccountSheet: View {
                     TextField("Client ID", text: $oauthClientID)
                     TextField("Redirect URI", text: $oauthRedirectURI)
                     TextField("Scopes", text: $oauthScopes)
-                    Text("Defaults load from shared/oauth.config, shared/*.local.config, or matching environment variables.")
-                        .stratusCaption()
+                    Text(
+                        "Defaults load from shared/oauth.config, shared/*.local.config, or matching environment variables."
+                    )
+                    .stratusCaption()
                     Button(isAuthorizing ? "Authorizing…" : "Authorize in Browser") {
                         Task { await authorizeOAuth(definition: definition) }
                     }
@@ -225,8 +226,10 @@ private struct AddAccountSheet: View {
                 }
             } else {
                 Section("Provider") {
-                    Text("This provider is configured by macOS or the File Provider extension. No demo account will be created; only a persisted account row is saved.")
-                        .stratusCaption()
+                    Text(
+                        "This provider is configured by macOS or the File Provider extension. No demo account will be created; only a persisted account row is saved."
+                    )
+                    .stratusCaption()
                 }
             }
 
@@ -277,7 +280,9 @@ private struct AddAccountSheet: View {
                     providerID: definition.id,
                     accountID: accountID
                 )
-            } else if definition.kind == "ssh-file-transfer" || definition.kind == "http-file-transfer" || definition.kind == "ftp-file-transfer" {
+            } else if definition.kind == "ssh-file-transfer" || definition.kind == "http-file-transfer" || definition
+                .kind == "ftp-file-transfer"
+            {
                 try await CredentialVault.shared.saveBasicCredential(
                     BasicCredential(username: username, password: password),
                     providerID: definition.id,
@@ -354,7 +359,8 @@ private struct AddAccountSheet: View {
 
     private func applySharedDefaults(for providerID: String) {
         oauthClientID = SharedConfig.string("CLIENT_ID", providerID: providerID) ?? ""
-        oauthRedirectURI = SharedConfig.string("REDIRECT_URI", providerID: providerID) ?? defaultRedirectURI(for: providerID)
+        oauthRedirectURI = SharedConfig
+            .string("REDIRECT_URI", providerID: providerID) ?? defaultRedirectURI(for: providerID)
         oauthScopes = SharedConfig.string("SCOPES", providerID: providerID) ?? defaultScopes(for: providerID)
 
         endpointURL = SharedConfig.string("ENDPOINT_URL", providerID: providerID) ?? ""
@@ -380,7 +386,8 @@ private struct AddAccountSheet: View {
             // Derive it from the configured CLIENT_ID so it matches what
             // Google Cloud Console generates automatically for Desktop/iOS clients.
             if let clientID = SharedConfig.string("CLIENT_ID", providerID: providerID),
-               clientID.hasSuffix(".apps.googleusercontent.com") {
+               clientID.hasSuffix(".apps.googleusercontent.com")
+            {
                 let prefix = clientID.replacingOccurrences(of: ".apps.googleusercontent.com", with: "")
                 return "com.googleusercontent.apps.\(prefix):/oauth2redirect"
             }
@@ -398,11 +405,11 @@ private struct AddAccountSheet: View {
 
     private func defaultScopes(for providerID: String) -> String {
         switch providerID {
-        case "gdrive": return "https://www.googleapis.com/auth/drive"
-        case "dropbox": return "files.content.write files.content.read account_info.read"
-        case "onedrive": return "Files.ReadWrite offline_access User.Read"
-        case "box": return "root_readwrite"
-        default: return ""
+        case "gdrive": "https://www.googleapis.com/auth/drive"
+        case "dropbox": "files.content.write files.content.read account_info.read"
+        case "onedrive": "Files.ReadWrite offline_access User.Read"
+        case "box": "root_readwrite"
+        default: ""
         }
     }
 }
