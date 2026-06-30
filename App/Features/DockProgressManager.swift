@@ -1,8 +1,9 @@
 import AppKit
-import StratusCore
 import os.log
+import StratusCore
 
 // MARK: - DockProgressManager
+
 // Updates the Dock tile with overall upload progress and badge count for pending conflicts.
 
 @MainActor
@@ -12,7 +13,7 @@ public final class DockProgressManager: NSObject, ObservableObject {
     private var progressView: DockProgressView?
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "DockProgress")
 
-    private override init() {
+    override private init() {
         super.init()
         setupDockTile()
     }
