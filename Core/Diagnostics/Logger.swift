@@ -13,34 +13,34 @@ import os.log
 
 /// The functional domain that produced a log entry.
 public enum LogCategory: String, Sendable, CaseIterable {
-    case upload      = "upload"
-    case download    = "download"
-    case sync        = "sync"
-    case provider    = "provider"
-    case networking  = "networking"
-    case encryption  = "encryption"
-    case general     = "general"
+    case upload
+    case download
+    case sync
+    case provider
+    case networking
+    case encryption
+    case general
 }
 
 // MARK: - Log Level
 
 public enum LogLevel: String, Sendable, Comparable {
-    case debug   = "DEBUG"
-    case info    = "INFO"
-    case notice  = "NOTICE"
+    case debug = "DEBUG"
+    case info = "INFO"
+    case notice = "NOTICE"
     case warning = "WARNING"
-    case error   = "ERROR"
-    case fault   = "FAULT"
+    case error = "ERROR"
+    case fault = "FAULT"
 
-    // Raw order for Comparable conformance
+    /// Raw order for Comparable conformance
     private var order: Int {
         switch self {
-        case .debug:   return 0
-        case .info:    return 1
-        case .notice:  return 2
-        case .warning: return 3
-        case .error:   return 4
-        case .fault:   return 5
+        case .debug: 0
+        case .info: 1
+        case .notice: 2
+        case .warning: 3
+        case .error: 4
+        case .fault: 5
         }
     }
 
@@ -75,7 +75,6 @@ private enum RedactionPattern {
 /// requirement that `OSLog`-backed objects are sendable across isolation
 /// boundaries — `os.Logger` is itself `Sendable`.
 public actor DiagnosticLogger {
-
     // MARK: Singleton
 
     public static let shared = DiagnosticLogger()
@@ -151,8 +150,14 @@ public actor DiagnosticLogger {
         function: String = #function,
         line: Int = #line
     ) {
-        log(level: .debug, category: category, message: message,
-            file: file, function: function, line: line)
+        log(
+            level: .debug,
+            category: category,
+            message: message,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
     public func info(
@@ -162,8 +167,14 @@ public actor DiagnosticLogger {
         function: String = #function,
         line: Int = #line
     ) {
-        log(level: .info, category: category, message: message,
-            file: file, function: function, line: line)
+        log(
+            level: .info,
+            category: category,
+            message: message,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
     public func notice(
@@ -173,8 +184,14 @@ public actor DiagnosticLogger {
         function: String = #function,
         line: Int = #line
     ) {
-        log(level: .notice, category: category, message: message,
-            file: file, function: function, line: line)
+        log(
+            level: .notice,
+            category: category,
+            message: message,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
     public func warning(
@@ -184,8 +201,14 @@ public actor DiagnosticLogger {
         function: String = #function,
         line: Int = #line
     ) {
-        log(level: .warning, category: category, message: message,
-            file: file, function: function, line: line)
+        log(
+            level: .warning,
+            category: category,
+            message: message,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
     public func error(
@@ -195,8 +218,14 @@ public actor DiagnosticLogger {
         function: String = #function,
         line: Int = #line
     ) {
-        log(level: .error, category: category, message: message,
-            file: file, function: function, line: line)
+        log(
+            level: .error,
+            category: category,
+            message: message,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
     public func fault(
@@ -206,8 +235,14 @@ public actor DiagnosticLogger {
         function: String = #function,
         line: Int = #line
     ) {
-        log(level: .fault, category: category, message: message,
-            file: file, function: function, line: line)
+        log(
+            level: .fault,
+            category: category,
+            message: message,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
     // MARK: - Redaction
