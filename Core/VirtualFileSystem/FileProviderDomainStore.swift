@@ -97,7 +97,10 @@ public actor FileProviderDomainStore {
             var records = try loadAll()
             records.removeAll { $0.id == record.id || $0.accountID == record.accountID }
             records.append(record)
-            try persist(records.sorted { $0.finderDisplayName.localizedCaseInsensitiveCompare($1.finderDisplayName) == .orderedAscending })
+            try persist(records
+                .sorted {
+                    $0.finderDisplayName.localizedCaseInsensitiveCompare($1.finderDisplayName) == .orderedAscending
+                })
         } catch let error as FileProviderDomainStoreError {
             throw error
         } catch {
@@ -123,7 +126,10 @@ public actor FileProviderDomainStore {
 
     public func remove(accountID: String) throws {
         var records = try loadAll()
-        records.removeAll { $0.accountID == accountID || $0.id == accountID || $0.id == Self.domainIdentifier(for: accountID) }
+        records
+            .removeAll {
+                $0.accountID == accountID || $0.id == accountID || $0.id == Self.domainIdentifier(for: accountID)
+            }
         try persist(records)
     }
 
@@ -146,7 +152,10 @@ public actor FileProviderDomainStore {
 
     private func persist(_ records: [FileProviderDomainRecord]) throws {
         do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             let data = try encoder.encode(records)
             try data.write(to: fileURL, options: [.atomic])
         } catch let error as EncodingError {
