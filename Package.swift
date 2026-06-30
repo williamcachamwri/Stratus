@@ -23,21 +23,14 @@ let package = Package(
                 "StratusCore",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
-            path: ".",
+            path: "App",
             exclude: [
-                ".build",
                 "Resources/Info.plist",
                 "Resources/Stratus.entitlements",
                 "Resources/FileProviderExtension.entitlements",
             ],
-            sources: [
-                "App",
-                "DesignSystem",
-                "Features",
-            ],
             resources: [
-                .process("Resources"),
-                .copy("shared"),
+                .copy("../shared"),
             ],
             swiftSettings: [
                 .unsafeFlags(["-strict-concurrency=complete"]),

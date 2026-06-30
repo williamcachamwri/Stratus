@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCES_JSON="$ROOT_DIR/Resources/ProviderLogoSources.json"
-ASSET_DIR="$ROOT_DIR/Resources/Assets.xcassets"
+SOURCES_JSON="$ROOT_DIR/App/Resources/ProviderLogoSources.json"
+ASSET_DIR="$ROOT_DIR/App/Resources/Assets.xcassets"
 
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then

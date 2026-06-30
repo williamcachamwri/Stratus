@@ -27,6 +27,21 @@ private struct GeneralPrefsTab: View {
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("showDockIcon") private var showDockIcon = true
     @AppStorage("updateChannel") private var updateChannel = "stable"
+    @AppStorage("appLanguage") private var appLanguage = ""
+    @State private var showRestartAlert = false
+
+    private let languages: [(code: String, name: String)] = [
+        ("", "System default"),
+        ("en", "English"),
+        ("vi", "Tiếng Việt"),
+        ("fr", "Français"),
+        ("de", "Deutsch"),
+        ("es", "Español"),
+        ("ja", "日本語"),
+        ("zh-Hans", "简体中文"),
+        ("ko", "한국어"),
+        ("pt-BR", "Português (Brasil)"),
+    ]
 
     var body: some View {
         Form {
@@ -38,6 +53,29 @@ private struct GeneralPrefsTab: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 200)
+            Picker("Language", selection: $appLanguage) {
+                ForEach(languages, id: \.code) { lang in
+                    Text(lang.name).tag(lang.code)
+                }
+            }
+            .onChange(of: appLanguage) { _, newValue in
+                if newValue.isEmpty {
+                    UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+                } else {
+                    UserDefaults.standard.set([newValue], forKey: "AppleLanguages")
+                }
+                showRestartAlert = true
+            }
+            .alert("Restart Required", isPresented: $showRestartAlert) {
+                Button("Restart Now") {
+                    let appPath = Bundle.main.bundlePath
+                    Process.launchedProcess(launchPath: "/usr/bin/open", arguments: [appPath])
+                    NSApp.terminate(nil)
+                }
+                Button("Later", role: .cancel) {}
+            } message: {
+                Text("Language changes take effect after restarting the app.")
+            }
         }
         .padding(Spacing.lg)
     }

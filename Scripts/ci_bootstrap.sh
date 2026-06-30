@@ -51,8 +51,8 @@ if (( major < 16 || (major == 16 && minor < 3) )); then
   exit 1
 fi
 
-plutil -lint Resources/Info.plist >/dev/null
-plutil -lint Resources/Stratus.entitlements >/dev/null
-plutil -lint Resources/FileProviderExtension.entitlements >/dev/null
+plutil -lint App/Resources/Info.plist >/dev/null
+plutil -lint App/Resources/Stratus.entitlements >/dev/null
+plutil -lint App/Resources/FileProviderExtension.entitlements >/dev/null
 
 echo "Bootstrap checks passed."

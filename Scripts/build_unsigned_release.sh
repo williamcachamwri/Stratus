@@ -34,7 +34,7 @@ swift build -c release --product "${product_name}FileProviderExtension"
 executable_path="$(swift build -c release --show-bin-path)/$product_name"
 install -m 755 "$executable_path" "$macos_dir/$product_name"
 
-cp Resources/Info.plist "$contents_dir/Info.plist"
+cp App/Resources/Info.plist "$contents_dir/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$contents_dir/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $version" "$contents_dir/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $bundle_id" "$contents_dir/Info.plist"
@@ -63,7 +63,7 @@ if [ -d "$repo_root/shared" ]; then
   cp -R "$repo_root/shared" "$resources_dir/"
 fi
 
-find Resources -mindepth 1 -maxdepth 1 \
+find App/Resources -mindepth 1 -maxdepth 1 \
   ! -name Info.plist \
   ! -name Stratus.entitlements \
   ! -name FileProviderExtension.entitlements \
@@ -90,7 +90,7 @@ if command -v codesign >/dev/null 2>&1; then
     codesign --force --sign - "$appex_dir" 2>/dev/null || true
   fi
   codesign --force --sign - \
-    --entitlements Resources/Stratus.entitlements \
+    --entitlements App/Resources/Stratus.entitlements \
     "$app_dir"
 fi
 
