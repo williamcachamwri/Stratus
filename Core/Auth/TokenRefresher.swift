@@ -2,6 +2,7 @@ import Foundation
 import os.log
 
 // MARK: - TokenRefresher
+
 // Automatically refreshes OAuth tokens before they expire.
 // Checks expiry before every request; refreshes if < 60s remaining.
 
@@ -10,7 +11,7 @@ public actor TokenRefresher {
     private let vault = CredentialVault.shared
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "TokenRefresher")
 
-    // In-flight refresh tasks — deduplicate concurrent requests for same account
+    /// In-flight refresh tasks — deduplicate concurrent requests for same account
     private var refreshTasks: [String: Task<OAuthCredential, any Error>] = [:]
 
     private init() {}
@@ -30,7 +31,11 @@ public actor TokenRefresher {
 
     // MARK: - Refresh with deduplication
 
-    private func refresh(providerID: String, accountID: String, existing: OAuthCredential) async throws -> OAuthCredential {
+    private func refresh(
+        providerID: String,
+        accountID: String,
+        existing: OAuthCredential
+    ) async throws -> OAuthCredential {
         let key = "\(providerID):\(accountID)"
 
         // If a refresh is already in flight for this account, wait on it
@@ -40,9 +45,9 @@ public actor TokenRefresher {
 
         let task = Task<OAuthCredential, any Error> { [weak self] in
             guard let self else { throw TokenError.internalError }
-            let refreshed = try await self.performRefresh(providerID: providerID, accountID: accountID, existing: existing)
-            try await self.vault.saveOAuthCredential(refreshed, providerID: providerID, accountID: accountID)
-            await self.clearTask(key: key)
+            let refreshed = try await performRefresh(providerID: providerID, accountID: accountID, existing: existing)
+            try await vault.saveOAuthCredential(refreshed, providerID: providerID, accountID: accountID)
+            await clearTask(key: key)
             return refreshed
         }
 
@@ -50,7 +55,11 @@ public actor TokenRefresher {
         return try await task.value
     }
 
-    private func performRefresh(providerID: String, accountID: String, existing: OAuthCredential) async throws -> OAuthCredential {
+    private func performRefresh(
+        providerID: String,
+        accountID: String,
+        existing: OAuthCredential
+    ) async throws -> OAuthCredential {
         guard let refreshToken = existing.refreshToken else {
             throw TokenError.noRefreshToken(accountID)
         }
@@ -95,7 +104,8 @@ public actor TokenRefresher {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let accessToken = json["access_token"] as? String else {
+              let accessToken = json["access_token"] as? String
+        else {
             logger.error("Token refresh failed for \(providerID)/\(accountID)")
             throw TokenError.refreshFailed
         }
@@ -103,9 +113,12 @@ public actor TokenRefresher {
         let expiresIn = json["expires_in"] as? TimeInterval ?? 3600
         let newRefreshToken = (json["refresh_token"] as? String) ?? refreshToken
         logger.debug("Refreshed token for \(providerID)/\(accountID)")
-        return OAuthCredential(accessToken: accessToken, refreshToken: newRefreshToken,
-                                expiresAt: Date().addingTimeInterval(expiresIn),
-                                scope: existing.scope)
+        return OAuthCredential(
+            accessToken: accessToken,
+            refreshToken: newRefreshToken,
+            expiresAt: Date().addingTimeInterval(expiresIn),
+            scope: existing.scope
+        )
     }
 
     private func clearTask(key: String) {
