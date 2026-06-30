@@ -1,13 +1,13 @@
-import XCTest
 import CryptoKit
+import XCTest
 @testable import StratusCore
 
 // MARK: - Integration Mock Provider
+
 // Simulates a real cloud provider: stores chunks in memory, assembles on complete,
 // computes SHA-256 of received bytes for checksum verification.
 
 private actor IntegrationMockProvider: CloudProvider {
-
     // MARK: - Protocol identity
 
     nonisolated let id = "integration-mock"
@@ -20,15 +20,15 @@ private actor IntegrationMockProvider: CloudProvider {
         maxChunkSize: 64 * 1024 * 1024,
         minChunkSize: 1 * 1024,
         maxConcurrentUploads: 16,
-        multipartThresholdBytes: 2 * 1024 * 1024  // 2 MB: keeps tests fast
+        multipartThresholdBytes: 2 * 1024 * 1024 // 2 MB: keeps tests fast
     )
     nonisolated let supportsBlockManifest = false
 
     // MARK: - Storage
 
-    private var chunkStorage: [String: [Int: Data]] = [:]   // uploadID → partNum(1-based) → data
-    private var uploadPaths: [String: String] = [:]          // uploadID → remote path
-    private var assembledChecksums: [String: String] = [:]   // remote path → SHA-256 hex
+    private var chunkStorage: [String: [Int: Data]] = [:] // uploadID → partNum(1-based) → data
+    private var uploadPaths: [String: String] = [:] // uploadID → remote path
+    private var assembledChecksums: [String: String] = [:] // remote path → SHA-256 hex
     private(set) var chunksReceived: [String: Set<Int>] = [:] // uploadID → chunk numbers available
     private var uploadCallsBySession: [String: [Int]] = [:]
     private(set) var multipartSessionsStarted = 0
@@ -39,18 +39,29 @@ private actor IntegrationMockProvider: CloudProvider {
 
     func authenticate(account: CloudAccount) async throws {}
     func refreshCredentials(account: CloudAccount) async throws {}
-    func validateCredentials(account: CloudAccount) async throws -> Bool { true }
+    func validateCredentials(account: CloudAccount) async throws -> Bool {
+        true
+    }
+
     func revokeCredentials(account: CloudAccount) async throws {}
 
     // MARK: - Quota
 
     func quota(for account: CloudAccount) async throws -> StorageQuota {
-        StorageQuota(totalBytes: Int64(1024) * 1024 * 1024 * 1024, usedBytes: 0, availableBytes: Int64(1024) * 1024 * 1024 * 1024)
+        StorageQuota(
+            totalBytes: Int64(1024) * 1024 * 1024 * 1024,
+            usedBytes: 0,
+            availableBytes: Int64(1024) * 1024 * 1024 * 1024
+        )
     }
 
     // MARK: - Listing
 
-    func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
+    func listDirectory(
+        path: CloudPath,
+        account: CloudAccount,
+        pageToken: String?
+    ) async throws -> PagedResult<[CloudFileItem]> {
         PagedResult(items: [])
     }
 
@@ -60,7 +71,11 @@ private actor IntegrationMockProvider: CloudProvider {
 
     // MARK: - Multipart upload
 
-    func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String {
+    func initiateMultipartUpload(
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> String {
         let uploadID = UUID().uuidString
         chunkStorage[uploadID] = [:]
         uploadPaths[uploadID] = remotePath.path
@@ -79,7 +94,12 @@ private actor IntegrationMockProvider: CloudProvider {
         uploadCallsBySession[uploadID] ?? []
     }
 
-    func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
+    func uploadChunk(
+        uploadID: String,
+        chunkNumber: Int,
+        data: Data,
+        account: CloudAccount
+    ) async throws -> ChunkUploadResult {
         chunkStorage[uploadID, default: [:]][chunkNumber] = data
         chunksReceived[uploadID, default: []].insert(chunkNumber)
         uploadCallsBySession[uploadID, default: []].append(chunkNumber)
@@ -87,7 +107,11 @@ private actor IntegrationMockProvider: CloudProvider {
         return ChunkUploadResult(etag: "etag-\(chunkNumber)", checksum: checksum, serverConfirmedChecksum: true)
     }
 
-    func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
+    func completeMultipartUpload(
+        uploadID: String,
+        parts: [CompletedPart],
+        account: CloudAccount
+    ) async throws -> CloudFileItem {
         let sorted = parts.sorted { $0.partNumber < $1.partNumber }
         var assembled = Data()
         for part in sorted {
@@ -113,7 +137,12 @@ private actor IntegrationMockProvider: CloudProvider {
 
     // MARK: - Small file upload
 
-    func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
+    func uploadSmallFile(
+        data: Data,
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> CloudFileItem {
         let digest = SHA256.hash(data: data)
         let sha256 = digest.map { String(format: "%02x", $0) }.joined()
         assembledChecksums[remotePath.path] = sha256
@@ -165,24 +194,34 @@ private actor IntegrationMockProvider: CloudProvider {
 
     // MARK: - Delta sync
 
-    func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? { nil }
+    func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
+        nil
+    }
+
     func storeBlockManifest(_ manifest: BlockMap, path: CloudPath, account: CloudAccount) async throws {}
 
     // MARK: - Trash
 
     func trash(path: CloudPath, account: CloudAccount) async throws {}
-    func listTrash(account: CloudAccount) async throws -> [CloudFileItem] { [] }
+    func listTrash(account: CloudAccount) async throws -> [CloudFileItem] {
+        []
+    }
+
     func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {}
     func emptyTrash(account: CloudAccount) async throws {}
 
     // MARK: - Versions / Sharing / Streaming
 
-    func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] { [] }
+    func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] {
+        []
+    }
+
     func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
 
     func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink {
         throw ProviderError.unsupportedOperation("createShareLink")
     }
+
     func revokeShareLink(link: ShareLink, account: CloudAccount) async throws {}
 
     func streamingURL(path: CloudPath, account: CloudAccount) async throws -> URL {
@@ -193,7 +232,6 @@ private actor IntegrationMockProvider: CloudProvider {
 // MARK: - Upload Pipeline Integration Tests
 
 final class UploadPipelineIntegrationTests: XCTestCase {
-
     private var tempDir: URL!
     private var provider: IntegrationMockProvider!
     private var account: CloudAccount!
@@ -225,11 +263,10 @@ final class UploadPipelineIntegrationTests: XCTestCase {
     ) async throws -> UploadTask {
         let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
         let fileSize = (attrs[.size] as? Int64) ?? 0
-        let checksum: String
-        if let override = checksumOverride {
-            checksum = override
+        let checksum: String = if let override = checksumOverride {
+            override
         } else {
-            checksum = try await ChecksumEngine.shared.sha256Stream(url: fileURL)
+            try await ChecksumEngine.shared.sha256Stream(url: fileURL)
         }
         return UploadTask(
             sourceURL: fileURL,
@@ -243,14 +280,14 @@ final class UploadPipelineIntegrationTests: XCTestCase {
 
     private func makeFileURL(size: Int, name: String = "test.bin") throws -> URL {
         let url = tempDir.appendingPathComponent(name)
-        let data = Data((0..<size).map { UInt8($0 % 256) })
+        let data = Data((0 ..< size).map { UInt8($0 % 256) })
         try data.write(to: url)
         return url
     }
 
     private func runUpload(task: UploadTask) async throws -> UploadResult {
         let (stream, cont) = AsyncStream<ChunkProgress>.makeStream()
-        _ = stream  // consumed implicitly
+        _ = stream // consumed implicitly
         let result = try await chunkEngine.upload(
             task: task,
             provider: provider,
@@ -268,7 +305,7 @@ final class UploadPipelineIntegrationTests: XCTestCase {
     // MARK: - Test: Small file (<threshold) uses single-part path
 
     func test_smallFile_singlePartPath() async throws {
-        let url = try makeFileURL(size: 512 * 1024, name: "small.bin")  // 512 KB < 2 MB threshold
+        let url = try makeFileURL(size: 512 * 1024, name: "small.bin") // 512 KB < 2 MB threshold
         let task = try await makeTask(fileURL: url)
         let result = try await runUpload(task: task)
 
@@ -281,7 +318,7 @@ final class UploadPipelineIntegrationTests: XCTestCase {
     // MARK: - Test: Small file SHA-256 verified end-to-end
 
     func test_smallFile_sha256VerifiedEndToEnd() async throws {
-        let url = try makeFileURL(size: 1 * 1024 * 1024, name: "hash_test.bin")  // 1 MB
+        let url = try makeFileURL(size: 1 * 1024 * 1024, name: "hash_test.bin") // 1 MB
         let expectedHash = try await ChecksumEngine.shared.sha256Stream(url: url)
         let task = try await makeTask(fileURL: url, checksumOverride: expectedHash)
         let result = try await runUpload(task: task)
@@ -306,20 +343,22 @@ final class UploadPipelineIntegrationTests: XCTestCase {
     // MARK: - Test: Multipart SHA-256 verified end-to-end
 
     func test_multipartFile_sha256VerifiedEndToEnd() async throws {
-        let size = 10 * 1024 * 1024  // 10 MB
+        let size = 10 * 1024 * 1024 // 10 MB
         let url = try makeFileURL(size: size, name: "multi_hash.bin")
         let expectedHash = try await ChecksumEngine.shared.sha256Stream(url: url)
         let task = try await makeTask(fileURL: url, checksumOverride: expectedHash)
         let result = try await runUpload(task: task)
 
-        XCTAssertTrue(result.checksumVerified,
-            "Server SHA-256 must match local — data integrity guarantee requires this")
+        XCTAssertTrue(
+            result.checksumVerified,
+            "Server SHA-256 must match local — data integrity guarantee requires this"
+        )
     }
 
     // MARK: - Test: Assembled bytes match original data exactly
 
     func test_uploadedBytes_exactlyMatchOriginal() async throws {
-        let originalData = Data((0..<(5 * 1024 * 1024)).map { UInt8($0 & 0xFF) })  // 5 MB
+        let originalData = Data((0 ..< (5 * 1024 * 1024)).map { UInt8($0 & 0xFF) }) // 5 MB
         let url = tempDir.appendingPathComponent("integrity.bin")
         try originalData.write(to: url)
 
@@ -332,8 +371,11 @@ final class UploadPipelineIntegrationTests: XCTestCase {
         // Verify: local SHA-256 == assembled SHA-256 == expectedHash
         let remotePath = CloudPath("/uploads/test.bin")
         let remoteCS = try await provider.remoteChecksum(path: remotePath, account: account)
-        XCTAssertEqual(remoteCS?.value, expectedHash,
-            "Bytes assembled by mock must SHA-256 match original file")
+        XCTAssertEqual(
+            remoteCS?.value,
+            expectedHash,
+            "Bytes assembled by mock must SHA-256 match original file"
+        )
     }
 
     // MARK: - Test: All chunks are uploaded (none missed)
@@ -435,7 +477,7 @@ final class UploadPipelineIntegrationTests: XCTestCase {
             accountID: account.id,
             providerID: provider.id,
             fileSize: 0,
-            localChecksum: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"  // SHA-256("")
+            localChecksum: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // SHA-256("")
         )
         // Should not throw or crash
         let result = try await runUpload(task: task)
@@ -445,7 +487,7 @@ final class UploadPipelineIntegrationTests: XCTestCase {
     // MARK: - Test: Large file produces reasonable chunk count
 
     func test_largeFile_chunkCountWithinBounds() async throws {
-        let size = 20 * 1024 * 1024  // 20 MB
+        let size = 20 * 1024 * 1024 // 20 MB
         let url = try makeFileURL(size: size, name: "large.bin")
         let task = try await makeTask(fileURL: url)
         let result = try await runUpload(task: task)
@@ -460,7 +502,10 @@ final class UploadPipelineIntegrationTests: XCTestCase {
 
     func test_checksumMismatch_detectedByEngine() async throws {
         let url = try makeFileURL(size: 1 * 1024 * 1024, name: "mismatch.bin")
-        let task = try await makeTask(fileURL: url, checksumOverride: "wrongchecksum0000000000000000000000000000000000000000000000000000")
+        let task = try await makeTask(
+            fileURL: url,
+            checksumOverride: "wrongchecksum0000000000000000000000000000000000000000000000000000"
+        )
 
         do {
             _ = try await runUpload(task: task)
@@ -476,17 +521,17 @@ final class UploadPipelineIntegrationTests: XCTestCase {
 
     func test_concurrentUploads_noCrossContamination() async throws {
         var files: [(UploadTask, URL)] = []
-        for i in 0..<4 {
+        for i in 0 ..< 4 {
             let url = try makeFileURL(size: (i + 1) * 1024 * 1024, name: "concurrent_\(i).bin")
             let task = try await makeTask(fileURL: url, destination: "/uploads/concurrent_\(i).bin")
             files.append((task, url))
         }
 
-        let engine = chunkEngine!
-        let prov = provider!
-        let acc = account!
-        let bwm = bandwidthMonitor!
-        let cc = congestionController!
+        let engine = try XCTUnwrap(chunkEngine)
+        let prov = try XCTUnwrap(provider)
+        let acc = try XCTUnwrap(account)
+        let bwm = try XCTUnwrap(bandwidthMonitor)
+        let cc = try XCTUnwrap(congestionController)
         try await withThrowingTaskGroup(of: UploadResult.self) { group in
             for (task, _) in files {
                 group.addTask {
@@ -511,8 +556,10 @@ final class UploadPipelineIntegrationTests: XCTestCase {
             }
             XCTAssertEqual(results.count, 4, "All 4 concurrent uploads must complete")
             for result in results {
-                XCTAssertTrue(result.checksumVerified,
-                    "Each concurrent upload must verify checksum independently")
+                XCTAssertTrue(
+                    result.checksumVerified,
+                    "Each concurrent upload must verify checksum independently"
+                )
             }
         }
     }
@@ -525,8 +572,11 @@ final class UploadPipelineIntegrationTests: XCTestCase {
         let task = try await makeTask(fileURL: url)
         let result = try await runUpload(task: task)
 
-        XCTAssertEqual(result.bytesUploaded, Int64(size),
-            "bytesUploaded must exactly equal file size")
+        XCTAssertEqual(
+            result.bytesUploaded,
+            Int64(size),
+            "bytesUploaded must exactly equal file size"
+        )
     }
 
     // MARK: - Test: Upload session cleaned from ResumeStore on success
@@ -538,17 +588,19 @@ final class UploadPipelineIntegrationTests: XCTestCase {
 
         let pending = try await ResumeStore.shared.loadPendingSessions()
         let remaining = pending.filter { $0.id == task.id.uuidString }
-        XCTAssertTrue(remaining.isEmpty,
-            "Completed upload must be removed from ResumeStore pending list")
+        XCTAssertTrue(
+            remaining.isEmpty,
+            "Completed upload must be removed from ResumeStore pending list"
+        )
     }
 
     // MARK: - Test: Delta sync — small change in large file reduces bytes
 
     func test_deltaSync_reducesTransferForSmallChange() async throws {
         // Create a "file" with known content
-        let blockSize = 256 * 1024  // 256 KB blocks
-        let blockCount = 20         // 5 MB total
-        let originalBlocks = (0..<blockCount).map { Data(repeating: UInt8($0), count: blockSize) }
+        let blockSize = 256 * 1024 // 256 KB blocks
+        let blockCount = 20 // 5 MB total
+        let originalBlocks = (0 ..< blockCount).map { Data(repeating: UInt8($0), count: blockSize) }
         let originalData = originalBlocks.reduce(Data(), +)
         let url = tempDir.appendingPathComponent("delta_test.bin")
         try originalData.write(to: url)
@@ -560,15 +612,18 @@ final class UploadPipelineIntegrationTests: XCTestCase {
 
         // Modify only 1 block
         var modifiedData = originalData
-        modifiedData.replaceSubrange(blockSize..<(blockSize * 2), with: Data(repeating: 0xFF, count: blockSize))
+        modifiedData.replaceSubrange(blockSize ..< (blockSize * 2), with: Data(repeating: 0xFF, count: blockSize))
         let modURL = tempDir.appendingPathComponent("delta_modified.bin")
         try modifiedData.write(to: modURL)
         let modifiedMap = try await engine.computeBlockMap(url: modURL)
 
         // Diff should show exactly 1 changed block
         let diff = await engine.diffBlockMaps(local: modifiedMap, remote: blockMap)
-        XCTAssertEqual(diff.changedBlocks.count, 1,
-            "Only 1 changed block should be detected; delta efficiency requires this")
+        XCTAssertEqual(
+            diff.changedBlocks.count,
+            1,
+            "Only 1 changed block should be detected; delta efficiency requires this"
+        )
         XCTAssertLessThan(
             Double(diff.changedBlocks.count) / Double(blockCount),
             0.1,
@@ -633,7 +688,9 @@ final class UploadPipelineIntegrationTests: XCTestCase {
         try await ResumeStore.shared.deleteSession(task.id.uuidString)
 
         var updates: [ChunkProgress] = []
-        for await p in stream { updates.append(p) }
+        for await p in stream {
+            updates.append(p)
+        }
 
         XCTAssertFalse(updates.isEmpty, "Multipart upload must emit at least one progress event")
         XCTAssertEqual(result.chunkCount, 3, "20 MB at 8 MB chunk size = 3 chunks")
