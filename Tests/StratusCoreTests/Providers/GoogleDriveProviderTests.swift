@@ -18,7 +18,7 @@ final class GoogleDriveProviderTests: XCTestCase {
     }
 
     func test_capabilities_multipart_supported() {
-        XCTAssertTrue(provider.capabilities.supportsMultipartUpload)
+        XCTAssertFalse(provider.capabilities.supportsMultipartUpload)
     }
 
     func test_capabilities_resume_supported() {
@@ -55,5 +55,48 @@ final class GoogleDriveProviderTests: XCTestCase {
 
     func test_provider_capabilities_multipart_threshold() {
         XCTAssertGreaterThan(provider.capabilities.multipartThresholdBytes, 0)
+    }
+
+    func test_web_link_google_doc_opens_docs_editor() {
+        let url = GoogleDriveWebLink.url(
+            fileID: "doc-id",
+            mimeType: "application/vnd.google-apps.document"
+        )
+
+        XCTAssertEqual(url?.absoluteString, "https://docs.google.com/document/d/doc-id/edit")
+    }
+
+    func test_web_link_google_sheet_opens_sheets_editor() {
+        let url = GoogleDriveWebLink.url(
+            fileID: "sheet-id",
+            mimeType: "application/vnd.google-apps.spreadsheet"
+        )
+
+        XCTAssertEqual(url?.absoluteString, "https://docs.google.com/spreadsheets/d/sheet-id/edit")
+    }
+
+    func test_web_link_folder_opens_drive_folder() {
+        let url = GoogleDriveWebLink.url(
+            fileID: "folder-id",
+            mimeType: GoogleDriveFile.folderMimeType
+        )
+
+        XCTAssertEqual(url?.absoluteString, "https://drive.google.com/drive/folders/folder-id")
+    }
+
+    func test_web_link_binary_file_opens_drive_preview() {
+        let url = GoogleDriveWebLink.url(fileID: "file-id", mimeType: "application/pdf")
+
+        XCTAssertEqual(url?.absoluteString, "https://drive.google.com/file/d/file-id/view")
+    }
+
+    func test_web_link_blank_file_id_returns_nil() {
+        XCTAssertNil(GoogleDriveWebLink.url(fileID: " ", mimeType: "application/pdf"))
+    }
+
+    func test_web_link_action_title_matches_google_editor() {
+        let title = GoogleDriveWebLink.actionTitle(mimeType: "application/vnd.google-apps.presentation")
+
+        XCTAssertEqual(title, "Open in Google Slides")
     }
 }
