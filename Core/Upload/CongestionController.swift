@@ -10,13 +10,14 @@ public enum CongestionMode: Sendable {
 }
 
 // MARK: - CongestionController
+
 // TCP-inspired AIMD: Additive Increase / Multiplicative Decrease
 // Finds optimal upload parallelism automatically without overwhelming server.
 
 public actor CongestionController {
     private var windowSize: Double = 4.0
     private var ssthresh: Double = 32.0
-    private(set) public var mode: CongestionMode = .slowStart
+    public private(set) var mode: CongestionMode = .slowStart
 
     private let minWindow: Double = 1.0
     private let maxWindow: Double
@@ -26,12 +27,12 @@ public actor CongestionController {
     private let highRTTThreshold: TimeInterval = 0.25
 
     public init(maxConcurrentStreams: Int = 32) {
-        self.maxWindow = Double(maxConcurrentStreams)
+        maxWindow = Double(maxConcurrentStreams)
     }
 
     // MARK: - Event Handlers
 
-    // Called after every successful chunk upload
+    /// Called after every successful chunk upload
     public func onChunkSuccess(rtt: TimeInterval) {
         rttSamples.append(rtt)
         if rttSamples.count > 10 { rttSamples.removeFirst() }
@@ -61,7 +62,7 @@ public actor CongestionController {
         windowSize = clamp(windowSize)
     }
 
-    // Called on upload timeout
+    /// Called on upload timeout
     public func onChunkTimeout() {
         ssthresh = max(windowSize / 2.0, minWindow)
         windowSize = minWindow
@@ -69,7 +70,7 @@ public actor CongestionController {
         logger.debug("Congestion: timeout — ssthresh=\(self.ssthresh), restarting slow start")
     }
 
-    // Called on 429 Too Many Requests
+    /// Called on 429 Too Many Requests
     public func onChunkRateLimited(retryAfter: TimeInterval) {
         ssthresh = max(windowSize / 2.0, minWindow)
         windowSize = max(minWindow, windowSize * 0.5)
@@ -77,7 +78,7 @@ public actor CongestionController {
         logger.debug("Congestion: rate limited — window=\(self.windowSize), retry after \(retryAfter)s")
     }
 
-    // Called on non-timeout errors (network errors, 5xx)
+    /// Called on non-timeout errors (network errors, 5xx)
     public func onChunkError() {
         ssthresh = max(windowSize / 2.0, minWindow)
         windowSize = max(minWindow, windowSize * 0.5)
@@ -96,8 +97,13 @@ public actor CongestionController {
         return rttSamples.reduce(0, +) / Double(rttSamples.count)
     }
 
-    public var windowSizeForTesting: Double { windowSize }
-    public var ssthreshForTesting: Double { ssthresh }
+    public var windowSizeForTesting: Double {
+        windowSize
+    }
+
+    public var ssthreshForTesting: Double {
+        ssthresh
+    }
 
     public func setWindowForTesting(_ value: Double) {
         windowSize = value
