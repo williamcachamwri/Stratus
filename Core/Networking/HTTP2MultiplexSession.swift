@@ -20,13 +20,13 @@ public actor HTTP2MultiplexSession {
     private let session: URLSession
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "HTTP2Multiplex")
 
-    // Track in-flight tasks for cancellation
+    /// Track in-flight tasks for cancellation
     private var activeTasks: [UUID: URLSessionTask] = [:]
 
     public init(configuration: URLSessionConfiguration? = nil) {
         let config = configuration ?? HTTP2MultiplexSession.makeHTTP2Configuration()
         // URLSession is internally thread-safe; we store it as a let constant.
-        self.session = URLSession(configuration: config)
+        session = URLSession(configuration: config)
     }
 
     // MARK: - Public API
@@ -95,7 +95,10 @@ public actor HTTP2MultiplexSession {
     private func perform(request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let id = UUID()
         return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(Data, HTTPURLResponse), any Error>) in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<
+                (Data, HTTPURLResponse),
+                any Error
+            >) in
                 let task = self.session.dataTask(with: request) { data, response, error in
                     if let error {
                         let mapped = Self.mapError(error)
