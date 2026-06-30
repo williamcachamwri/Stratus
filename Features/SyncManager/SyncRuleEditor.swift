@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct SyncRuleEditor: View {
     @Binding private var rules: [SyncRule]
@@ -8,7 +8,7 @@ public struct SyncRuleEditor: View {
     @State private var draftPattern = ""
 
     public init(rules: Binding<[SyncRule]>) {
-        self._rules = rules
+        _rules = rules
     }
 
     public var body: some View {
