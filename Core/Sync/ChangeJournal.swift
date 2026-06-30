@@ -55,6 +55,9 @@ public actor ChangeJournal {
     public func stopWatching(pairID: UUID) {
         monitors[pairID]?.stop()
         monitors.removeValue(forKey: pairID)
+        pendingEvents = pendingEvents.filter { $0.value.pairID != pairID }
+        continuations[pairID]?.finish()
+        continuations.removeValue(forKey: pairID)
     }
 
     public func events(for pairID: UUID) -> AsyncStream<ChangeEvent> {
