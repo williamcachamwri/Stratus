@@ -42,8 +42,11 @@ final class KeychainStoreTests: XCTestCase {
     }
 
     func test_delete_nonexistent_token_no_throw() async throws {
-        // Deleting a non-existent item must not throw
-        XCTAssertNoThrow(try await store.deleteToken(service: "com.stratus.ghost", account: "ghost"))
+        do {
+            try await store.deleteToken(service: "com.stratus.ghost", account: "ghost")
+        } catch {
+            XCTFail("Deleting a non-existent item must not throw: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Secret (Generic Password)
