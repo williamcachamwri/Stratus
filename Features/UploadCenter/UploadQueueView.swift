@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct UploadQueueView: View {
     public let rows: [UploadRowState]
@@ -44,14 +44,14 @@ public struct UploadQueueView: View {
 
     private func title(for phase: UploadDisplayPhase) -> String {
         switch phase {
-        case .queued: return "Queued"
-        case .hashing: return "Preparing"
-        case .uploading: return "In Progress"
-        case .paused: return "Paused"
-        case .failed: return "Failed"
-        case .completed: return "Completed"
-        case .cancelled: return "Cancelled"
-        case .skipped: return "Skipped"
+        case .queued: "Queued"
+        case .hashing: "Preparing"
+        case .uploading: "In Progress"
+        case .paused: "Paused"
+        case .failed: "Failed"
+        case .completed: "Completed"
+        case .cancelled: "Cancelled"
+        case .skipped: "Skipped"
         }
     }
 }
