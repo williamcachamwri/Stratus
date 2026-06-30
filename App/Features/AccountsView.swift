@@ -55,15 +55,31 @@ private struct AccountRowView: View {
         HStack(spacing: Spacing.md) {
             ProviderIcon(providerID: account.providerID, size: 36)
             VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text(account.displayName)
+                Text(primaryTitle)
                     .font(.stratusHeadline)
-                Text(account.email ?? ProviderDefinitionCatalog.shared.displayName(for: account.providerID))
-                    .stratusCaption()
+                    .lineLimit(1)
+                if let secondaryTitle {
+                    Text(secondaryTitle)
+                        .stratusCaption()
+                        .lineLimit(1)
+                }
             }
             Spacer()
             StatusBadge(status: .idle)
         }
         .padding(.vertical, Spacing.xs)
+    }
+
+    private var primaryTitle: String {
+        "\(account.email ?? account.displayName) - \(providerName)"
+    }
+
+    private var secondaryTitle: String? {
+        account.email == nil ? nil : account.displayName
+    }
+
+    private var providerName: String {
+        ProviderDefinitionCatalog.shared.displayName(for: account.providerID)
     }
 }
 
