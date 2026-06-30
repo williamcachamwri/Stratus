@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class DropboxProviderTests: XCTestCase {
-
     private let provider = DropboxProvider()
 
     func test_provider_id() {
@@ -35,7 +34,7 @@ final class DropboxProviderTests: XCTestCase {
     }
 
     func test_capabilities_sendable() {
-        func check<T: Sendable>(_: T) {}
+        func check(_: some Sendable) {}
         check(provider.capabilities)
     }
 
