@@ -1,6 +1,6 @@
-import Foundation
 import AuthenticationServices
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - Dropbox OAuth2 PKCE
@@ -13,7 +13,10 @@ public actor DropboxAuth {
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "DropboxAuth")
     private init() {}
 
-    public func authorize(appKey: String, context: ASWebAuthenticationPresentationContextProviding) async throws -> OAuthCredential {
+    public func authorize(
+        appKey: String,
+        context: ASWebAuthenticationPresentationContextProviding
+    ) async throws -> OAuthCredential {
         let (verifier, challenge) = generatePKCE()
         let state = UUID().uuidString
 
@@ -33,8 +36,14 @@ public actor DropboxAuth {
             throw AuthError.invalidTokenResponse
         }
 
-        let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, any Error>) in
-            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "com.stratus.cloudmanager") { url, error in
+        let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<
+            URL,
+            any Error
+        >) in
+            let session = ASWebAuthenticationSession(
+                url: authURL,
+                callbackURLScheme: "com.stratus.cloudmanager"
+            ) { url, error in
                 if let error { continuation.resume(throwing: error) }
                 else if let url { continuation.resume(returning: url) }
                 else { continuation.resume(throwing: AuthError.cancelled) }
@@ -45,7 +54,8 @@ public actor DropboxAuth {
         }
 
         guard let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
-            .queryItems?.first(where: { $0.name == "code" })?.value else {
+            .queryItems?.first(where: { $0.name == "code" })?.value
+        else {
             throw AuthError.noAuthorizationCode
         }
 
@@ -57,7 +67,8 @@ public actor DropboxAuth {
 
         let (data, _) = try await URLSession.shared.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let accessToken = json["access_token"] as? String else {
+              let accessToken = json["access_token"] as? String
+        else {
             throw AuthError.invalidTokenResponse
         }
         return OAuthCredential(
@@ -76,21 +87,31 @@ public actor DropboxAuth {
         request.httpBody = Data(body.utf8)
         let (data, _) = try await URLSession.shared.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let accessToken = json["access_token"] as? String else {
+              let accessToken = json["access_token"] as? String
+        else {
             throw AuthError.invalidTokenResponse
         }
-        return OAuthCredential(accessToken: accessToken, refreshToken: refreshToken,
-                                expiresAt: Date().addingTimeInterval((json["expires_in"] as? TimeInterval) ?? 14400))
+        return OAuthCredential(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: Date().addingTimeInterval((json["expires_in"] as? TimeInterval) ?? 14400)
+        )
     }
 
     private func generatePKCE() -> (verifier: String, challenge: String) {
         var bytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         let verifier = Data(bytes).base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(
+                of: "=",
+                with: ""
+            )
         let hash = SHA256.hash(data: Data(verifier.utf8))
         let challenge = Data(hash).base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(
+                of: "=",
+                with: ""
+            )
         return (verifier, challenge)
     }
 }
