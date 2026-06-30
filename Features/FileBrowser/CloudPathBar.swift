@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct CloudPathBar: View {
     public let path: CloudPath
@@ -54,5 +54,7 @@ private struct PathComponent: Identifiable, Equatable {
     let title: String
     let path: CloudPath
 
-    var id: String { path.path }
+    var id: String {
+        path.path
+    }
 }
