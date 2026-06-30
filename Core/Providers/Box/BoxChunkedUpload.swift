@@ -1,8 +1,9 @@
-import Foundation
 import CommonCrypto
+import Foundation
 import os.log
 
 // MARK: - BoxChunkedUpload
+
 // Implements the Box Chunked Upload API.
 // Flow:
 //   1. createSession  — POST /files/upload_sessions
@@ -10,7 +11,6 @@ import os.log
 //   3. commit         — POST /files/upload_sessions/{id}/commit
 
 public actor BoxChunkedUpload {
-
     private static let uploadBase = "https://upload.box.com/api/2.0"
 
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "BoxChunkedUpload")
@@ -51,7 +51,8 @@ public actor BoxChunkedUpload {
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
-              let sessionID = json["id"] as? String else {
+              let sessionID = json["id"] as? String
+        else {
             throw BoxChunkedUploadError.invalidResponse("Expected session id in createSession response")
         }
 
@@ -97,7 +98,8 @@ public actor BoxChunkedUpload {
 
         guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
               let part = json["part"] as? [String: Any],
-              let partID = part["part_id"] as? String else {
+              let partID = part["part_id"] as? String
+        else {
             throw BoxChunkedUploadError.invalidResponse("Expected part_id in uploadChunk response")
         }
 
