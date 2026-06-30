@@ -1,7 +1,7 @@
-import Foundation
 import AppKit
 import AuthenticationServices
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - OAuthTokens
@@ -51,25 +51,25 @@ extension OAuthError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .userCancelled:
-            return "Authorization was cancelled."
+            "Authorization was cancelled."
         case .noAuthorizationCode:
-            return "The provider did not return an authorization code."
+            "The provider did not return an authorization code."
         case .stateMismatch:
-            return "Security check failed: state parameter mismatch. Please try again."
+            "Security check failed: state parameter mismatch. Please try again."
         case .pkceVerifierMissing:
-            return "Internal error: PKCE verifier not found. Please try again."
+            "Internal error: PKCE verifier not found. Please try again."
         case .sessionDidNotStart:
-            return "Could not open the authorization window. Make sure the app has a visible window and try again."
-        case .tokenExchangeFailed(let code, let body):
-            return "Token exchange failed (HTTP \(code)): \(body.isEmpty ? "no details" : body)"
-        case .invalidTokenResponse(let detail):
-            return "Invalid token response: \(detail)"
-        case .refreshFailed(let code, let body):
-            return "Token refresh failed (HTTP \(code)): \(body.isEmpty ? "no details" : body)"
+            "Could not open the authorization window. Make sure the app has a visible window and try again."
+        case let .tokenExchangeFailed(code, body):
+            "Token exchange failed (HTTP \(code)): \(body.isEmpty ? "no details" : body)"
+        case let .invalidTokenResponse(detail):
+            "Invalid token response: \(detail)"
+        case let .refreshFailed(code, body):
+            "Token refresh failed (HTTP \(code)): \(body.isEmpty ? "no details" : body)"
         case .missingRefreshToken:
-            return "No refresh token available. Please re-authorize."
-        case .sessionCreationFailed(let underlying):
-            return "Could not start authorization: \(underlying.localizedDescription)"
+            "No refresh token available. Please re-authorize."
+        case let .sessionCreationFailed(underlying):
+            "Could not start authorization: \(underlying.localizedDescription)"
         }
     }
 }
@@ -89,10 +89,10 @@ public actor OAuthManager: NSObject {
     private let session = URLSession(configuration: .ephemeral)
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "OAuthManager")
 
-    // Pending PKCE verifiers keyed by state nonce
+    /// Pending PKCE verifiers keyed by state nonce
     private var pendingVerifiers: [String: String] = [:]
 
-    private override init() {}
+    override private init() {}
 
     // MARK: - Authenticate
 
@@ -376,9 +376,9 @@ public actor OAuthManager: NSObject {
 
 // MARK: - OAuthPresentationContext
 
-// Provides a window anchor for ASWebAuthenticationSession on macOS.
-// presentationContextProvider is weak — callers must retain this object
-// for the duration of the auth session (captured in the completion closure).
+/// Provides a window anchor for ASWebAuthenticationSession on macOS.
+/// presentationContextProvider is weak — callers must retain this object
+/// for the duration of the auth session (captured in the completion closure).
 private final class OAuthPresentationContext: NSObject,
     ASWebAuthenticationPresentationContextProviding,
     @unchecked Sendable
@@ -392,19 +392,20 @@ private final class OAuthPresentationContext: NSObject,
 
 // MARK: - ASWebAuth completion handler (file-scope, no actor isolation)
 
-// Must live at file scope so Swift 6 does NOT infer @MainActor on it.
-// ASWebAuthenticationSession invokes the completion on an internal XPC
-// thread; a @MainActor-isolated closure there triggers
-// dispatch_assert_queue_fail → EXC_BREAKPOINT.
+/// Must live at file scope so Swift 6 does NOT infer @MainActor on it.
+/// ASWebAuthenticationSession invokes the completion on an internal XPC
+/// thread; a @MainActor-isolated closure there triggers
+/// dispatch_assert_queue_fail → EXC_BREAKPOINT.
 private func makeASWebAuthHandler(
     continuation: CheckedContinuation<URL, any Error>,
     retaining contextProvider: OAuthPresentationContext
 ) -> (URL?, (any Error)?) -> Void {
     { callbackURL, error in
-        _ = contextProvider  // keep provider alive until callback fires
+        _ = contextProvider // keep provider alive until callback fires
         if let error {
             if let authError = error as? ASWebAuthenticationSessionError,
-               authError.code == .canceledLogin {
+               authError.code == .canceledLogin
+            {
                 continuation.resume(throwing: OAuthError.userCancelled)
             } else {
                 continuation.resume(throwing: OAuthError.sessionCreationFailed(error))
