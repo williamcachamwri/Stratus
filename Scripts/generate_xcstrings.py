@@ -27,11 +27,11 @@ strings = {
     "Sync": {"vi": "Đồng bộ", "comment": "Tab label / command menu"},
     "Mounts": {"vi": "Ổ đĩa", "comment": "Tab label for Finder mounts"},
     "Preferences": {"vi": "Cài đặt", "comment": "Tab label"},
-    "Add account…": {"vi": "Thêm tài khoản…", "comment": "Empty state label in sidebar"},
+    # Removed "Add account…" (symbol conflicts with "Add Account")
     "Finder": {"vi": "Finder", "comment": "Sidebar section"},
     "Open Mount Manager": {"vi": "Mở quản lý ổ đĩa", "comment": "Sidebar action row"},
     "Sync Pairs": {"vi": "Cặp đồng bộ", "comment": "Sidebar section"},
-    "No sync pairs": {"vi": "Không có cặp đồng bộ", "comment": "Empty state label"},
+    # Removed "No sync pairs" (symbol conflicts with "No Sync Pairs")
     "General": {"vi": "Chung", "comment": "Preferences tab"},
     "Bandwidth": {"vi": "Băng thông", "comment": "Preferences tab"},
     "Encryption": {"vi": "Mã hóa", "comment": "Preferences tab"},
@@ -199,7 +199,7 @@ strings = {
     "Update Master Password": {"vi": "Cập nhật mật khẩu chính", "comment": "Button"},
     "Set Master Password": {"vi": "Đặt mật khẩu chính", "comment": "Button"},
     "Upload completed": {"vi": "Tải lên hoàn tất", "comment": "Notification toggle"},
-    "Upload failed": {"vi": "Tải lên thất bại", "comment": "Notification toggle"},
+    # Removed "Upload failed" (symbol conflicts with "Upload Failed")
     "Sync conflict detected": {"vi": "Phát hiện xung đột đồng bộ", "comment": "Notification toggle"},
     "Master password saved.": {"vi": "Đã lưu mật khẩu chính.", "comment": "Success feedback"},
 
@@ -239,14 +239,14 @@ strings = {
     "Mounted": {"vi": "Đã gắn", "comment": "Status value"},
     "Syncing": {"vi": "Đang đồng bộ", "comment": "Status value"},
     "All accounts are mounted": {"vi": "Tất cả tài khoản đã được gắn", "comment": "Empty state menu text"},
-    "Provider:": {"vi": "Nhà cung cấp:", "comment": "Label prefix"},
+    # Removed "Provider:" (symbol conflicts with "Provider")
     "Quota:": {"vi": "Hạn ngạch:", "comment": "Label prefix"},
     "Cache:": {"vi": "Bộ nhớ đệm:", "comment": "Label prefix"},
     "Unlimited": {"vi": "Không giới hạn", "comment": "Unlimited quota/bandwidth"},
 
     # === Sync Rule Editor ===
     "Sync Rules": {"vi": "Quy tắc đồng bộ", "comment": "Header text"},
-    "Type": {"vi": "Loại", "comment": "Picker label"},
+    # Removed "Type" (reserved keyword in Swift)
     "Include": {"vi": "Bao gồm", "comment": "Picker option"},
     "Exclude": {"vi": "Loại trừ", "comment": "Picker option"},
     "Scope": {"vi": "Phạm vi", "comment": "Picker label"},
@@ -281,9 +281,9 @@ strings = {
     "Drop to upload": {"vi": "Thả để tải lên", "comment": "Drag overlay label"},
     "Copied Google Drive link": {"vi": "Đã sao chép liên kết Google Drive", "comment": "Feedback toast"},
     "Queued for upload": {"vi": "Đã xếp hàng để tải lên", "comment": "Feedback prefix"},
-    "Upload failed:": {"vi": "Tải lên thất bại:", "comment": "Error prefix"},
+    # Removed "Upload failed:" (symbol conflicts with "Upload Failed")
     "Unsupported drop item type": {"vi": "Loại mục thả không được hỗ trợ", "comment": "Error feedback"},
-    "Error:": {"vi": "Lỗi:", "comment": "Error prefix"},
+    # Removed "Error:" (symbol conflicts with "Error")
 
     # === Notifications ===
     "Upload Complete": {"vi": "Tải lên hoàn tất", "comment": "Notification title"},
@@ -324,8 +324,6 @@ strings = {
 
     # === Capabilities ===
     "parallel chunks": {"vi": "chunk song song", "comment": "Capability text"},
-    "resume": {"vi": "tiếp tục", "comment": "Capability text"},
-    "transfer acceleration": {"vi": "tăng tốc truyền tải", "comment": "Capability text"},
 
     # === Detail / Status Text ===
     "live transfer": {"vi": "truyền trực tiếp", "comment": "Live transfer detail"},
@@ -350,8 +348,6 @@ strings = {
     "No provider is registered for": {"vi": "Không có nhà cung cấp nào được đăng ký cho", "comment": "Provider error prefix"},
     "Check account configuration.": {"vi": "Kiểm tra cấu hình tài khoản.", "comment": "Provider error suffix"},
     "active": {"vi": "đang hoạt động", "comment": "Status text"},
-    "queued": {"vi": "đang chờ", "comment": "Status text"},
-    "failed": {"vi": "thất bại", "comment": "Status text"},
     "files remaining": {"vi": "tập tin còn lại", "comment": "Status bar text"},
     "Pattern, e.g. *.tmp": {"vi": "Mẫu, ví dụ *.tmp", "comment": "TextField placeholder"},
 
@@ -418,6 +414,7 @@ strings = {
     },
 }
 
+# (All duplicate-symbol conflicts resolved by removing conflicting keys)
 # Build the xcstrings JSON structure
 result = {
     "sourceLanguage": "en",

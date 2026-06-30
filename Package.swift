@@ -24,6 +24,12 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: ".",
+            exclude: [
+                ".build",
+                "Resources/Info.plist",
+                "Resources/Stratus.entitlements",
+                "Resources/FileProviderExtension.entitlements",
+            ],
             sources: [
                 "App",
                 "DesignSystem",
