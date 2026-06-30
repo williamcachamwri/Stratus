@@ -23,11 +23,11 @@ struct FileBrowserView: View {
                 HStack(spacing: Spacing.sm) {
                     ProviderIcon(providerID: account.providerID, size: 20)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(account.email ?? account.displayName)
+                        Text(accountTitle(for: account))
                             .font(.stratusBody)
                             .lineLimit(1)
-                        if account.email != nil {
-                            Text(account.displayName)
+                        if let subtitle = accountSubtitle(for: account) {
+                            Text(subtitle)
                                 .font(.caption)
                                 .foregroundColor(.textSecondary)
                                 .lineLimit(1)
@@ -116,6 +116,15 @@ struct FileBrowserView: View {
         pathHistory.append(currentPath)
         currentPath = path
         loadItems()
+    }
+
+    private func accountTitle(for account: CloudAccount) -> String {
+        let providerName = ProviderDefinitionCatalog.shared.displayName(for: account.providerID)
+        return "\(account.email ?? account.displayName) - \(providerName)"
+    }
+
+    private func accountSubtitle(for account: CloudAccount) -> String? {
+        account.email == nil ? nil : account.displayName
     }
 
     private func activate(_ item: CloudFileItem) {
