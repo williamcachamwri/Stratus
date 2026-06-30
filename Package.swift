@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Stratus",
+    defaultLocalization: "en",
     platforms: [.macOS(.v15)],
     products: [
         .executable(name: "Stratus", targets: ["Stratus"]),
@@ -29,7 +30,7 @@ let package = Package(
                 "Features",
             ],
             resources: [
-                .copy("Resources"),
+                .process("Resources"),
                 .copy("shared"),
             ],
             swiftSettings: [
