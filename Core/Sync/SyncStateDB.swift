@@ -17,7 +17,7 @@ public struct SyncFileRecord: Codable, FetchableRecord, PersistableRecord, Senda
     var localChecksum: String?
     var remoteChecksum: String?
     var syncedAt: Date
-    var syncDirection: String  // "upload" | "download"
+    var syncDirection: String // "upload" | "download"
 }
 
 // MARK: - SyncStateDB
@@ -49,16 +49,25 @@ public actor SyncStateDB {
                 t.column("syncedAt", .datetime).notNull()
                 t.column("syncDirection", .text).notNull()
             }
-            try db.create(index: "sync_file_state_pair", on: "sync_file_state",
-                          columns: ["pairID"], ifNotExists: true)
+            try db.create(
+                index: "sync_file_state_pair",
+                on: "sync_file_state",
+                columns: ["pairID"],
+                ifNotExists: true
+            )
         }
     }
 
     // MARK: - Public API
 
-    public func recordSync(pairID: UUID, localURL: URL, remotePath: CloudPath,
-                            localItem: CloudFileItem, remoteItem: CloudFileItem,
-                            direction: String) async throws {
+    public func recordSync(
+        pairID: UUID,
+        localURL: URL,
+        remotePath: CloudPath,
+        localItem: CloudFileItem,
+        remoteItem: CloudFileItem,
+        direction: String
+    ) async throws {
         let record = SyncFileRecord(
             pairID: pairID.uuidString,
             remotePath: remotePath.path,
@@ -95,24 +104,33 @@ public actor SyncStateDB {
 
     public func deleteRecord(pairID: UUID, remotePath: CloudPath) async throws {
         try await pool.write { db in
-            try db.execute(sql: "DELETE FROM sync_file_state WHERE pairID = ? AND remotePath = ?",
-                           arguments: [pairID.uuidString, remotePath.path])
+            try db.execute(
+                sql: "DELETE FROM sync_file_state WHERE pairID = ? AND remotePath = ?",
+                arguments: [pairID.uuidString, remotePath.path]
+            )
         }
     }
 
     public func deleteAllRecords(pairID: UUID) async throws {
         try await pool.write { db in
-            try db.execute(sql: "DELETE FROM sync_file_state WHERE pairID = ?",
-                           arguments: [pairID.uuidString])
+            try db.execute(
+                sql: "DELETE FROM sync_file_state WHERE pairID = ?",
+                arguments: [pairID.uuidString]
+            )
         }
     }
 
     // MARK: - Conflict Detection
 
-    public func isConflict(pairID: UUID, localURL: URL, remotePath: CloudPath,
-                            localModDate: Date, remoteModDate: Date) async throws -> Bool {
+    public func isConflict(
+        pairID: UUID,
+        localURL: URL,
+        remotePath: CloudPath,
+        localModDate: Date,
+        remoteModDate: Date
+    ) async throws -> Bool {
         guard let record = try await lastSyncRecord(pairID: pairID, remotePath: remotePath) else {
-            return false  // No prior sync state = not a conflict
+            return false // No prior sync state = not a conflict
         }
         let localChanged = abs(localModDate.timeIntervalSince(record.localModifiedAt)) > 1
         let remoteChanged = abs(remoteModDate.timeIntervalSince(record.remoteModifiedAt)) > 1
