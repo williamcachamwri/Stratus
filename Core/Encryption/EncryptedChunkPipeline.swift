@@ -33,7 +33,6 @@ public struct ProcessedChunk: Sendable {
 /// drive multiple invocations with a `TaskGroup` when it wants encryption of
 /// chunk N to overlap with upload of chunk N-1.
 public actor EncryptedChunkPipeline {
-
     // MARK: - Dependencies
 
     private let encryption: ClientSideEncryption
