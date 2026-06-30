@@ -14,7 +14,7 @@
 --importgrouping testable-last
 --header strip
 --enable isEmpty
---enable redundantSelf
+--disable redundantSelf
 --disable trailingCommas
 --disable unusedArguments
 --exclude .build,.swiftpm
