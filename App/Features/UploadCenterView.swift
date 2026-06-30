@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 struct UploadCenterView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -113,8 +113,10 @@ private struct UploadSummaryCard: View {
                     .frame(width: 44, alignment: .trailing)
             }
 
-            Text("\(formatBytes(summary.bytesTransferred)) of \(formatBytes(summary.totalBytes)) · \(summary.failedCount) failed · \(summary.pausedCount) paused · \(summary.completedCount) completed")
-                .stratusCaption()
+            Text(
+                "\(formatBytes(summary.bytesTransferred)) of \(formatBytes(summary.totalBytes)) · \(summary.failedCount) failed · \(summary.pausedCount) paused · \(summary.completedCount) completed"
+            )
+            .stratusCaption()
         }
         .accessibilityElement(children: .combine)
     }
@@ -232,23 +234,23 @@ private struct UploadItemRowView: View {
 
     private var phaseLabel: String {
         switch row.phase {
-        case .queued: return "Queued"
-        case .hashing: return "Preparing"
-        case .uploading: return "\(Int(row.progress * 100))%"
-        case .paused: return "Paused"
-        case .failed: return "Failed"
-        case .completed: return row.checksumVerified ? "Verified" : "Done"
-        case .cancelled: return "Cancelled"
-        case .skipped: return "Skipped"
+        case .queued: "Queued"
+        case .hashing: "Preparing"
+        case .uploading: "\(Int(row.progress * 100))%"
+        case .paused: "Paused"
+        case .failed: "Failed"
+        case .completed: row.checksumVerified ? "Verified" : "Done"
+        case .cancelled: "Cancelled"
+        case .skipped: "Skipped"
         }
     }
 
     private var statusBadge: StatusBadge.Status {
         switch row.phase {
-        case .hashing, .uploading: return .active
-        case .paused: return .paused
-        case .failed: return .failed
-        default: return .idle
+        case .hashing, .uploading: .active
+        case .paused: .paused
+        case .failed: .failed
+        default: .idle
         }
     }
 
@@ -285,11 +287,13 @@ private struct DropZoneEmptyState: View {
             VStack(spacing: Spacing.xs) {
                 Text("No upload activity")
                     .font(.stratusHeadline)
-                Text("Start an upload from the file browser. Every file will show bytes, speed, chunk progress, checksum status, and retry state here.")
-                    .font(.stratusBody)
-                    .foregroundColor(.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 520)
+                Text(
+                    "Start an upload from the file browser. Every file will show bytes, speed, chunk progress, checksum status, and retry state here."
+                )
+                .font(.stratusBody)
+                .foregroundColor(.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 520)
             }
         }
         .padding(Spacing.xxxl)
