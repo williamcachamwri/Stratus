@@ -39,7 +39,7 @@ final class AboutPanelController {
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
 
-        self.window = panel
+        window = panel
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
     }
@@ -86,7 +86,7 @@ private struct AboutStratusView: View {
                     }
                 }
                 Button("Close", action: closeAction)
-                .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(.defaultAction)
             }
         }
         .padding(24)
