@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class SFTPProviderTests: XCTestCase {
-
     private let provider = SFTPProvider()
 
     func test_provider_id() {
@@ -27,11 +26,11 @@ final class SFTPProviderTests: XCTestCase {
     }
 
     func test_capabilities_sendable() {
-        func check<T: Sendable>(_: T) {}
+        func check(_: some Sendable) {}
         check(provider.capabilities)
     }
 
-    func test_validate_credentials_throws_without_account() async throws {
+    func test_validate_credentials_throws_without_account() async {
         let account = CloudAccount(id: "sftp-no-host", providerID: "sftp", displayName: "Test SFTP", email: nil)
         // Without real credentials this must throw, not hang or crash
         let valid = try? await provider.validateCredentials(account: account)
