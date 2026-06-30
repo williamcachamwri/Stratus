@@ -1,6 +1,6 @@
 import Foundation
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 @MainActor
 public final class AccountsViewModel: ObservableObject {
