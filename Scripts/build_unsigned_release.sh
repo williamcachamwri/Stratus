@@ -53,8 +53,8 @@ echo -n "XPC!????" > "$appex_dir/Contents/PkgInfo"
 
 # Copy SPM resource bundle
 build_products="$(swift build -c release --show-bin-path)"
-if [ -d "$build_products/../$product_name""_$product_name.bundle" ]; then
-  cp -R "$build_products/../$product_name""_$product_name.bundle" "$resources_dir/"
+if [ -d "$build_products/$product_name""_$product_name.bundle" ]; then
+  cp -R "$build_products/$product_name""_$product_name.bundle" "$resources_dir/"
 fi
 
 # Copy SPM resource files

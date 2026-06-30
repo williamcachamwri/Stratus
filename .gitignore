@@ -58,6 +58,9 @@ coverage/
 # Archives
 *.xcarchive/
 
+# Build output
+dist/
+
 # Temporary
 *.tmp
 *.temp
