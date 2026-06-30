@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct MenuBarQuickActions: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -52,8 +52,10 @@ public struct MenuBarTransferSummary: View {
                     .font(.stratusSmallMono)
             }
             ProgressView(value: summary.progress)
-            Text("\(summary.queuedCount) queued · \(summary.failedCount) failed · ETA \(formatMenuETA(summary.etaSeconds))")
-                .stratusCaption()
+            Text(
+                "\(summary.queuedCount) queued · \(summary.failedCount) failed · ETA \(formatMenuETA(summary.etaSeconds))"
+            )
+            .stratusCaption()
         }
         .padding(Spacing.md)
     }
