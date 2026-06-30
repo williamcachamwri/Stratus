@@ -8,19 +8,19 @@ import os.log
 /// One row ↔ one DownloadTask. Fields that change frequently (completedSegments,
 /// state) are updated in-place with ON CONFLICT … DO UPDATE.
 public struct DownloadSession: Sendable, Codable {
-    public let id: String               // UUID string; matches DownloadTask.id
+    public let id: String // UUID string; matches DownloadTask.id
     public let providerID: String
     public let accountID: String
     public let remotePath: String
-    public let destinationPath: String  // local URL.path for the finished file
-    public let stagingPath: String      // local URL.path for the staging file
-    public let expectedSize: Int64      // 0 when unknown
-    public var completedSegmentIndices: [Int]   // sorted list of finished segment indices
-    public var highWaterOffset: Int64           // highest byte offset confirmed written
-    public var state: String                    // "queued" | "downloading" | "paused" | "completed" | "failed" | "cancelled"
+    public let destinationPath: String // local URL.path for the finished file
+    public let stagingPath: String // local URL.path for the staging file
+    public let expectedSize: Int64 // 0 when unknown
+    public var completedSegmentIndices: [Int] // sorted list of finished segment indices
+    public var highWaterOffset: Int64 // highest byte offset confirmed written
+    public var state: String // "queued" | "downloading" | "paused" | "completed" | "failed" | "cancelled"
     public var retryCount: Int
     public var errorDescription: String?
-    public var priority: Int            // DownloadPriority.rawValue
+    public var priority: Int // DownloadPriority.rawValue
     public let createdAt: Date
     public var updatedAt: Date
 
@@ -85,7 +85,6 @@ public enum DownloadResumeStoreError: Error, Sendable {
 /// concurrency. The actor isolation ensures that concurrent calls to e.g.
 /// `markSegmentComplete` and `updateState` are serialised safely.
 public actor DownloadResumeStore {
-
     // MARK: Shared instance
 
     public static let shared = DownloadResumeStore()
@@ -153,7 +152,8 @@ public actor DownloadResumeStore {
         let now = Date().timeIntervalSince1970
 
         try await db.write { database in
-            try database.execute(sql: """
+            try database.execute(
+                sql: """
                 INSERT INTO download_sessions
                   (id, provider_id, account_id, remote_path, destination_path, staging_path,
                    expected_size, completed_segment_indices, high_water_offset, state,
@@ -187,7 +187,10 @@ public actor DownloadResumeStore {
                 ]
             )
         }
-        logger.debug("Upserted session \(session.id) state=\(session.state) segments=\(session.completedSegmentIndices.count)")
+        logger
+            .debug(
+                "Upserted session \(session.id) state=\(session.state) segments=\(session.completedSegmentIndices.count)"
+            )
     }
 
     /// Atomically mark a single segment as complete and advance the high-water offset.
@@ -224,7 +227,8 @@ public actor DownloadResumeStore {
                 throw DownloadResumeStoreError.encodingFailed(error.localizedDescription)
             }
 
-            try database.execute(sql: """
+            try database.execute(
+                sql: """
                 UPDATE download_sessions
                 SET completed_segment_indices = ?,
                     high_water_offset         = ?,
@@ -243,7 +247,8 @@ public actor DownloadResumeStore {
         errorDescription: String? = nil
     ) async throws {
         try await db.write { database in
-            try database.execute(sql: """
+            try database.execute(
+                sql: """
                 UPDATE download_sessions
                 SET state = ?, error_description = ?, updated_at = ?
                 WHERE id = ?
@@ -256,7 +261,8 @@ public actor DownloadResumeStore {
     /// Increment the retry counter for a session.
     public func incrementRetryCount(sessionID: String) async throws {
         try await db.write { database in
-            try database.execute(sql: """
+            try database.execute(
+                sql: """
                 UPDATE download_sessions
                 SET retry_count = retry_count + 1, updated_at = ?
                 WHERE id = ?
@@ -276,7 +282,7 @@ public actor DownloadResumeStore {
                 sql: "SELECT * FROM download_sessions WHERE id = ?",
                 arguments: [sessionID]
             ) else { return nil }
-            return try self.sessionFromRow(row)
+            return try sessionFromRow(row)
         }
     }
 
@@ -287,10 +293,10 @@ public actor DownloadResumeStore {
             let rows = try Row.fetchAll(
                 database,
                 sql: """
-                    SELECT * FROM download_sessions
-                    WHERE state IN ('queued', 'downloading', 'paused')
-                    ORDER BY priority DESC, created_at ASC
-                    """
+                SELECT * FROM download_sessions
+                WHERE state IN ('queued', 'downloading', 'paused')
+                ORDER BY priority DESC, created_at ASC
+                """
             )
             return rows.compactMap { try? self.sessionFromRow($0) }
         }
@@ -339,21 +345,21 @@ public actor DownloadResumeStore {
         let updatedAt = Date(timeIntervalSince1970: (row["updated_at"] as? Double) ?? 0)
 
         return DownloadSession(
-            id:                      (row["id"]               as? String) ?? "",
-            providerID:              (row["provider_id"]       as? String) ?? "",
-            accountID:               (row["account_id"]        as? String) ?? "",
-            remotePath:              (row["remote_path"]       as? String) ?? "",
-            destinationPath:         (row["destination_path"]  as? String) ?? "",
-            stagingPath:             (row["staging_path"]      as? String) ?? "",
-            expectedSize:            (row["expected_size"]     as? Int64)  ?? 0,
+            id: (row["id"] as? String) ?? "",
+            providerID: (row["provider_id"] as? String) ?? "",
+            accountID: (row["account_id"] as? String) ?? "",
+            remotePath: (row["remote_path"] as? String) ?? "",
+            destinationPath: (row["destination_path"] as? String) ?? "",
+            stagingPath: (row["staging_path"] as? String) ?? "",
+            expectedSize: (row["expected_size"] as? Int64) ?? 0,
             completedSegmentIndices: indices,
-            highWaterOffset:         (row["high_water_offset"] as? Int64)  ?? 0,
-            state:                   (row["state"]             as? String) ?? "unknown",
-            retryCount:              (row["retry_count"]       as? Int)    ?? 0,
-            errorDescription:         row["error_description"] as? String,
-            priority:                (row["priority"]          as? Int)    ?? DownloadPriority.normal.rawValue,
-            createdAt:               createdAt,
-            updatedAt:               updatedAt
+            highWaterOffset: (row["high_water_offset"] as? Int64) ?? 0,
+            state: (row["state"] as? String) ?? "unknown",
+            retryCount: (row["retry_count"] as? Int) ?? 0,
+            errorDescription: row["error_description"] as? String,
+            priority: (row["priority"] as? Int) ?? DownloadPriority.normal.rawValue,
+            createdAt: createdAt,
+            updatedAt: updatedAt
         )
     }
 }
