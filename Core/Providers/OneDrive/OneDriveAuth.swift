@@ -1,6 +1,6 @@
-import Foundation
 import AuthenticationServices
 import CryptoKit
+import Foundation
 
 public actor OneDriveAuth {
     public static let shared = OneDriveAuth()
@@ -10,7 +10,10 @@ public actor OneDriveAuth {
     private static let scope = "Files.ReadWrite.All offline_access"
     private init() {}
 
-    public func authorize(clientID: String, context: ASWebAuthenticationPresentationContextProviding) async throws -> OAuthCredential {
+    public func authorize(
+        clientID: String,
+        context: ASWebAuthenticationPresentationContextProviding
+    ) async throws -> OAuthCredential {
         let (verifier, challenge) = generatePKCE()
         guard var comps = URLComponents(string: Self.authURL) else {
             throw AuthError.pkceGenerationFailed
@@ -26,7 +29,10 @@ public actor OneDriveAuth {
         ]
         guard let authURL = comps.url else { throw AuthError.pkceGenerationFailed }
         let callbackURL = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, any Error>) in
-            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "com.stratus.cloudmanager") { url, error in
+            let session = ASWebAuthenticationSession(
+                url: authURL,
+                callbackURLScheme: "com.stratus.cloudmanager"
+            ) { url, error in
                 if let error { cont.resume(throwing: error) }
                 else if let url { cont.resume(returning: url) }
                 else { cont.resume(throwing: AuthError.cancelled) }
@@ -35,7 +41,9 @@ public actor OneDriveAuth {
             session.prefersEphemeralWebBrowserSession = true
             session.start()
         }
-        guard let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "code" })?.value else {
+        guard let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.queryItems?
+            .first(where: { $0.name == "code" })?.value
+        else {
             throw AuthError.noAuthorizationCode
         }
         var request = URLRequest(url: URL(string: Self.tokenURL) ?? URL(fileURLWithPath: "/"))
@@ -46,15 +54,25 @@ public actor OneDriveAuth {
         let (data, _) = try await URLSession.shared.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let accessToken = json["access_token"] as? String else { throw AuthError.invalidTokenResponse }
-        return OAuthCredential(accessToken: accessToken, refreshToken: json["refresh_token"] as? String,
-                                expiresAt: Date().addingTimeInterval((json["expires_in"] as? TimeInterval) ?? 3600))
+        return OAuthCredential(
+            accessToken: accessToken,
+            refreshToken: json["refresh_token"] as? String,
+            expiresAt: Date().addingTimeInterval((json["expires_in"] as? TimeInterval) ?? 3600)
+        )
     }
 
     private func generatePKCE() -> (String, String) {
         var bytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        let v = Data(bytes).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
-        let c = Data(SHA256.hash(data: Data(v.utf8))).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        let v = Data(bytes).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(
+            of: "/",
+            with: "_"
+        ).replacingOccurrences(of: "=", with: "")
+        let c = Data(SHA256.hash(data: Data(v.utf8))).base64EncodedString().replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(
+                of: "/",
+                with: "_"
+            ).replacingOccurrences(of: "=", with: "")
         return (v, c)
     }
 }
