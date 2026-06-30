@@ -11,6 +11,7 @@ public enum FTPSMode: Sendable {
 }
 
 // MARK: - FTPSProvider
+
 // FTPS provider (FTP over TLS). Explicit and implicit TLS modes.
 // Delegates to FTPProvider configured with TLS enabled.
 // All methods currently surface ProviderError.unsupportedOperation as the
@@ -18,7 +19,6 @@ public enum FTPSMode: Sendable {
 // the ftps:// scheme — a full FTPS stack would replace these stubs.
 
 public actor FTPSProvider: CloudProvider {
-
     public nonisolated let id = "ftps"
     public nonisolated let displayName = "FTPS"
     public nonisolated let iconName = "server.rack"
@@ -37,7 +37,7 @@ public actor FTPSProvider: CloudProvider {
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "FTPSProvider")
 
     public init(mode: FTPSMode = .explicit) {
-        self.ftpsMode = mode
+        ftpsMode = mode
     }
 
     // MARK: - Auth
@@ -166,7 +166,9 @@ public actor FTPSProvider: CloudProvider {
         throw ProviderError.unsupportedOperation("")
     }
 
-    public nonisolated var supportsBlockManifest: Bool { false }
+    public nonisolated var supportsBlockManifest: Bool {
+        false
+    }
 
     public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
         throw ProviderError.unsupportedOperation("")
