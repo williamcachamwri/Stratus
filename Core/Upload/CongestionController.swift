@@ -23,6 +23,7 @@ public actor CongestionController {
     private var lastRTT: TimeInterval = 0
     private var rttSamples: [TimeInterval] = []
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "CongestionController")
+    private let highRTTThreshold: TimeInterval = 0.25
 
     public init(maxConcurrentStreams: Int = 32) {
         self.maxWindow = Double(maxConcurrentStreams)
@@ -38,9 +39,9 @@ public actor CongestionController {
 
         switch mode {
         case .slowStart:
-            // Double window size each RTT until ssthresh
-            windowSize = min(windowSize * 2.0, ssthresh)
-            if windowSize >= ssthresh {
+            let targetThreshold = rtt >= highRTTThreshold ? min(ssthresh, 16.0) : ssthresh
+            windowSize = min(windowSize * 2.0, targetThreshold)
+            if windowSize >= targetThreshold {
                 mode = .avoidance
                 logger.debug("Congestion: entering avoidance at window=\(self.windowSize)")
             }
