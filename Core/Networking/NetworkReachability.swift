@@ -38,10 +38,10 @@ public actor NetworkReachabilityMonitor {
     )
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "Reachability")
 
-    // Most recently observed path
+    /// Most recently observed path
     private var latestPath: NWPath?
 
-    // Active stream continuations keyed by UUID for O(1) removal
+    /// Active stream continuations keyed by UUID for O(1) removal
     private var continuations: [UUID: AsyncStream<ConnectionStatus>.Continuation] = [:]
 
     // MARK: - Init
@@ -132,7 +132,8 @@ public actor NetworkReachabilityMonitor {
         // Only broadcast if something meaningful changed.
         guard newStatus != previousStatus else { return }
 
-        logger.info("Reachability changed: connected=\(newStatus.isConnected) type=\(String(describing: newStatus.type))")
+        logger
+            .info("Reachability changed: connected=\(newStatus.isConnected) type=\(String(describing: newStatus.type))")
 
         for continuation in continuations.values {
             continuation.yield(newStatus)
