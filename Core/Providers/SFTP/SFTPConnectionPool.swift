@@ -1,5 +1,5 @@
-import Foundation
 import Citadel
+import Foundation
 import os.log
 
 // MARK: - SFTPCredentials
@@ -24,9 +24,9 @@ public struct SFTPSession: Sendable {
     public let port: Int
     public let username: String
 
-    // The underlying Citadel SFTP client.
-    // @unchecked Sendable: SFTPClient is from Citadel (NIO-backed); it is designed
-    // for concurrent use via its own internal synchronisation on the NIO EventLoop.
+    /// The underlying Citadel SFTP client.
+    /// @unchecked Sendable: SFTPClient is from Citadel (NIO-backed); it is designed
+    /// for concurrent use via its own internal synchronisation on the NIO EventLoop.
     let client: SFTPClient
 
     public init(id: UUID = UUID(), host: String, port: Int, username: String, client: SFTPClient) {
@@ -47,11 +47,11 @@ private struct PoolKey: Hashable {
 }
 
 // MARK: - SFTPConnectionPool
+
 // Maintains a pool of active SFTP sessions (max 4 per server) for connection reuse.
 // Callers acquire a session before transfer and release it when done.
 
 public actor SFTPConnectionPool {
-
     public static let shared = SFTPConnectionPool()
 
     private static let maxPerServer = 4
@@ -141,7 +141,7 @@ public actor SFTPConnectionPool {
         let authMethod: SSHAuthenticationMethod
         if let key = credentials.privateKey {
             // Citadel expects raw PEM data; fall back to password-based if key parsing fails
-            _ = key  // Simplified: production would parse the PEM and use .privateKey(...)
+            _ = key // Simplified: production would parse the PEM and use .privateKey(...)
             authMethod = .passwordBased(username: username, password: "")
         } else if let password = credentials.password {
             authMethod = .passwordBased(username: username, password: password)
@@ -153,7 +153,7 @@ public actor SFTPConnectionPool {
             host: host,
             port: port,
             authenticationMethod: authMethod,
-            hostKeyValidator: .acceptAnything(),  // Production: validate against known_hosts
+            hostKeyValidator: .acceptAnything(), // Production: validate against known_hosts
             reconnect: .never
         )
         return try await sshClient.openSFTP()
