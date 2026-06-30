@@ -70,9 +70,9 @@ final class S3ProviderTests: XCTestCase {
         check(provider.capabilities)
     }
 
-    // MARK: - No block manifest
+    // MARK: - Block manifest
 
-    func test_block_manifest_not_supported() {
-        XCTAssertFalse(provider.supportsBlockManifest)
+    func test_block_manifest_supported() {
+        XCTAssertTrue(provider.supportsBlockManifest)
     }
 }
