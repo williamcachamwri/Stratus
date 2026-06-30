@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct MountManagerView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -12,9 +12,17 @@ public struct MountManagerView: View {
         self.mounts = mounts
     }
 
-    private var visibleMounts: [MountRow] { mounts ?? env.mountRows }
-    private var mountedAccountIDs: Set<String> { Set(visibleMounts.map(\.accountID)) }
-    private var unmountedAccounts: [CloudAccount] { env.accounts.filter { !mountedAccountIDs.contains($0.id) } }
+    private var visibleMounts: [MountRow] {
+        mounts ?? env.mountRows
+    }
+
+    private var mountedAccountIDs: Set<String> {
+        Set(visibleMounts.map(\.accountID))
+    }
+
+    private var unmountedAccounts: [CloudAccount] {
+        env.accounts.filter { !mountedAccountIDs.contains($0.id) }
+    }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
@@ -175,8 +183,10 @@ private struct MountItemView: View {
             HStack(spacing: Spacing.lg) {
                 Text("Provider: \(row.providerID)")
                     .stratusCaption()
-                Text("Quota: \(formatMountBytes(row.quotaUsed)) / \(row.quotaTotal.map(formatMountBytes) ?? "Unlimited")")
-                    .stratusCaption()
+                Text(
+                    "Quota: \(formatMountBytes(row.quotaUsed)) / \(row.quotaTotal.map(formatMountBytes) ?? "Unlimited")"
+                )
+                .stratusCaption()
                 Text("Cache: \(formatMountBytes(row.cacheUsed))")
                     .stratusCaption()
             }
@@ -192,10 +202,10 @@ private struct MountItemView: View {
 
     private var statusIcon: String {
         switch row.status {
-        case .mounted: return "externaldrive"
-        case .syncing: return "externaldrive.badge.icloud"
-        case .offline: return "externaldrive.badge.questionmark"
-        case .error: return "externaldrive.badge.exclamationmark"
+        case .mounted: "externaldrive"
+        case .syncing: "externaldrive.badge.icloud"
+        case .offline: "externaldrive.badge.questionmark"
+        case .error: "externaldrive.badge.exclamationmark"
         }
     }
 }
