@@ -142,10 +142,15 @@ private final class FSEventsMonitor: @unchecked Sendable {
             for (path, flag) in zip(paths, flags) {
                 let url = URL(fileURLWithPath: path)
                 let changeType: ChangeType
-                if flag & UInt32(kFSEventStreamEventFlagItemRenamed) != 0 { changeType = .renamed }
-                else if flag & UInt32(kFSEventStreamEventFlagItemCreated) != 0 { changeType = .created }
-                else if flag & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 { changeType = .deleted }
-                else { changeType = .modified }
+                if flag & UInt32(kFSEventStreamEventFlagItemRenamed) != 0 {
+                    changeType = .renamed
+                } else if flag & UInt32(kFSEventStreamEventFlagItemCreated) != 0 {
+                    changeType = .created
+                } else if flag & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 {
+                    changeType = .deleted
+                } else {
+                    changeType = .modified
+                }
                 box.onEvent(ChangeEvent(pairID: box.pairID, localURL: url, changeType: changeType))
             }
         }
