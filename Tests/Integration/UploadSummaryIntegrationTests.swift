@@ -1,7 +1,7 @@
 import XCTest
 @testable import StratusCore
 
-final class UploadPipelineIntegrationTests: XCTestCase {
+final class UploadSummaryIntegrationTests: XCTestCase {
     func testCompletedUploadSummaryCarriesIntegrityAndThroughputFields() {
         let item = CloudFileItem(id: "remote-1", name: "video.mov", path: CloudPath("/media/video.mov"), size: 10_000)
         let summary = UploadSummary(
