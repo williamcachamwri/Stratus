@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - WebDAVAuthMethod
@@ -20,12 +20,12 @@ public enum WebDAVAuthError: Error, Sendable {
 }
 
 // MARK: - WebDAVAuth
+
 // Handles WebDAV authentication: Basic, Digest (RFC 7616), and OAuth2 Bearer.
 // Call `authorizationHeader` to get the header value for a request.
 // Call `handleChallenge` when the server returns a 401 to negotiate a method.
 
 public actor WebDAVAuth {
-
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "WebDAVAuth")
 
     /// The currently active authentication method.
@@ -37,7 +37,7 @@ public actor WebDAVAuth {
     private var digestChallenge: DigestChallenge?
 
     public init(initialMethod: WebDAVAuthMethod? = nil) {
-        self.currentMethod = initialMethod
+        currentMethod = initialMethod
     }
 
     // MARK: - Authorization Header
@@ -50,13 +50,13 @@ public actor WebDAVAuth {
         }
 
         switch authMethod {
-        case .basic(let username, let password):
+        case let .basic(username, password):
             return basicHeader(username: username, password: password)
 
-        case .digest(let username, let password):
+        case let .digest(username, password):
             return try digestHeader(username: username, password: password, url: url, method: method)
 
-        case .oauth2(let token):
+        case let .oauth2(token):
             return "Bearer \(token)"
         }
     }
@@ -76,7 +76,7 @@ public actor WebDAVAuth {
         if trimmed.lowercased().hasPrefix("bearer") {
             // OAuth2 Bearer challenge — caller must supply token externally;
             // keep current method if it is already oauth2
-            if case .oauth2(let token) = currentMethod {
+            if case let .oauth2(token) = currentMethod {
                 return .oauth2(token: token)
             }
             throw WebDAVAuthError.unsupportedAuthScheme("Bearer (no token available)")
@@ -89,7 +89,7 @@ public actor WebDAVAuth {
             logger.debug("WebDAV Digest challenge received, realm: \(challenge.realm)")
             // Preserve username/password from current method if it is Digest or Basic
             switch currentMethod {
-            case .digest(let u, let p), .basic(let u, let p):
+            case let .digest(u, p), let .basic(u, p):
                 let method = WebDAVAuthMethod.digest(username: u, password: p)
                 currentMethod = method
                 return method
@@ -100,7 +100,7 @@ public actor WebDAVAuth {
 
         if trimmed.lowercased().hasPrefix("basic") {
             switch currentMethod {
-            case .basic(let u, let p):
+            case let .basic(u, p):
                 return .basic(username: u, password: p)
             default:
                 throw WebDAVAuthError.unsupportedAuthScheme("Basic (no credentials available)")
@@ -188,7 +188,8 @@ public actor WebDAVAuth {
         }
 
         guard let realm = extract("realm"),
-              let nonce = extract("nonce") else {
+              let nonce = extract("nonce")
+        else {
             throw WebDAVAuthError.malformedChallenge("Missing realm or nonce in Digest challenge")
         }
 
