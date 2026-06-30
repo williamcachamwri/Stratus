@@ -1,12 +1,12 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 // MARK: - S3PresignedURLFactory
+
 // Generates AWS S3 presigned GET and PUT URLs using SigV4 query-string signing.
 // All URL assembly goes through URLComponents — no string interpolation for URLs.
 
 public struct S3PresignedURLFactory: Sendable {
-
     public init() {}
 
     // MARK: - Presigned GET
