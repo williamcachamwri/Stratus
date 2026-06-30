@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct ProviderPickerView: View {
     @ObservedObject private var catalog = ProviderDefinitionCatalog.shared
@@ -29,8 +29,10 @@ public struct ProviderPickerView: View {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Text("Connect a Cloud Account")
                             .font(.stratusTitle)
-                        Text("Providers are loaded from ProviderDefinitions.json so the onboarding UI matches the real backend capabilities.")
-                            .stratusCaption()
+                        Text(
+                            "Providers are loaded from ProviderDefinitions.json so the onboarding UI matches the real backend capabilities."
+                        )
+                        .stratusCaption()
                     }
                 }
 
