@@ -19,7 +19,7 @@ public actor WebDAVProvider: CloudProvider {
     private let http = HTTPClient()
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "WebDAVProvider")
 
-    // Base URL per account stored here
+    /// Base URL per account stored here
     private var baseURLs: [String: URL] = [:]
 
     public init() {}
@@ -31,12 +31,18 @@ public actor WebDAVProvider: CloudProvider {
     public func authenticate(account: CloudAccount) async throws {
         guard baseURLs[account.id] != nil else { throw ProviderError.authenticationFailed("No WebDAV URL for account") }
     }
+
     public func refreshCredentials(account: CloudAccount) async throws {}
     public func validateCredentials(account: CloudAccount) async throws -> Bool {
         guard let base = baseURLs[account.id] else { return false }
-        let response = try? await http.data(for: HTTPRequest(url: base, method: .HEAD, headers: await authHeaders(account: account)))
+        let response = try? await http.data(for: HTTPRequest(
+            url: base,
+            method: .HEAD,
+            headers: authHeaders(account: account)
+        ))
         return response?.isSuccess ?? false
     }
+
     public func revokeCredentials(account: CloudAccount) async throws {
         try await vault.deleteOAuthCredential(providerID: id, accountID: account.id)
         baseURLs.removeValue(forKey: account.id)
@@ -46,16 +52,20 @@ public actor WebDAVProvider: CloudProvider {
         StorageQuota(totalBytes: nil, usedBytes: 0, availableBytes: nil)
     }
 
-    public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
+    public func listDirectory(
+        path: CloudPath,
+        account: CloudAccount,
+        pageToken: String?
+    ) async throws -> PagedResult<[CloudFileItem]> {
         guard let base = baseURLs[account.id] else { throw ProviderError.authenticationFailed("No WebDAV URL") }
         let url = base.appendingPathComponent(path.path)
         var headers = await authHeaders(account: account)
         headers["Depth"] = "1"
         headers["Content-Type"] = "application/xml"
         let body = Data("""
-            <?xml version="1.0" encoding="utf-8"?>
-            <propfind xmlns="DAV:"><prop><getcontentlength/><getlastmodified/><resourcetype/><getetag/></prop></propfind>
-            """.utf8)
+        <?xml version="1.0" encoding="utf-8"?>
+        <propfind xmlns="DAV:"><prop><getcontentlength/><getlastmodified/><resourcetype/><getetag/></prop></propfind>
+        """.utf8)
 
         var request = HTTPRequest(url: url, method: .POST, headers: headers, body: body)
         request.method = HTTPMethod(rawValue: "PROPFIND")!
@@ -75,18 +85,39 @@ public actor WebDAVProvider: CloudProvider {
         return item
     }
 
-    public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String {
-        return remotePath.path
+    public func initiateMultipartUpload(
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> String {
+        remotePath.path
     }
-    public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
+
+    public func uploadChunk(
+        uploadID: String,
+        chunkNumber: Int,
+        data: Data,
+        account: CloudAccount
+    ) async throws -> ChunkUploadResult {
         ChunkUploadResult(etag: nil)
     }
-    public func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
+
+    public func completeMultipartUpload(
+        uploadID: String,
+        parts: [CompletedPart],
+        account: CloudAccount
+    ) async throws -> CloudFileItem {
         CloudFileItem(id: uploadID, name: (uploadID as NSString).lastPathComponent, path: CloudPath(uploadID))
     }
+
     public func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {}
 
-    public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
+    public func uploadSmallFile(
+        data: Data,
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> CloudFileItem {
         guard let base = baseURLs[account.id] else { throw ProviderError.authenticationFailed("No WebDAV URL") }
         let url = base.appendingPathComponent(remotePath.path)
         var headers = await authHeaders(account: account)
@@ -97,8 +128,13 @@ public actor WebDAVProvider: CloudProvider {
             throw ProviderError.serverError(statusCode: response.statusCode, message: "")
         }
         let etag = response.headers["ETag"]?.trimmingCharacters(in: .init(charactersIn: "\""))
-        return CloudFileItem(id: remotePath.path, name: remotePath.lastComponent, path: remotePath,
-                              size: Int64(data.count), etag: etag)
+        return CloudFileItem(
+            id: remotePath.path,
+            name: remotePath.lastComponent,
+            path: remotePath,
+            size: Int64(data.count),
+            etag: etag
+        )
     }
 
     public func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL {
@@ -118,7 +154,7 @@ public actor WebDAVProvider: CloudProvider {
     public func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         guard let base = baseURLs[account.id] else { throw ProviderError.authenticationFailed("No WebDAV URL") }
         let url = base.appendingPathComponent(path.path)
-        var request = HTTPRequest(url: url, method: .POST, headers: await authHeaders(account: account))
+        var request = await HTTPRequest(url: url, method: .POST, headers: authHeaders(account: account))
         request.method = HTTPMethod(rawValue: "MKCOL")!
         let response = try await http.data(for: request)
         guard response.isSuccess || response.statusCode == 201 else {
@@ -162,7 +198,7 @@ public actor WebDAVProvider: CloudProvider {
     public func delete(path: CloudPath, account: CloudAccount) async throws {
         guard let base = baseURLs[account.id] else { throw ProviderError.authenticationFailed("No WebDAV URL") }
         let url = base.appendingPathComponent(path.path)
-        let request = HTTPRequest(url: url, method: .DELETE, headers: await authHeaders(account: account))
+        let request = await HTTPRequest(url: url, method: .DELETE, headers: authHeaders(account: account))
         let response = try await http.data(for: request)
         guard response.isSuccess || response.statusCode == 204 else {
             throw ProviderError.serverError(statusCode: response.statusCode, message: "")
@@ -173,20 +209,46 @@ public actor WebDAVProvider: CloudProvider {
         try await move(from: path, to: path.deletingLastComponent.appendingComponent(newName), account: account)
     }
 
-    public func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? { nil }
-    public nonisolated var supportsBlockManifest: Bool { false }
-    public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? { nil }
+    public func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? {
+        nil
+    }
+
+    public nonisolated var supportsBlockManifest: Bool {
+        false
+    }
+
+    public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
+        nil
+    }
+
     public func storeBlockManifest(_ manifest: BlockMap, path: CloudPath, account: CloudAccount) async throws {}
-    public func trash(path: CloudPath, account: CloudAccount) async throws { try await delete(path: path, account: account) }
-    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] { [] }
+    public func trash(path: CloudPath, account: CloudAccount) async throws {
+        try await delete(
+            path: path,
+            account: account
+        )
+    }
+
+    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] {
+        []
+    }
+
     public func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {}
     public func emptyTrash(account: CloudAccount) async throws {}
-    public func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] { [] }
+    public func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] {
+        []
+    }
+
     public func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
-    public func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink {
+    public func createShareLink(
+        path: CloudPath,
+        account: CloudAccount,
+        options: ShareOptions
+    ) async throws -> ShareLink {
         let url = try await downloadURL(path: path, account: account, expiresIn: 3600)
         return ShareLink(url: url, id: UUID().uuidString)
     }
+
     public func revokeShareLink(link: ShareLink, account: CloudAccount) async throws {}
     public func streamingURL(path: CloudPath, account: CloudAccount) async throws -> URL {
         try await downloadURL(path: path, account: account, expiresIn: 86400)
@@ -209,15 +271,25 @@ public actor WebDAVProvider: CloudProvider {
         let xml = String(data: data, encoding: .utf8) ?? ""
         var items: [CloudFileItem] = []
         for response in xml.components(separatedBy: "<D:response>").dropFirst() {
-            guard let href = response.components(separatedBy: "<D:href>").dropFirst().first?.components(separatedBy: "</D:href>").first else { continue }
-            let name = (href.removingPercentEncoding ?? href).components(separatedBy: "/").filter { !$0.isEmpty }.last ?? ""
+            guard let href = response.components(separatedBy: "<D:href>").dropFirst().first?
+                .components(separatedBy: "</D:href>").first else { continue }
+            let name = (href.removingPercentEncoding ?? href).components(separatedBy: "/").filter { !$0.isEmpty }
+                .last ?? ""
             guard !name.isEmpty else { continue }
             let isDir = response.contains("<D:collection/>")
-            let sizeStr = response.components(separatedBy: "<D:getcontentlength>").dropFirst().first?.components(separatedBy: "</D:getcontentlength>").first ?? "0"
+            let sizeStr = response.components(separatedBy: "<D:getcontentlength>").dropFirst().first?
+                .components(separatedBy: "</D:getcontentlength>").first ?? "0"
             let size = Int64(sizeStr) ?? 0
-            let etag = response.components(separatedBy: "<D:getetag>").dropFirst().first?.components(separatedBy: "</D:getetag>").first?.trimmingCharacters(in: .init(charactersIn: "\""))
-            items.append(CloudFileItem(id: href, name: name, path: basePath.appendingComponent(name),
-                                        size: isDir ? nil : size, isDirectory: isDir, etag: etag))
+            let etag = response.components(separatedBy: "<D:getetag>").dropFirst().first?
+                .components(separatedBy: "</D:getetag>").first?.trimmingCharacters(in: .init(charactersIn: "\""))
+            items.append(CloudFileItem(
+                id: href,
+                name: name,
+                path: basePath.appendingComponent(name),
+                size: isDir ? nil : size,
+                isDirectory: isDir,
+                etag: etag
+            ))
         }
         return items
     }
