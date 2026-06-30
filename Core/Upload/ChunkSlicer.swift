@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Chunk Descriptor
 
 public struct ChunkDescriptor: Sendable {
-    public let number: Int       // 0-based
+    public let number: Int // 0-based
     public let offset: Int64
     public let size: Int
     public let isLast: Bool
@@ -43,8 +43,8 @@ public struct ParallelismConfig: Sendable {
 // MARK: - ChunkSlicer
 
 public struct ChunkSlicer: Sendable {
-
     // MARK: - Chunk size strategy (adaptive, not fixed)
+
     //
     // < 5 MB:         single-part (no chunking)
     // 5–100 MB:       8 MB chunks, up to 8 parallel
@@ -77,20 +77,20 @@ public struct ChunkSlicer: Sendable {
 
     public static func defaultChunkSize(for fileSize: Int64) -> Int {
         switch fileSize {
-        case ..<Int64(5 * MB):         return fileSize == 0 ? MB : Int(fileSize)
-        case ..<Int64(100 * MB):       return 8 * MB
-        case ..<Int64(1024 * MB):      return 16 * MB
-        case ..<Int64(10 * 1024 * MB): return 32 * MB
-        default:                        return 64 * MB
+        case ..<Int64(5 * MB): fileSize == 0 ? MB : Int(fileSize)
+        case ..<Int64(100 * MB): 8 * MB
+        case ..<Int64(1024 * MB): 16 * MB
+        case ..<Int64(10 * 1024 * MB): 32 * MB
+        default: 64 * MB
         }
     }
 
     public static func defaultParallelism(for fileSize: Int64) -> Int {
         switch fileSize {
-        case ..<Int64(5 * MB):         return 1
-        case ..<Int64(100 * MB):       return 8
-        case ..<Int64(1024 * MB):      return 16
-        default:                        return 32
+        case ..<Int64(5 * MB): 1
+        case ..<Int64(100 * MB): 8
+        case ..<Int64(1024 * MB): 16
+        default: 32
         }
     }
 
@@ -104,7 +104,7 @@ public struct ChunkSlicer: Sendable {
         var parallelism = defaultParallelism(for: fileSize)
 
         // High bandwidth: more parallelism
-        if bandwidthBPS > 100 * 1024 * 1024 {  // > 100 MB/s
+        if bandwidthBPS > 100 * 1024 * 1024 { // > 100 MB/s
             parallelism = min(parallelism * 2, capabilities.maxConcurrentUploads)
         }
 
@@ -131,13 +131,13 @@ public struct ChunkSlicer: Sendable {
         )
     }
 
-    // Read a chunk safely using pread (thread-safe, no seek required).
-    //
-    // pread(2) is allowed to return fewer bytes than requested even when the
-    // file has not reached EOF.  A production upload engine must loop until the
-    // exact descriptor size has been read; otherwise a transient short read can
-    // silently upload a truncated part while the chunk map still says the full
-    // byte range was transferred.
+    /// Read a chunk safely using pread (thread-safe, no seek required).
+    ///
+    /// pread(2) is allowed to return fewer bytes than requested even when the
+    /// file has not reached EOF.  A production upload engine must loop until the
+    /// exact descriptor size has been read; otherwise a transient short read can
+    /// silently upload a truncated part while the chunk map still says the full
+    /// byte range was transferred.
     public static func readChunk(
         fileHandle: FileHandle,
         offset: Int64,
