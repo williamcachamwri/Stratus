@@ -13,7 +13,7 @@ public struct OAuthCredential: Sendable, Codable {
 
     public var isExpired: Bool {
         guard let expiresAt else { return false }
-        return Date() >= expiresAt.addingTimeInterval(-60)  // 60s buffer
+        return Date() >= expiresAt.addingTimeInterval(-60) // 60s buffer
     }
 
     public init(
@@ -80,8 +80,12 @@ public actor CredentialVault {
 
     public func saveOAuthCredential(_ credential: OAuthCredential, providerID: String, accountID: String) async throws {
         let data = try encoder.encode(credential)
-        try await keychain.saveSecret(data,
-            service: KeychainStore.ServiceName.accessToken(providerID: providerID, accountID: accountID),
+        try await keychain.saveSecret(
+            data,
+            service: KeychainStore.ServiceName.accessToken(
+                providerID: providerID,
+                accountID: accountID
+            ),
             account: accountID
         )
     }
@@ -103,10 +107,18 @@ public actor CredentialVault {
 
     // MARK: - API Key Credentials
 
-    public func saveAPIKeyCredential(_ credential: APIKeyCredential, providerID: String, accountID: String) async throws {
+    public func saveAPIKeyCredential(
+        _ credential: APIKeyCredential,
+        providerID: String,
+        accountID: String
+    ) async throws {
         let data = try encoder.encode(credential)
-        try await keychain.saveSecret(data,
-            service: KeychainStore.ServiceName.apiKey(providerID: providerID, accountID: accountID),
+        try await keychain.saveSecret(
+            data,
+            service: KeychainStore.ServiceName.apiKey(
+                providerID: providerID,
+                accountID: accountID
+            ),
             account: accountID
         )
     }
@@ -123,7 +135,8 @@ public actor CredentialVault {
 
     public func saveBasicCredential(_ credential: BasicCredential, providerID: String, accountID: String) async throws {
         let data = try encoder.encode(credential)
-        try await keychain.saveSecret(data,
+        try await keychain.saveSecret(
+            data,
             service: KeychainStore.ServiceName.sftpPassword(accountID: accountID),
             account: accountID
         )
@@ -154,13 +167,14 @@ public actor CredentialVault {
             return false
         }
         return try await withCheckedThrowingContinuation { continuation in
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: success)
+            context
+                .evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: success)
+                    }
                 }
-            }
         }
     }
 }
