@@ -49,11 +49,11 @@ struct ContentView: View {
                             HStack(spacing: Spacing.sm) {
                                 ProviderIcon(providerID: account.providerID, size: 16)
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text(account.email ?? account.displayName)
+                                    Text(accountSidebarTitle(for: account))
                                         .font(.stratusBody)
                                         .lineLimit(1)
-                                    if account.email != nil {
-                                        Text(account.displayName)
+                                    if let subtitle = accountSidebarSubtitle(for: account) {
+                                        Text(subtitle)
                                             .font(.caption2)
                                             .foregroundColor(.textSecondary)
                                             .lineLimit(1)
@@ -71,22 +71,26 @@ struct ContentView: View {
                 }
 
                 Section("Transfers") {
-                    Button { selectedTab = .uploads } label: {
-                        Label("\(env.uploadSummary.activeCount) uploading", systemImage: "arrow.up.circle")
-                    }
-                    .buttonStyle(.plain)
-                    Button { selectedTab = .downloads } label: {
-                        Label("\(env.downloadSummary.activeCount) downloading", systemImage: "arrow.down.circle")
-                    }
-                    .buttonStyle(.plain)
-                    Button { selectedTab = .uploads } label: {
-                        Label("\(env.uploadSummary.queuedCount + env.downloadSummary.queuedCount) queued", systemImage: "clock")
-                    }
-                    .buttonStyle(.plain)
-                    Button { selectedTab = .uploads } label: {
-                        Label("\(env.uploadSummary.failedCount + env.downloadSummary.failedCount) failed", systemImage: "exclamationmark.triangle")
-                    }
-                    .buttonStyle(.plain)
+                    SidebarActionRow(
+                        title: "\(env.uploadSummary.activeCount) uploading",
+                        icon: "arrow.up.circle",
+                        action: showUploads
+                    )
+                    SidebarActionRow(
+                        title: "\(env.downloadSummary.activeCount) downloading",
+                        icon: "arrow.down.circle",
+                        action: showDownloads
+                    )
+                    SidebarActionRow(
+                        title: "\(env.uploadSummary.queuedCount + env.downloadSummary.queuedCount) queued",
+                        icon: "clock",
+                        action: showQueuedTransfers
+                    )
+                    SidebarActionRow(
+                        title: "\(env.uploadSummary.failedCount + env.downloadSummary.failedCount) failed",
+                        icon: "exclamationmark.triangle",
+                        action: showFailedTransfers
+                    )
                 }
 
                 Section("Sync Pairs") {
@@ -145,6 +149,31 @@ struct ContentView: View {
         }
     }
 
+    private func accountSidebarTitle(for account: CloudAccount) -> String {
+        let providerName = ProviderDefinitionCatalog.shared.displayName(for: account.providerID)
+        return "\(account.email ?? account.displayName) - \(providerName)"
+    }
+
+    private func accountSidebarSubtitle(for account: CloudAccount) -> String? {
+        account.email == nil ? nil : account.displayName
+    }
+
+    private func showUploads() {
+        selectedTab = .uploads
+    }
+
+    private func showDownloads() {
+        selectedTab = .downloads
+    }
+
+    private func showQueuedTransfers() {
+        selectedTab = env.uploadSummary.queuedCount > 0 ? .uploads : .downloads
+    }
+
+    private func showFailedTransfers() {
+        selectedTab = env.uploadSummary.failedCount > 0 ? .uploads : .downloads
+    }
+
     @ViewBuilder
     private var selectedContent: some View {
         switch selectedTab {
@@ -156,6 +185,21 @@ struct ContentView: View {
         case .browse:   FileBrowserView()
         case .prefs:    PreferencesView()
         }
+    }
+}
+
+private struct SidebarActionRow: View {
+    let title: String
+    let icon: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
     }
 }
 
