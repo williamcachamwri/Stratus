@@ -1,9 +1,8 @@
-import XCTest
 import CryptoKit
+import XCTest
 @testable import StratusCore
 
 final class KeyDerivationTests: XCTestCase {
-
     // MARK: - deriveKey determinism
 
     func test_derive_key_is_deterministic() throws {
@@ -66,8 +65,10 @@ final class KeyDerivationTests: XCTestCase {
         let wrongKey = SymmetricKey(size: .bits256)
         let fileKey = SymmetricKey(size: .bits256)
         let wrapped = try EncryptionKeyDerivation.wrapKey(fileKey, with: masterKey)
-        XCTAssertThrowsError(try EncryptionKeyDerivation.unwrapKey(wrapped, with: wrongKey),
-                             "Decrypting with wrong master key must throw")
+        XCTAssertThrowsError(
+            try EncryptionKeyDerivation.unwrapKey(wrapped, with: wrongKey),
+            "Decrypting with wrong master key must throw"
+        )
     }
 
     func test_wrapped_key_is_not_plaintext() throws {
@@ -90,7 +91,7 @@ final class KeyDerivationTests: XCTestCase {
     // MARK: - Sendable conformance (compile-time)
 
     func test_encryption_key_derivation_sendable() {
-        func requiresSendable<T: Sendable>(_: T.Type) {}
+        func requiresSendable(_: (some Sendable).Type) {}
         requiresSendable(EncryptionKeyDerivation.self)
     }
 
