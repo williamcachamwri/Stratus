@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class ChangeJournalTests: XCTestCase {
-
     // MARK: - ChangeEvent
 
     func test_change_event_unique_ids() {
@@ -49,7 +48,7 @@ final class ChangeJournalTests: XCTestCase {
 
     // MARK: - ChangeJournal actor
 
-    func test_start_and_stop_watching_does_not_crash() async throws {
+    func test_start_and_stop_watching_does_not_crash() async {
         let journal = ChangeJournal.shared
         let pair = SyncPair(
             localPath: URL(fileURLWithPath: "/tmp"),
@@ -66,7 +65,7 @@ final class ChangeJournalTests: XCTestCase {
         await journal.stopWatching(pairID: UUID())
     }
 
-    func test_events_stream_terminates_on_stop() async throws {
+    func test_events_stream_terminates_on_stop() async {
         let journal = ChangeJournal.shared
         let pair = SyncPair(
             localPath: URL(fileURLWithPath: "/tmp"),
@@ -86,10 +85,10 @@ final class ChangeJournalTests: XCTestCase {
             }
             return count
         }
-        XCTAssertNotNil(result)  // Did not deadlock
+        XCTAssertNotNil(result) // Did not deadlock
     }
 
-    func test_double_start_watching_is_idempotent() async throws {
+    func test_double_start_watching_is_idempotent() async {
         let journal = ChangeJournal.shared
         let pair = SyncPair(
             localPath: URL(fileURLWithPath: "/tmp"),
@@ -97,7 +96,7 @@ final class ChangeJournalTests: XCTestCase {
             accountID: "idempotent-acc"
         )
         await journal.startWatching(pair: pair)
-        await journal.startWatching(pair: pair)  // second call must be safe
+        await journal.startWatching(pair: pair) // second call must be safe
         await journal.stopWatching(pairID: pair.id)
     }
 }
