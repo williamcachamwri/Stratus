@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class ChunkSlicerTests: XCTestCase {
-
     func test_sliceSingleChunk_smallFile() {
         let chunks = ChunkSlicer.slice(fileSize: 100, chunkSize: 5 * 1024 * 1024)
         XCTAssertEqual(chunks.count, 1)
@@ -36,8 +35,8 @@ final class ChunkSlicerTests: XCTestCase {
         let chunkSize = 8 * 1024 * 1024
         let fileSize = Int64(chunkSize * 5 + 1234)
         let chunks = ChunkSlicer.slice(fileSize: fileSize, chunkSize: chunkSize)
-        for i in 1..<chunks.count {
-            XCTAssertEqual(chunks[i].offset, chunks[i-1].offset + Int64(chunks[i-1].size))
+        for i in 1 ..< chunks.count {
+            XCTAssertEqual(chunks[i].offset, chunks[i - 1].offset + Int64(chunks[i - 1].size))
         }
         let totalCovered = chunks.reduce(Int64(0)) { $0 + Int64($1.size) }
         XCTAssertEqual(totalCovered, fileSize)
@@ -49,7 +48,7 @@ final class ChunkSlicerTests: XCTestCase {
     }
 
     func test_defaultChunkSize_largeFile() {
-        let size = Int64(2 * 1024 * 1024 * 1024)  // 2 GB
+        let size = Int64(2 * 1024 * 1024 * 1024) // 2 GB
         let chunk = ChunkSlicer.defaultChunkSize(for: size)
         // Should produce at most ~1000 parts per S3 limits
         let numParts = Int(ceil(Double(size) / Double(chunk)))
@@ -79,7 +78,7 @@ final class ChunkSlicerTests: XCTestCase {
         let chunkSize = 5 * 1024 * 1024
         let chunks = ChunkSlicer.slice(fileSize: Int64(chunkSize * 3 + 100), chunkSize: chunkSize)
         XCTAssertEqual(chunks.count, 4)
-        for i in 0..<3 {
+        for i in 0 ..< 3 {
             XCTAssertFalse(chunks[i].isLast, "Chunk \(i) must not be marked last")
         }
         XCTAssertTrue(chunks[3].isLast, "Only the final chunk must be marked last")
@@ -91,9 +90,10 @@ final class ChunkSlicerTests: XCTestCase {
         // 100 MB boundary: uses 16 MB chunks
         XCTAssertEqual(chunkSize, 16 * 1024 * 1024)
     }
+
     func test_readChunk_returnsExactRequestedBytes() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let data = Data((0..<4096).map { UInt8($0 % 251) })
+        let data = Data((0 ..< 4096).map { UInt8($0 % 251) })
         try data.write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -102,7 +102,7 @@ final class ChunkSlicerTests: XCTestCase {
 
         let chunk = try ChunkSlicer.readChunk(fileHandle: handle, offset: 512, size: 1024)
         XCTAssertEqual(chunk.count, 1024)
-        XCTAssertEqual(chunk, data[512..<1536])
+        XCTAssertEqual(chunk, data[512 ..< 1536])
     }
 
     func test_readChunk_throwsOnShortRead() throws {
@@ -117,5 +117,4 @@ final class ChunkSlicerTests: XCTestCase {
             XCTAssertEqual(error as? ChunkSlicerError, .shortRead(expected: 8, actual: 4))
         }
     }
-
 }
