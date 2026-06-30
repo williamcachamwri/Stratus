@@ -1,9 +1,8 @@
-import XCTest
 import CryptoKit
+import XCTest
 @testable import StratusCore
 
 final class ChecksumEngineTests: XCTestCase {
-
     private var tempDir: URL!
     private var engine: ChecksumEngine!
 
@@ -17,7 +16,7 @@ final class ChecksumEngineTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempDir)
     }
 
-    func test_sha256OfKnownData() async throws {
+    func test_sha256OfKnownData() async {
         let data = Data("hello world".utf8)
         let hash = await engine.sha256(of: data)
         // Known SHA-256 of "hello world"
@@ -25,7 +24,7 @@ final class ChecksumEngineTests: XCTestCase {
     }
 
     func test_sha256Stream_matchesSha256OfData() async throws {
-        let data = Data(repeating: 0xAB, count: 4 * 1024 * 1024 + 17)  // 4MB + 17 bytes
+        let data = Data(repeating: 0xAB, count: 4 * 1024 * 1024 + 17) // 4MB + 17 bytes
         let fileURL = tempDir.appendingPathComponent("test.bin")
         try data.write(to: fileURL)
         let streamHash = try await engine.sha256Stream(url: fileURL)
@@ -52,7 +51,7 @@ final class ChecksumEngineTests: XCTestCase {
         try data.write(to: fileURL)
         let streamMD5 = try await engine.md5Stream(url: fileURL)
         XCTAssertFalse(streamMD5.isEmpty)
-        XCTAssertEqual(streamMD5.count, 32)  // hex-encoded 16 bytes
+        XCTAssertEqual(streamMD5.count, 32) // hex-encoded 16 bytes
     }
 
     func test_s3MultipartETag_twoChunks() async {
@@ -79,7 +78,7 @@ final class ChecksumEngineTests: XCTestCase {
         // Standard CRC32C check value for ASCII "123456789" is 0xE3069283
         let data = "123456789".data(using: .utf8)!
         let result = await engine.crc32c(of: data)
-        XCTAssertEqual(result, 0xE3069283)
+        XCTAssertEqual(result, 0xE306_9283)
     }
 
     func test_sha256Batch_returnsHashForEachURL() async throws {
