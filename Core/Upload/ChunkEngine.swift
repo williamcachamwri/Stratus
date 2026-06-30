@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - Upload Result
@@ -14,7 +14,7 @@ public struct UploadResult: Sendable {
     public let retriedChunks: Int
 }
 
-private struct ChunkOutcome: Sendable {
+private struct ChunkOutcome {
     let chunkNumber: Int
     let etag: String
     let retries: Int
@@ -24,6 +24,7 @@ private struct ChunkOutcome: Sendable {
 }
 
 // MARK: - ChunkEngine
+
 // Central orchestrator for a single file's upload lifecycle.
 
 public actor ChunkEngine {
@@ -58,10 +59,15 @@ public actor ChunkEngine {
                 account: account,
                 provider: provider
             ) {
-            case .skip(_, let bytesSkipped):
+            case let .skip(_, bytesSkipped):
                 bytesSkippedByDelta = bytesSkipped
-                let remoteItem = (try? await provider.fileMetadata(path: task.destinationPath, account: account))
-                    ?? CloudFileItem(id: task.destinationPath.path, name: task.destinationPath.lastComponent, path: task.destinationPath, size: task.fileSize)
+                let remoteItem = await (try? provider.fileMetadata(path: task.destinationPath, account: account))
+                    ?? CloudFileItem(
+                        id: task.destinationPath.path,
+                        name: task.destinationPath.lastComponent,
+                        path: task.destinationPath,
+                        size: task.fileSize
+                    )
                 return UploadResult(
                     remoteItem: remoteItem,
                     bytesUploaded: 0,
@@ -71,25 +77,36 @@ public actor ChunkEngine {
                     chunkCount: 0,
                     retriedChunks: 0
                 )
-            case .uploadFull(let localMap, _, let reason):
+            case let .uploadFull(localMap, _, reason):
                 deltaMapToStore = localMap
-                logger.info("Delta full-upload fallback for \(task.destinationPath.path, privacy: .private): \(reason, privacy: .public)")
-            case .unavailable(let reason):
-                logger.debug("Delta unavailable for \(task.destinationPath.path, privacy: .private): \(reason, privacy: .public)")
+                logger
+                    .info(
+                        "Delta full-upload fallback for \(task.destinationPath.path, privacy: .private): \(reason, privacy: .public)"
+                    )
+            case let .unavailable(reason):
+                logger
+                    .debug(
+                        "Delta unavailable for \(task.destinationPath.path, privacy: .private): \(reason, privacy: .public)"
+                    )
             }
         } else {
-            logger.debug("Delta sync disabled for encrypted upload \(task.destinationPath.path, privacy: .private) to avoid plaintext manifest leakage")
+            logger
+                .debug(
+                    "Delta sync disabled for encrypted upload \(task.destinationPath.path, privacy: .private) to avoid plaintext manifest leakage"
+                )
         }
 
         let bandwidth = await bandwidthMonitor.currentBPS
-        let config = ChunkSlicer.optimalConfig(
+        let config = await ChunkSlicer.optimalConfig(
             fileSize: task.fileSize,
             bandwidthBPS: bandwidth,
-            rtt: await congestionController.smoothedRTT,
+            rtt: congestionController.smoothedRTT,
             capabilities: provider.capabilities
         )
 
-        if !provider.capabilities.supportsMultipartUpload || task.fileSize < Int64(provider.capabilities.multipartThresholdBytes) {
+        if !provider.capabilities.supportsMultipartUpload || task
+            .fileSize < Int64(provider.capabilities.multipartThresholdBytes)
+        {
             return try await uploadSmallFile(
                 task: task,
                 provider: provider,
@@ -109,11 +126,23 @@ public actor ChunkEngine {
             if let existingID = existing.uploadID {
                 uploadID = existingID
             } else {
-                uploadID = try await startMultipart(task: task, provider: provider, account: account, session: &session, chunks: chunks)
+                uploadID = try await startMultipart(
+                    task: task,
+                    provider: provider,
+                    account: account,
+                    session: &session,
+                    chunks: chunks
+                )
             }
             logger.info("Resuming upload \(task.id) from chunk \(existing.completedChunks.count)/\(totalChunks)")
         } else {
-            uploadID = try await startMultipart(task: task, provider: provider, account: account, session: &session, chunks: chunks)
+            uploadID = try await startMultipart(
+                task: task,
+                provider: provider,
+                account: account,
+                session: &session,
+                chunks: chunks
+            )
             logger.info("Starting new upload \(task.id) — \(totalChunks) chunks × \(config.chunkSize / 1024 / 1024) MB")
         }
 
@@ -180,20 +209,26 @@ public actor ChunkEngine {
                         congestionController: congestionController
                     )
 
-                    let delay = await throttle.delayBetweenChunks(chunkSize: config.chunkSize, activeConcurrency: inFlight)
+                    let delay = await throttle.delayBetweenChunks(
+                        chunkSize: config.chunkSize,
+                        activeConcurrency: inFlight
+                    )
                     if delay > 0 {
                         try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                     }
 
-                    progressStream.yield(ChunkProgress(
+                    await progressStream.yield(ChunkProgress(
                         total: totalChunks,
                         completed: etags.count,
                         inFlight: inFlight,
                         failed: failedChunks,
                         bytesTransferred: plaintextTransferred,
                         totalBytes: task.fileSize,
-                        currentSpeedBPS: await bandwidthMonitor.currentBPS,
-                        estimatedSecondsRemaining: await bandwidthMonitor.estimatedTimeRemaining(bytesLeft: max(0, task.fileSize - plaintextTransferred))
+                        currentSpeedBPS: bandwidthMonitor.currentBPS,
+                        estimatedSecondsRemaining: bandwidthMonitor.estimatedTimeRemaining(bytesLeft: max(
+                            0,
+                            task.fileSize - plaintextTransferred
+                        ))
                     ))
 
                     if let next = pendingIterator.next(), inFlight < maxConcurrent {
@@ -218,12 +253,16 @@ public actor ChunkEngine {
             throw UploadError.cancelled
         } catch {
             failedChunks += 1
-            try? await resumeStore.updateSessionState(task.id.uuidString, state: "failed", error: String(describing: error))
+            try? await resumeStore.updateSessionState(
+                task.id.uuidString,
+                state: "failed",
+                error: String(describing: error)
+            )
             try? await provider.abortMultipartUpload(uploadID: uploadID, account: account)
             throw error
         }
 
-        let parts = try (0..<totalChunks).map { chunkNumber -> CompletedPart in
+        let parts = try (0 ..< totalChunks).map { chunkNumber -> CompletedPart in
             guard let etag = etags[chunkNumber], !etag.isEmpty else {
                 throw UploadError.providerError("Missing ETag for completed chunk \(chunkNumber + 1)")
             }
@@ -235,23 +274,28 @@ public actor ChunkEngine {
             throw UploadError.providerError("Provider did not confirm one or more chunk checksums")
         }
 
-        let finalChecksumVerified: Bool
-        if isEncryptedUpload {
-            finalChecksumVerified = chunkVerification
+        let finalChecksumVerified: Bool = if isEncryptedUpload {
+            chunkVerification
         } else {
-            finalChecksumVerified = try await verifyFinalChecksum(
+            try await verifyFinalChecksum(
                 provider: provider,
                 account: account,
                 path: task.destinationPath,
                 expectedSHA256: task.localChecksum,
-                expectedMD5: try await checksumEngine.md5Stream(url: task.sourceURL),
+                expectedMD5: checksumEngine.md5Stream(url: task.sourceURL),
                 fallbackConfirmed: chunkVerification
             )
         }
 
         if !isEncryptedUpload, let deltaMapToStore {
             try? await provider.storeBlockManifest(deltaMapToStore, path: task.destinationPath, account: account)
-            try? await resumeStore.saveBlockManifest(deltaMapToStore, fileURL: task.sourceURL, providerID: provider.id, accountID: account.id, remotePath: task.destinationPath.path)
+            try? await resumeStore.saveBlockManifest(
+                deltaMapToStore,
+                fileURL: task.sourceURL,
+                providerID: provider.id,
+                accountID: account.id,
+                remotePath: task.destinationPath.path
+            )
         }
 
         try await resumeStore.deleteSession(task.id.uuidString)
@@ -274,7 +318,7 @@ public actor ChunkEngine {
         congestionController: CongestionController
     ) async -> Int {
         let providerLimit = max(1, provider.capabilities.maxConcurrentUploads)
-        let congestionLimit = max(1, await congestionController.recommendedParallelism)
+        let congestionLimit = await max(1, congestionController.recommendedParallelism)
         let configLimit = max(1, config.maxConcurrentChunks)
         return max(1, min(providerLimit, congestionLimit, configLimit))
     }
@@ -292,9 +336,9 @@ public actor ChunkEngine {
             metadata: task.metadata
         )
         task.setUploadID(uploadID)
-        let newSession = UploadSession(
+        let newSession = try UploadSession(
             id: task.id.uuidString,
-            fileBookmark: try ResumeStore.makeBookmarkData(for: task.sourceURL),
+            fileBookmark: ResumeStore.makeBookmarkData(for: task.sourceURL),
             fileURLString: task.sourceURL.path,
             providerID: task.providerID,
             accountID: task.accountID,
@@ -370,7 +414,7 @@ public actor ChunkEngine {
 
                 retries += 1
                 attempt += 1
-                if case ProviderError.rateLimited(let retryAfter) = error {
+                if case let ProviderError.rateLimited(retryAfter) = error {
                     await congestionController.onChunkRateLimited(retryAfter: retryAfter)
                     try await Task.sleep(nanoseconds: UInt64(max(0, retryAfter) * 1_000_000_000))
                 } else {
@@ -394,7 +438,11 @@ public actor ChunkEngine {
         let expectedSHA256: String
         let expectedMD5: String
         if let encryptionPipeline {
-            let processed = try await encryptionPipeline.processChunk(data: plaintext, chunkIndex: 0, fileID: task.id.uuidString)
+            let processed = try await encryptionPipeline.processChunk(
+                data: plaintext,
+                chunkIndex: 0,
+                fileID: task.id.uuidString
+            )
             payload = processed.encryptedData
             expectedSHA256 = processed.encryptedChecksum
             expectedMD5 = await checksumEngine.md5(of: payload)
@@ -424,7 +472,13 @@ public actor ChunkEngine {
 
         if encryptionPipeline == nil, let deltaMapToStore {
             try? await provider.storeBlockManifest(deltaMapToStore, path: task.destinationPath, account: account)
-            try? await resumeStore.saveBlockManifest(deltaMapToStore, fileURL: task.sourceURL, providerID: provider.id, accountID: account.id, remotePath: task.destinationPath.path)
+            try? await resumeStore.saveBlockManifest(
+                deltaMapToStore,
+                fileURL: task.sourceURL,
+                providerID: provider.id,
+                accountID: account.id,
+                remotePath: task.destinationPath.path
+            )
         }
 
         return UploadResult(
@@ -438,7 +492,10 @@ public actor ChunkEngine {
         )
     }
 
-    private func makeEncryptionPipelineIfNeeded(task: UploadTask, account: CloudAccount) async throws -> EncryptedChunkPipeline? {
+    private func makeEncryptionPipelineIfNeeded(
+        task: UploadTask,
+        account: CloudAccount
+    ) async throws -> EncryptedChunkPipeline? {
         guard encryptionEnabled(in: task.metadata) else { return nil }
         guard let vaultID = task.metadata.customAttributes["stratus.encryption.vaultID"], !vaultID.isEmpty else {
             throw UploadError.providerError("Encrypted upload requested but no vault ID was provided")
@@ -447,7 +504,8 @@ public actor ChunkEngine {
             service: KeychainStore.ServiceName.encryptionKey(vaultID: vaultID),
             account: account.id
         ) else {
-            throw UploadError.providerError("Encrypted upload requested but vault key \(vaultID) is missing from Keychain")
+            throw UploadError
+                .providerError("Encrypted upload requested but vault key \(vaultID) is missing from Keychain")
         }
         guard keyData.count == 32 else {
             throw UploadError.providerError("Vault key \(vaultID) must be exactly 32 bytes for AES-256-GCM")
@@ -503,22 +561,22 @@ public actor ChunkEngine {
     private func isRetriable(_ error: Error) -> Bool {
         switch error {
         case ProviderError.rateLimited, ProviderError.networkUnavailable:
-            return true
-        case ProviderError.serverError(let statusCode, _):
-            return [408, 429, 500, 502, 503, 504].contains(statusCode)
+            true
+        case let ProviderError.serverError(statusCode, _):
+            [408, 429, 500, 502, 503, 504].contains(statusCode)
         case ProviderError.accessDenied(_), ProviderError.authenticationFailed(_), ProviderError.fileNotFound(_),
              ProviderError.quotaExceeded, ProviderError.sessionExpired, ProviderError.unsupportedOperation(_),
-             ProviderError.checksumMismatch(_, _), ProviderError.invalidResponse(_), ProviderError.providerSpecific(_, _):
-            return false
+             ProviderError.checksumMismatch(_, _), ProviderError.invalidResponse(_), ProviderError.providerSpecific:
+            false
         default:
-            return true
+            true
         }
     }
 
     private func retryDelayNanoseconds(forAttempt attempt: Int) -> UInt64 {
         let retryIndex = max(0, attempt - 2)
         let base = min(pow(2.0, Double(retryIndex)), 16.0)
-        let jitter = Double.random(in: -0.25...0.25) * base
+        let jitter = Double.random(in: -0.25 ... 0.25) * base
         return UInt64(max(0.25, base + jitter) * 1_000_000_000)
     }
 }
