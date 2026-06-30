@@ -1,12 +1,11 @@
-import XCTest
 import GRDB
+import XCTest
 @testable import StratusCore
 
 // Tests that an upload session survives a simulated crash (process kill) and
 // can be resumed from the exact byte offset where it was interrupted.
 
 final class ResumeAfterCrashTests: XCTestCase {
-
     private var db: AppDatabase!
     private var store: ResumeStore!
 
@@ -35,7 +34,7 @@ final class ResumeAfterCrashTests: XCTestCase {
         try await store.saveSession(session)
 
         // Simulate completing chunks 0-4 before crash
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             try await store.markChunkComplete(sessionID: "crash-002", chunk: i, etag: "etag-\(i)")
         }
 
@@ -47,7 +46,7 @@ final class ResumeAfterCrashTests: XCTestCase {
         XCTAssertEqual(recoveredSession.totalChunks, 10)
 
         // Resume: complete remaining chunks 5-9
-        for i in 5..<10 {
+        for i in 5 ..< 10 {
             try await store.markChunkComplete(sessionID: "crash-002", chunk: i, etag: "etag-\(i)")
         }
 
@@ -74,16 +73,16 @@ final class ResumeAfterCrashTests: XCTestCase {
     // MARK: - Multiple sessions coexist and resume independently
 
     func test_multiple_sessions_resume_independently() async throws {
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             let s = makeSession(id: "multi-crash-\(i)", uploadID: "mpu-multi-\(i)", totalChunks: 4)
             try await store.saveSession(s)
         }
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             try await store.markChunkComplete(sessionID: "multi-crash-\(i)", chunk: 0, etag: "e-\(i)-0")
             try await store.markChunkComplete(sessionID: "multi-crash-\(i)", chunk: 1, etag: "e-\(i)-1")
         }
 
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             let loaded = try await store.loadSession("multi-crash-\(i)")
             XCTAssertEqual(loaded?.completedChunks.sorted(), [0, 1], "Session \(i) must have exactly chunks 0,1")
         }
@@ -106,7 +105,12 @@ final class ResumeAfterCrashTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeSession(id: String, uploadID: String, totalChunks: Int = 10, checksum: String = "sha256-default") -> UploadSession {
+    private func makeSession(
+        id: String,
+        uploadID: String,
+        totalChunks: Int = 10,
+        checksum: String = "sha256-default"
+    ) -> UploadSession {
         UploadSession(
             id: id,
             fileURLString: "/tmp/crash-test.bin",
