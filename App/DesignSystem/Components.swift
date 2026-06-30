@@ -1,6 +1,6 @@
 import SwiftUI
 #if os(macOS)
-import AppKit
+    import AppKit
 #endif
 
 // MARK: - ProviderIcon
@@ -26,18 +26,18 @@ public struct ProviderIcon: View {
 
     private var assetLogo: Image {
         #if os(macOS)
-        if let image = NSImage(named: assetName) {
-            return Image(nsImage: image)
-        }
+            if let image = NSImage(named: assetName) {
+                return Image(nsImage: image)
+            }
         #endif
         return Image(assetName)
     }
 
     private var hasAssetLogo: Bool {
         #if os(macOS)
-        return NSImage(named: assetName) != nil
+            return NSImage(named: assetName) != nil
         #else
-        return true
+            return true
         #endif
     }
 
@@ -55,45 +55,45 @@ public struct ProviderIcon: View {
 
     private var assetName: String {
         switch providerID {
-        case "s3": return "ProviderLogoAmazonAWS"
-        case "wasabi": return "ProviderLogoWasabi"
-        case "backblaze_b2": return "ProviderLogoBackblaze"
-        case "cloudflare_r2": return "ProviderLogoCloudflare"
-        case "gdrive": return "ProviderLogoGoogleDrive"
-        case "dropbox": return "ProviderLogoDropbox"
-        case "onedrive": return "ProviderLogoOneDrive"
-        case "box": return "ProviderLogoBox"
-        case "icloud": return "ProviderLogoICloud"
-        default: return ""
+        case "s3": "ProviderLogoAmazonAWS"
+        case "wasabi": "ProviderLogoWasabi"
+        case "backblaze_b2": "ProviderLogoBackblaze"
+        case "cloudflare_r2": "ProviderLogoCloudflare"
+        case "gdrive": "ProviderLogoGoogleDrive"
+        case "dropbox": "ProviderLogoDropbox"
+        case "onedrive": "ProviderLogoOneDrive"
+        case "box": "ProviderLogoBox"
+        case "icloud": "ProviderLogoICloud"
+        default: ""
         }
     }
 
     private var accessibilityName: String {
         switch providerID {
-        case "s3": return "Amazon S3"
-        case "wasabi": return "Wasabi"
-        case "backblaze_b2": return "Backblaze B2"
-        case "cloudflare_r2": return "Cloudflare R2"
-        case "gdrive": return "Google Drive"
-        case "dropbox": return "Dropbox"
-        case "onedrive": return "OneDrive"
-        case "box": return "Box"
-        case "icloud": return "iCloud Drive"
-        case "sftp": return "SFTP"
-        case "webdav": return "WebDAV"
-        case "ftp": return "FTP / FTPS"
-        default: return "Cloud provider"
+        case "s3": "Amazon S3"
+        case "wasabi": "Wasabi"
+        case "backblaze_b2": "Backblaze B2"
+        case "cloudflare_r2": "Cloudflare R2"
+        case "gdrive": "Google Drive"
+        case "dropbox": "Dropbox"
+        case "onedrive": "OneDrive"
+        case "box": "Box"
+        case "icloud": "iCloud Drive"
+        case "sftp": "SFTP"
+        case "webdav": "WebDAV"
+        case "ftp": "FTP / FTPS"
+        default: "Cloud provider"
         }
     }
 
     private var systemImage: String {
         switch providerID {
-        case "s3", "wasabi", "backblaze_b2", "cloudflare_r2", "minio": return "server.rack"
-        case "gdrive", "dropbox", "box": return "externaldrive"
-        case "onedrive", "icloud": return "icloud"
-        case "sftp": return "network"
-        case "webdav": return "globe"
-        default: return "cloud"
+        case "s3", "wasabi", "backblaze_b2", "cloudflare_r2", "minio": "server.rack"
+        case "gdrive", "dropbox", "box": "externaldrive"
+        case "onedrive", "icloud": "icloud"
+        case "sftp": "network"
+        case "webdav": "globe"
+        default: "cloud"
         }
     }
 }
@@ -120,7 +120,7 @@ public struct BandwidthLabel: View {
 // MARK: - ProgressRing
 
 public struct ProgressRing: View {
-    let progress: Double  // 0–1
+    let progress: Double // 0–1
     var size: CGFloat = 24
     var lineWidth: CGFloat = 3
     var color: Color = .accentColor
@@ -165,10 +165,10 @@ public struct StatusBadge: View {
 
     private var color: Color {
         switch status {
-        case .active: return .uploadActive
-        case .paused: return .uploadPaused
-        case .failed: return .uploadFailed
-        case .idle: return .textTertiary
+        case .active: .uploadActive
+        case .paused: .uploadPaused
+        case .failed: .uploadFailed
+        case .idle: .textTertiary
         }
     }
 }
@@ -177,7 +177,7 @@ public struct StatusBadge: View {
 
 public struct SectionHeader: View {
     let title: String
-    var trailing: String? = nil
+    var trailing: String?
 
     public var body: some View {
         HStack {
@@ -203,8 +203,8 @@ public struct EmptyStateView: View {
     let icon: String
     let title: String
     let subtitle: String
-    var actionTitle: String? = nil
-    var action: (() -> Void)? = nil
+    var actionTitle: String?
+    var action: (() -> Void)?
 
     public var body: some View {
         VStack(spacing: Spacing.lg) {
