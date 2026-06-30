@@ -9,11 +9,11 @@ public struct ChunkDescriptorWithResult: Sendable {
 }
 
 // MARK: - ParallelStreamUploader
+
 // HTTP/2 multiplexed chunk uploads with exponential backoff retry.
 // Never buffers full chunk in RAM — streams from InputStream.
 
 public final class ParallelStreamUploader: @unchecked Sendable {
-
     // Retry schedule (seconds ± jitter fraction):
     // Attempt 1: immediate
     // Attempt 2: 1s ± 250ms
@@ -31,11 +31,11 @@ public final class ParallelStreamUploader: @unchecked Sendable {
         let config = URLSessionConfiguration.ephemeral
         config.httpMaximumConnectionsPerHost = 6
         config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 0  // unlimited for large chunks
+        config.timeoutIntervalForResource = 0 // unlimited for large chunks
         config.waitsForConnectivity = true
         config.allowsCellularAccess = true
         config.tlsMinimumSupportedProtocolVersion = .TLSv12
-        self.session = URLSession(configuration: config)
+        session = URLSession(configuration: config)
     }
 
     deinit {
@@ -53,29 +53,28 @@ public final class ParallelStreamUploader: @unchecked Sendable {
     ) async throws -> ChunkUploadResult {
         var lastError: any Error = ChunkUploaderError.maxRetriesExceeded
 
-        for attempt in 0..<Self.maxAttempts {
+        for attempt in 0 ..< Self.maxAttempts {
             // Exponential backoff with ±25% jitter
             if attempt > 0 {
                 let base = Self.retryDelays[min(attempt, Self.retryDelays.count - 1)]
-                let jitter = base * 0.25 * (Double.random(in: -1...1))
+                let jitter = base * 0.25 * (Double.random(in: -1 ... 1))
                 let delay = max(0, base + jitter)
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
 
             do {
-                let result = try await performUpload(
+                return try await performUpload(
                     data: data,
                     to: endpoint,
                     headers: headers,
                     chunkSize: Int64(chunk.size),
                     progressHandler: progressHandler
                 )
-                return result
             } catch let error as ChunkUploaderError {
                 switch error {
-                case .nonRetryableStatus(_, _):
-                    throw error  // 400/401/403/404/409 — do not retry
-                case .rateLimited(let retryAfter):
+                case .nonRetryableStatus:
+                    throw error // 400/401/403/404/409 — do not retry
+                case let .rateLimited(retryAfter):
                     let waitTime = retryAfter ?? Self.retryDelays[min(attempt, Self.retryDelays.count - 1)]
                     logger.warning("Chunk \(chunk.number) rate limited, waiting \(waitTime)s")
                     try await Task.sleep(nanoseconds: UInt64(waitTime * 1_000_000_000))
@@ -149,12 +148,23 @@ private final class ChunkUploadDelegate: NSObject, URLSessionTaskDelegate, URLSe
         self.continuation = continuation
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
         progressHandler(totalBytesSent, expectedSize)
     }
 
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
-        self.httpResponse = response as? HTTPURLResponse
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        httpResponse = response as? HTTPURLResponse
         completionHandler(.allow)
     }
 
@@ -186,7 +196,8 @@ private final class ChunkUploadDelegate: NSObject, URLSessionTaskDelegate, URLSe
 
         // Rate limit
         if statusCode == 429 {
-            let retryAfter = (response.value(forHTTPHeaderField: "Retry-After") ?? response.value(forHTTPHeaderField: "retry-after")).flatMap { TimeInterval($0) }
+            let retryAfter = (response.value(forHTTPHeaderField: "Retry-After") ?? response
+                .value(forHTTPHeaderField: "retry-after")).flatMap { TimeInterval($0) }
             continuation.resume(throwing: ChunkUploaderError.rateLimited(retryAfter: retryAfter))
             return
         }
@@ -198,7 +209,7 @@ private final class ChunkUploadDelegate: NSObject, URLSessionTaskDelegate, URLSe
         }
 
         // Success (200–299)
-        guard (200...299).contains(statusCode) else {
+        guard (200 ... 299).contains(statusCode) else {
             continuation.resume(throwing: ChunkUploaderError.unexpectedStatus(statusCode))
             return
         }
