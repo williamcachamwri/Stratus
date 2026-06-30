@@ -27,17 +27,17 @@ public enum GoogleDriveWebLink {
     public static func actionTitle(mimeType: String?) -> String {
         switch mimeType {
         case "application/vnd.google-apps.document":
-            return "Open in Google Docs"
+            "Open in Google Docs"
         case "application/vnd.google-apps.spreadsheet":
-            return "Open in Google Sheets"
+            "Open in Google Sheets"
         case "application/vnd.google-apps.presentation":
-            return "Open in Google Slides"
+            "Open in Google Slides"
         case "application/vnd.google-apps.form":
-            return "Open in Google Forms"
+            "Open in Google Forms"
         case "application/vnd.google-apps.drawing":
-            return "Open in Google Drawings"
+            "Open in Google Drawings"
         default:
-            return "Open in Google Drive"
+            "Open in Google Drive"
         }
     }
 }
