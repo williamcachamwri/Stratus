@@ -1,9 +1,8 @@
-import XCTest
 import CryptoKit
+import XCTest
 @testable import StratusCore
 
 final class ClientSideEncryptionTests: XCTestCase {
-
     private var tempDir: URL!
     private var masterKey: SymmetricKey!
     private var encryption: ClientSideEncryption!
@@ -47,7 +46,7 @@ final class ClientSideEncryptionTests: XCTestCase {
         try Data("test".utf8).write(to: plainURL)
         try await encryption.encrypt(fileURL: plainURL, to: encURL)
         let header = try Data(contentsOf: encURL).prefix(4)
-        XCTAssertEqual(Array(header), [0x53, 0x54, 0x52, 0x53])  // "STRS"
+        XCTAssertEqual(Array(header), [0x53, 0x54, 0x52, 0x53]) // "STRS"
     }
 
     func test_wrongKeyFailsDecryption() async throws {
@@ -76,8 +75,8 @@ final class ClientSideEncryptionTests: XCTestCase {
     }
 
     func test_largeFileRoundTrip() async throws {
-        let size = 4 * 1024 * 1024  // 4MB
-        let original = Data((0..<size).map { _ in UInt8.random(in: 0...255) })
+        let size = 4 * 1024 * 1024 // 4MB
+        let original = Data((0 ..< size).map { _ in UInt8.random(in: 0 ... 255) })
         let plainURL = tempDir.appendingPathComponent("large.bin")
         let encURL = tempDir.appendingPathComponent("large.stre")
         let decURL = tempDir.appendingPathComponent("large_dec.bin")
@@ -87,7 +86,6 @@ final class ClientSideEncryptionTests: XCTestCase {
         let decrypted = try Data(contentsOf: decURL)
         XCTAssertEqual(original, decrypted)
     }
-
 
     func test_largeFileUsesMultipleAuthenticatedFrames() async throws {
         let size = 3 * 1024 * 1024 + 17
@@ -104,7 +102,8 @@ final class ClientSideEncryptionTests: XCTestCase {
         var frameCount = 0
         while offset < encrypted.count {
             XCTAssertGreaterThanOrEqual(encrypted.count - offset, 4)
-            let length = Int(encrypted[offset..<(offset + 4)].withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).bigEndian })
+            let length = Int(encrypted[offset ..< (offset + 4)]
+                .withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).bigEndian })
             offset += 4 + 12 + length
             frameCount += 1
         }
@@ -121,7 +120,7 @@ final class ClientSideEncryptionTests: XCTestCase {
         let original = Data("critical data that must not be silently corrupted".utf8)
         let encrypted = try await encryption.encryptData(original)
         var corrupted = encrypted
-        corrupted[EncryptionHeader.byteLength] ^= 0xFF  // flip first ciphertext byte
+        corrupted[EncryptionHeader.byteLength] ^= 0xFF // flip first ciphertext byte
         do {
             _ = try await encryption.decryptData(corrupted)
             XCTFail("AES-GCM authentication must detect ciphertext corruption")
@@ -144,9 +143,9 @@ final class ClientSideEncryptionTests: XCTestCase {
         XCTAssertEqual(decrypted, empty, "Empty data must survive encrypt/decrypt round trip")
     }
 
-    func test_headerParsing_wrongMagic_throwsIntegrityError() async throws {
+    func test_headerParsing_wrongMagic_throwsIntegrityError() throws {
         var badHeader = Data(count: EncryptionHeader.byteLength)
-        badHeader[0] = 0xFF  // wrong magic (correct is 0x53 "S")
+        badHeader[0] = 0xFF // wrong magic (correct is 0x53 "S")
         do {
             _ = try EncryptionHeader.parse(from: badHeader)
             XCTFail("Wrong magic bytes must throw integrityCheckFailed")
