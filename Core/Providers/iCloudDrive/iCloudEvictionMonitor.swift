@@ -1,16 +1,17 @@
 import Foundation
 import os.log
 
-// MARK: - iCloudEvictionEvent
+// MARK: - ICloudEvictionEvent
 
-public enum iCloudEvictionEvent: Sendable {
+public enum ICloudEvictionEvent: Sendable {
     /// A file that was locally present has been evicted to iCloud-only storage.
     case fileEvicted(URL)
     /// A file that was evicted has been downloaded back to local storage.
     case fileDownloaded(URL)
 }
 
-// MARK: - iCloudEvictionMonitor
+// MARK: - ICloudEvictionMonitor
+
 // Monitors iCloud Drive file eviction events via NSMetadataQuery.
 // Notifies observers through an AsyncStream when files are evicted from
 // local storage or successfully downloaded back.
@@ -19,26 +20,25 @@ public enum iCloudEvictionEvent: Sendable {
 // the main queue and communicate results back to the actor only through
 // value types (no direct NSMetadataQuery capture across isolation boundaries).
 
-public actor iCloudEvictionMonitor {
-
+public actor ICloudEvictionMonitor {
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "iCloudEvictionMonitor")
 
-    // Continuations for active event streams
-    private var continuations: [UUID: AsyncStream<iCloudEvictionEvent>.Continuation] = [:]
+    /// Continuations for active event streams
+    private var continuations: [UUID: AsyncStream<ICloudEvictionEvent>.Continuation] = [:]
 
-    // Snapshot of previous download statuses — keyed by file path
+    /// Snapshot of previous download statuses — keyed by file path
     private var previousStatuses: [String: String] = [:]
 
-    // Whether the main-queue NSMetadataQuery is currently running
+    /// Whether the main-queue NSMetadataQuery is currently running
     private var queryRunning = false
 
     public init() {}
 
     // MARK: - Public API
 
-    /// Returns an AsyncStream that yields iCloudEvictionEvent values as iCloud
+    /// Returns an AsyncStream that yields ICloudEvictionEvent values as iCloud
     /// Drive changes the local availability of files.
-    public var events: AsyncStream<iCloudEvictionEvent> {
+    public var events: AsyncStream<ICloudEvictionEvent> {
         AsyncStream { continuation in
             let id = UUID()
             continuations[id] = continuation
@@ -77,16 +77,18 @@ public actor iCloudEvictionMonitor {
             let url = URL(fileURLWithPath: entry.path)
 
             // Detect eviction: was current (local), now not current
-            if previous == NSMetadataUbiquitousItemDownloadingStatusCurrent
-                && entry.status != NSMetadataUbiquitousItemDownloadingStatusCurrent {
+            if previous == NSMetadataUbiquitousItemDownloadingStatusCurrent,
+               entry.status != NSMetadataUbiquitousItemDownloadingStatusCurrent
+            {
                 logger.debug("File evicted: \(entry.path)")
                 emit(.fileEvicted(url))
             }
 
             // Detect download: transitioned to current (from some prior state)
-            if previous != NSMetadataUbiquitousItemDownloadingStatusCurrent
-                && entry.status == NSMetadataUbiquitousItemDownloadingStatusCurrent
-                && previous != nil {
+            if previous != NSMetadataUbiquitousItemDownloadingStatusCurrent,
+               entry.status == NSMetadataUbiquitousItemDownloadingStatusCurrent,
+               previous != nil
+            {
                 logger.debug("File downloaded: \(entry.path)")
                 emit(.fileDownloaded(url))
             }
@@ -105,7 +107,7 @@ public actor iCloudEvictionMonitor {
         logger.info("iCloudEvictionMonitor started NSMetadataQuery via coordinator")
     }
 
-    private func emit(_ event: iCloudEvictionEvent) {
+    private func emit(_ event: ICloudEvictionEvent) {
         for continuation in continuations.values {
             continuation.yield(event)
         }
@@ -122,20 +124,21 @@ public actor iCloudEvictionMonitor {
 }
 
 // MARK: - EvictionQueryCoordinator
+
 // Lives on the main actor so it can safely own NSMetadataQuery.
 // Converts NSMetadataQuery notifications into sendable value batches
-// and forwards them to the iCloudEvictionMonitor actor.
+// and forwards them to the ICloudEvictionMonitor actor.
 
 @MainActor
 private final class EvictionQueryCoordinator {
     static let shared = EvictionQueryCoordinator()
 
     private var query: NSMetadataQuery?
-    private weak var monitor: iCloudEvictionMonitor?
+    private weak var monitor: ICloudEvictionMonitor?
 
     private init() {}
 
-    func startQuery(monitor: iCloudEvictionMonitor) {
+    func startQuery(monitor: ICloudEvictionMonitor) {
         self.monitor = monitor
         guard query == nil else { return }
 
@@ -158,7 +161,7 @@ private final class EvictionQueryCoordinator {
         )
 
         metadataQuery.start()
-        self.query = metadataQuery
+        query = metadataQuery
     }
 
     func stopQuery() {
@@ -177,7 +180,7 @@ private final class EvictionQueryCoordinator {
 
         // Collect (path, status) pairs as pure value types — safe to send
         var batch: [(path: String, status: String)] = []
-        for index in 0..<q.resultCount {
+        for index in 0 ..< q.resultCount {
             guard let item = q.result(at: index) as? NSMetadataItem else { continue }
             guard let path = item.value(forAttribute: NSMetadataItemPathKey) as? String else { continue }
             let status = (item.value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String) ?? ""
