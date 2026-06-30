@@ -1,16 +1,17 @@
-import Foundation
-import CryptoKit
 import CommonCrypto
+import CryptoKit
+import Foundation
 import Security
 
 // MARK: - Argon2id Key Derivation
+
 // Uses CommonCrypto's PBKDF2-SHA256 as a safe substitute until a native Argon2 library ships.
 // The KDF parameters are tuned for interactive use on macOS: ~100ms per derivation.
 
 public struct EncryptionKeyDerivation: Sendable {
     private static let saltLength = 32
-    private static let keyLength = 32  // AES-256
-    // PBKDF2 iterations calibrated for ~100ms on an M1 at interactive login
+    private static let keyLength = 32 // AES-256
+    /// PBKDF2 iterations calibrated for ~100ms on an M1 at interactive login
     private static let pbkdf2Iterations: Int = 310_000
 
     // MARK: - Key Derivation
