@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class CongestionControllerTests: XCTestCase {
-
     func test_slowStartDoublesWindow() async {
         let cc = CongestionController()
         let initial = await cc.windowSizeForTesting
@@ -48,7 +47,9 @@ final class CongestionControllerTests: XCTestCase {
 
     func test_windowNeverBelowOne() async {
         let cc = CongestionController()
-        for _ in 0..<10 { await cc.onChunkTimeout() }
+        for _ in 0 ..< 10 {
+            await cc.onChunkTimeout()
+        }
         let window = await cc.windowSizeForTesting
         XCTAssertGreaterThanOrEqual(window, 1.0)
     }
@@ -56,9 +57,9 @@ final class CongestionControllerTests: XCTestCase {
     func test_recoveryMode_addsOnePerRTT() async {
         let cc = CongestionController(maxConcurrentStreams: 100)
         await cc.setWindowForTesting(16.0)
-        await cc.onChunkRateLimited(retryAfter: 0)  // enters recovery, halves window to 8
+        await cc.onChunkRateLimited(retryAfter: 0) // enters recovery, halves window to 8
         let before = await cc.windowSizeForTesting
-        await cc.onChunkSuccess(rtt: 0.05)           // recovery: +1.0
+        await cc.onChunkSuccess(rtt: 0.05) // recovery: +1.0
         let after = await cc.windowSizeForTesting
         XCTAssertEqual(after, before + 1.0, accuracy: 0.001)
     }
@@ -87,8 +88,8 @@ final class CongestionControllerTests: XCTestCase {
 
     func test_slowStart_capsAtSsthresh() async {
         let cc = CongestionController(maxConcurrentStreams: 100)
-        await cc.setWindowForTesting(20.0)  // 20 < default ssthresh(32) → slowStart
-        await cc.onChunkSuccess(rtt: 0.05)  // doubles to 40, capped at ssthresh(32)
+        await cc.setWindowForTesting(20.0) // 20 < default ssthresh(32) → slowStart
+        await cc.onChunkSuccess(rtt: 0.05) // doubles to 40, capped at ssthresh(32)
         let window = await cc.windowSizeForTesting
         XCTAssertLessThanOrEqual(window, 32.0)
     }
