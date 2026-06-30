@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - Download State Machine
+
 //
 // Valid transitions:
 //   .queued      → .downloading, .cancelled
@@ -23,10 +24,10 @@ public enum DownloadState: Equatable, Sendable {
 
 public enum DownloadPriority: Int, Comparable, Sendable, Codable {
     case background = 0
-    case low        = 25
-    case normal     = 50
-    case high       = 75
-    case urgent     = 100
+    case low = 25
+    case normal = 50
+    case high = 75
+    case urgent = 100
 
     public static func < (lhs: DownloadPriority, rhs: DownloadPriority) -> Bool {
         lhs.rawValue < rhs.rawValue
@@ -135,7 +136,6 @@ public struct DownloadResumeToken: Equatable, Sendable, Codable {
 /// Represents a single file download. Mutation is intentionally unguarded at
 /// the class level because the DownloadEngine actor serialises all access.
 public final class DownloadTask: @unchecked Sendable, Identifiable {
-
     // MARK: Immutable identity
 
     public let id: UUID
@@ -152,10 +152,10 @@ public final class DownloadTask: @unchecked Sendable, Identifiable {
 
     // MARK: Mutable state (guarded by owning actor)
 
-    private(set) public var state: DownloadState
-    private(set) public var retryCount: Int = 0
+    public private(set) var state: DownloadState
+    public private(set) var retryCount: Int = 0
     /// Set once the staging file URL is known (parallel downloader creates it).
-    private(set) public var stagingURL: URL?
+    public private(set) var stagingURL: URL?
 
     // MARK: Init
 
@@ -201,13 +201,13 @@ public final class DownloadTask: @unchecked Sendable, Identifiable {
 
     public var isTerminal: Bool {
         switch state {
-        case .completed, .cancelled: return true
-        default: return false
+        case .completed, .cancelled: true
+        default: false
         }
     }
 
     public var resumeToken: DownloadResumeToken? {
-        if case .paused(let token) = state { return token }
+        if case let .paused(token) = state { return token }
         return nil
     }
 }
