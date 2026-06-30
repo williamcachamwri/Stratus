@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct DownloadCenterView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -83,8 +83,10 @@ private struct DownloadSummaryCard: View {
                     .frame(width: 44, alignment: .trailing)
             }
 
-            Text("\(formatTransferBytes(summary.bytesReceived)) of \(formatTransferBytes(summary.totalBytes)) · \(summary.failedCount) failed · \(summary.pausedCount) paused · \(summary.completedCount) completed")
-                .stratusCaption()
+            Text(
+                "\(formatTransferBytes(summary.bytesReceived)) of \(formatTransferBytes(summary.totalBytes)) · \(summary.failedCount) failed · \(summary.pausedCount) paused · \(summary.completedCount) completed"
+            )
+            .stratusCaption()
         }
     }
 }
@@ -153,10 +155,12 @@ private struct DownloadItemRow: View {
                 ProgressView(value: row.progress)
                     .accessibilityLabel("\(row.fileName) download progress")
                     .accessibilityValue("\(Int(row.progress * 100)) percent")
-                Text("\(formatTransferBytes(row.bytesReceived)) / \(formatTransferBytes(row.totalBytes)) · \(row.sourcePath) · \(row.rangeText) · \(row.detailText)")
-                    .font(.stratusSmallMono)
-                    .foregroundColor(.textSecondary)
-                    .lineLimit(1)
+                Text(
+                    "\(formatTransferBytes(row.bytesReceived)) / \(formatTransferBytes(row.totalBytes)) · \(row.sourcePath) · \(row.rangeText) · \(row.detailText)"
+                )
+                .font(.stratusSmallMono)
+                .foregroundColor(.textSecondary)
+                .lineLimit(1)
             }
 
             Spacer(minLength: Spacing.md)
@@ -175,12 +179,12 @@ private struct DownloadItemRow: View {
 
     private var phaseLabel: String {
         switch row.phase {
-        case .queued, .restored: return "Queued"
-        case .downloading: return "\(Int(row.progress * 100))%"
-        case .paused: return "Paused"
-        case .failed: return "Failed"
-        case .completed: return row.checksumVerified ? "Verified" : "Done"
-        case .cancelled: return "Cancelled"
+        case .queued, .restored: "Queued"
+        case .downloading: "\(Int(row.progress * 100))%"
+        case .paused: "Paused"
+        case .failed: "Failed"
+        case .completed: row.checksumVerified ? "Verified" : "Done"
+        case .cancelled: "Cancelled"
         }
     }
 
