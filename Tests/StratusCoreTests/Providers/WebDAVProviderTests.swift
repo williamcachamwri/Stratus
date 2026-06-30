@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class WebDAVProviderTests: XCTestCase {
-
     private let provider = WebDAVProvider()
 
     func test_provider_id() {
@@ -27,11 +26,11 @@ final class WebDAVProviderTests: XCTestCase {
     }
 
     func test_capabilities_sendable() {
-        func check<T: Sendable>(_: T) {}
+        func check(_: some Sendable) {}
         check(provider.capabilities)
     }
 
-    func test_validate_credentials_without_server_config() async throws {
+    func test_validate_credentials_without_server_config() async {
         let account = CloudAccount(id: "webdav-test", providerID: "webdav", displayName: "Test WebDAV", email: nil)
         // Without real server config this either returns false or throws
         let valid = try? await provider.validateCredentials(account: account)
