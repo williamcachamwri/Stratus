@@ -3,6 +3,7 @@ import GRDB
 import os.log
 
 // MARK: - ResumeStore
+
 // SQLite-backed crash-proof persistence for upload sessions.
 // Survives app crashes, force quits, and system restarts.
 
@@ -19,20 +20,29 @@ public actor ResumeStore {
 
     public nonisolated static func makeBookmarkData(for url: URL) throws -> Data? {
         #if os(macOS)
-        return try url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+            return try url.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
         #else
-        return nil
+            return nil
         #endif
     }
 
     public nonisolated func resolvedFileURL(for session: UploadSession) throws -> URL {
         #if os(macOS)
-        if let bookmark = session.fileBookmark, !bookmark.isEmpty {
-            var stale = false
-            let url = try URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale)
-            guard !stale else { throw UploadError.fileChanged(url) }
-            return url
-        }
+            if let bookmark = session.fileBookmark, !bookmark.isEmpty {
+                var stale = false
+                let url = try URL(
+                    resolvingBookmarkData: bookmark,
+                    options: [.withSecurityScope],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &stale
+                )
+                guard !stale else { throw UploadError.fileChanged(url) }
+                return url
+            }
         #endif
         return URL(fileURLWithPath: session.fileURLString)
     }
@@ -47,7 +57,8 @@ public actor ResumeStore {
         let now = Date().timeIntervalSince1970
 
         try await db.write { database in
-            try database.execute(sql: """
+            try database.execute(
+                sql: """
                 INSERT INTO upload_sessions
                   (id, file_bookmark, file_url_string, provider_id, account_id, remote_path,
                    upload_id, file_size, file_checksum, chunk_size, total_chunks,
@@ -92,7 +103,8 @@ public actor ResumeStore {
     public func markChunkComplete(sessionID: String, chunk: Int, etag: String) async throws {
         // Atomic update: append chunk number + set etag
         try await db.write { database in
-            guard let row = try Row.fetchOne(database,
+            guard let row = try Row.fetchOne(
+                database,
                 sql: "SELECT completed_chunks, etags FROM upload_sessions WHERE id = ?",
                 arguments: [sessionID]
             ) else { return }
@@ -109,10 +121,17 @@ public actor ResumeStore {
             var etagMap = (try? JSONDecoder().decode([Int: String].self, from: Data(etagsStr.utf8))) ?? [:]
             etagMap[chunk] = etag
 
-            let newChunksJSON = (try? JSONEncoder().encode(chunks)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
-            let newEtagsJSON = (try? JSONEncoder().encode(etagMap)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+            let newChunksJSON = (try? JSONEncoder().encode(chunks)).flatMap { String(
+                data: $0,
+                encoding: .utf8
+            ) } ?? "[]"
+            let newEtagsJSON = (try? JSONEncoder().encode(etagMap)).flatMap { String(
+                data: $0,
+                encoding: .utf8
+            ) } ?? "{}"
 
-            try database.execute(sql: """
+            try database.execute(
+                sql: """
                 UPDATE upload_sessions
                 SET completed_chunks = ?, etags = ?, updated_at = ?
                 WHERE id = ?
@@ -124,7 +143,8 @@ public actor ResumeStore {
 
     public func loadSession(_ id: String) async throws -> UploadSession? {
         try await db.read { database in
-            guard let row = try Row.fetchOne(database,
+            guard let row = try Row.fetchOne(
+                database,
                 sql: "SELECT * FROM upload_sessions WHERE id = ?",
                 arguments: [id]
             ) else { return nil }
@@ -134,7 +154,8 @@ public actor ResumeStore {
 
     public func loadPendingSessions() async throws -> [UploadSession] {
         try await db.read { database in
-            let rows = try Row.fetchAll(database,
+            let rows = try Row.fetchAll(
+                database,
                 sql: "SELECT * FROM upload_sessions WHERE state IN ('uploading', 'paused', 'queued') ORDER BY created_at ASC"
             )
             return rows.compactMap { try? self.sessionFromRow($0) }
@@ -150,7 +171,8 @@ public actor ResumeStore {
 
     public func updateSessionState(_ id: String, state: String, error: String? = nil) async throws {
         try await db.write { database in
-            try database.execute(sql: """
+            try database.execute(
+                sql: """
                 UPDATE upload_sessions SET state = ?, error_description = ?, updated_at = ? WHERE id = ?
                 """,
                 arguments: [state, error, Date().timeIntervalSince1970, id]
@@ -172,20 +194,35 @@ public actor ResumeStore {
 
     // MARK: - Block Manifests
 
-    public func saveBlockManifest(_ manifest: BlockMap, fileURL: URL, providerID: String, accountID: String, remotePath: String) async throws {
+    public func saveBlockManifest(
+        _ manifest: BlockMap,
+        fileURL: URL,
+        providerID: String,
+        accountID: String,
+        remotePath: String
+    ) async throws {
         let manifestJSON = try encoder.encode(manifest)
         let manifestStr = String(data: manifestJSON, encoding: .utf8) ?? "{}"
         let bookmarkStr = bookmarkKey(for: fileURL)
 
         try await db.write { database in
-            try database.execute(sql: """
+            try database.execute(
+                sql: """
                 INSERT INTO block_manifests (id, file_bookmark, provider_id, account_id, remote_path, block_map, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(file_bookmark) DO UPDATE SET
                   block_map = excluded.block_map,
                   updated_at = excluded.updated_at
                 """,
-                arguments: [UUID().uuidString, bookmarkStr, providerID, accountID, remotePath, manifestStr, Date().timeIntervalSince1970]
+                arguments: [
+                    UUID().uuidString,
+                    bookmarkStr,
+                    providerID,
+                    accountID,
+                    remotePath,
+                    manifestStr,
+                    Date().timeIntervalSince1970
+                ]
             )
         }
     }
@@ -193,11 +230,12 @@ public actor ResumeStore {
     public func loadBlockManifest(fileURL: URL, providerID: String) async throws -> BlockMap? {
         let bookmarkStr = bookmarkKey(for: fileURL)
         return try await db.read { database in
-            guard let row = try Row.fetchOne(database,
+            guard let row = try Row.fetchOne(
+                database,
                 sql: "SELECT block_map FROM block_manifests WHERE file_bookmark = ? AND provider_id = ?",
                 arguments: [bookmarkStr, providerID]
             ), let mapStr = row["block_map"] as? String,
-               let mapData = mapStr.data(using: .utf8) else { return nil }
+            let mapData = mapStr.data(using: .utf8) else { return nil }
             return try? JSONDecoder().decode(BlockMap.self, from: mapData)
         }
     }
