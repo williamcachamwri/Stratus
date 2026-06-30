@@ -1,5 +1,5 @@
-import Foundation
 import FileProvider
+import Foundation
 
 // MARK: - StratusFileProviderDomainContext
 
@@ -49,7 +49,10 @@ public actor StratusFileProviderDomainResolver {
         }
         let config = try await configStore.load(accountID: account.id)
         guard let provider = await CloudProviderFactory.makeProvider(for: account, config: config) else {
-            throw StratusFileProviderDomainResolverError.providerMissing(accountID: account.id, providerID: account.providerID)
+            throw StratusFileProviderDomainResolverError.providerMissing(
+                accountID: account.id,
+                providerID: account.providerID
+            )
         }
         return StratusFileProviderDomainContext(account: account, provider: provider, record: record)
     }
