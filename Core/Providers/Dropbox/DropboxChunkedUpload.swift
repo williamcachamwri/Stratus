@@ -2,21 +2,23 @@ import Foundation
 import os.log
 
 // MARK: - Dropbox Upload Session
+
 // Dropbox upload_session API is SEQUENTIAL — no parallel chunks per session.
 // Max chunk size: 150 MB. Session valid 48 hours with activity.
 
 public actor DropboxChunkedUpload {
-    private static let maxChunkSize = 150 * 1024 * 1024  // 150 MB
-    private static let defaultChunkSize = 50 * 1024 * 1024  // 50 MB
+    private static let maxChunkSize = 150 * 1024 * 1024 // 150 MB
+    private static let defaultChunkSize = 50 * 1024 * 1024 // 50 MB
     private let http = HTTPClient()
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "DropboxUpload")
 
     public init() {}
 
-    // Step 1: Start session
+    /// Step 1: Start session
     public func startSession(accessToken: String) async throws -> String {
         var request = HTTPRequest(
-            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/start") ?? URL(fileURLWithPath: "/"),
+            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/start") ??
+                URL(fileURLWithPath: "/"),
             method: .POST
         )
         request.headers["Authorization"] = "Bearer \(accessToken)"
@@ -27,19 +29,27 @@ public actor DropboxChunkedUpload {
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
-              let sessionID = json["session_id"] as? String else {
+              let sessionID = json["session_id"] as? String
+        else {
             throw DropboxError.sessionStartFailed(response.statusCode)
         }
         return sessionID
     }
 
-    // Step 2: Append chunk (sequential)
-    public func appendChunk(sessionID: String, data: Data, offset: Int64, isLast: Bool, accessToken: String) async throws {
+    /// Step 2: Append chunk (sequential)
+    public func appendChunk(
+        sessionID: String,
+        data: Data,
+        offset: Int64,
+        isLast: Bool,
+        accessToken: String
+    ) async throws {
         let cursorJSON = "{\"session_id\":\"\(sessionID)\",\"offset\":\(offset)}"
         let apiArg = "{\"cursor\":\(cursorJSON),\"close\":\(isLast)}"
 
         var request = HTTPRequest(
-            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/append_v2") ?? URL(fileURLWithPath: "/"),
+            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/append_v2") ??
+                URL(fileURLWithPath: "/"),
             method: .POST
         )
         request.headers["Authorization"] = "Bearer \(accessToken)"
@@ -53,19 +63,20 @@ public actor DropboxChunkedUpload {
         }
     }
 
-    // Step 3: Finish (commit)
+    /// Step 3: Finish (commit)
     public func finishSession(
         sessionID: String,
         offset: Int64,
         remotePath: String,
         accessToken: String
-    ) async throws -> String {  // returns file ID
+    ) async throws -> String { // returns file ID
         let cursorJSON = "{\"session_id\":\"\(sessionID)\",\"offset\":\(offset)}"
         let commitJSON = "{\"path\":\"\(remotePath)\",\"mode\":\"overwrite\",\"autorename\":false}"
         let apiArg = "{\"cursor\":\(cursorJSON),\"commit\":\(commitJSON)}"
 
         var request = HTTPRequest(
-            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/finish") ?? URL(fileURLWithPath: "/"),
+            url: URL(string: "https://content.dropboxapi.com/2/files/upload_session/finish") ??
+                URL(fileURLWithPath: "/"),
             method: .POST
         )
         request.headers["Authorization"] = "Bearer \(accessToken)"
@@ -76,13 +87,14 @@ public actor DropboxChunkedUpload {
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
-              let id = json["id"] as? String else {
+              let id = json["id"] as? String
+        else {
             throw DropboxError.finishFailed(response.statusCode)
         }
         return id
     }
 
-    // Full file upload orchestration
+    /// Full file upload orchestration
     public func upload(
         fileURL: URL,
         fileSize: Int64,
@@ -100,12 +112,23 @@ public actor DropboxChunkedUpload {
             let data = try ChunkSlicer.readChunk(fileHandle: fileHandle, offset: offset, size: chunkSize)
             let isLast = offset + Int64(chunkSize) >= fileSize
 
-            try await appendChunk(sessionID: sessionID, data: data, offset: offset, isLast: isLast && !isLast, accessToken: accessToken)
+            try await appendChunk(
+                sessionID: sessionID,
+                data: data,
+                offset: offset,
+                isLast: isLast && !isLast,
+                accessToken: accessToken
+            )
             offset += Int64(chunkSize)
             progressHandler(offset, fileSize)
         }
 
-        return try await finishSession(sessionID: sessionID, offset: fileSize, remotePath: remotePath, accessToken: accessToken)
+        return try await finishSession(
+            sessionID: sessionID,
+            offset: fileSize,
+            remotePath: remotePath,
+            accessToken: accessToken
+        )
     }
 }
 
