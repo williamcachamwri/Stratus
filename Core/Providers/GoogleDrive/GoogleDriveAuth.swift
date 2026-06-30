@@ -1,6 +1,6 @@
-import Foundation
 import AuthenticationServices
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - Google OAuth2 via ASWebAuthenticationSession
@@ -21,7 +21,10 @@ public actor GoogleDriveAuth {
 
     // MARK: - Authorization Code + PKCE
 
-    public func authorize(clientID: String, presentationContext: ASWebAuthenticationPresentationContextProviding) async throws -> OAuthCredential {
+    public func authorize(
+        clientID: String,
+        presentationContext: ASWebAuthenticationPresentationContextProviding
+    ) async throws -> OAuthCredential {
         let (codeVerifier, codeChallenge) = generatePKCE()
         let state = UUID().uuidString
 
@@ -41,8 +44,14 @@ public actor GoogleDriveAuth {
         guard let authURL = comps.url else {
             throw AuthError.pkceGenerationFailed
         }
-        let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, any Error>) in
-            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "com.stratus.cloudmanager") { url, error in
+        let callbackURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<
+            URL,
+            any Error
+        >) in
+            let session = ASWebAuthenticationSession(
+                url: authURL,
+                callbackURLScheme: "com.stratus.cloudmanager"
+            ) { url, error in
                 if let error { continuation.resume(throwing: error) }
                 else if let url { continuation.resume(returning: url) }
                 else { continuation.resume(throwing: AuthError.cancelled) }
@@ -53,7 +62,8 @@ public actor GoogleDriveAuth {
         }
 
         guard let code = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
-            .queryItems?.first(where: { $0.name == "code" })?.value else {
+            .queryItems?.first(where: { $0.name == "code" })?.value
+        else {
             throw AuthError.noAuthorizationCode
         }
 
@@ -88,7 +98,8 @@ public actor GoogleDriveAuth {
 
     private func parseTokenResponse(data: Data, existingRefreshToken: String?) throws -> OAuthCredential {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let accessToken = json["access_token"] as? String else {
+              let accessToken = json["access_token"] as? String
+        else {
             throw AuthError.invalidTokenResponse
         }
         let expiresIn = json["expires_in"] as? TimeInterval ?? 3600
