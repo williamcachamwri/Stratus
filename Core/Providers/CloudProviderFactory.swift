@@ -33,10 +33,13 @@ public enum CloudProviderFactory {
 
         case "gdrive":
             return GoogleDriveProvider()
+
         case "dropbox":
             return DropboxProvider()
+
         case "onedrive":
             return OneDriveProvider()
+
         case "box":
             return BoxProvider()
 
@@ -45,7 +48,10 @@ public enum CloudProviderFactory {
                 let config,
                 let host = config.host,
                 let username = config.username,
-                let basic = try? await credentialVault.loadBasicCredential(providerID: account.providerID, accountID: account.id)
+                let basic = try? await credentialVault.loadBasicCredential(
+                    providerID: account.providerID,
+                    accountID: account.id
+                )
             else { return nil }
             let provider = SFTPProvider()
             await provider.registerConnection(
@@ -69,7 +75,10 @@ public enum CloudProviderFactory {
             guard
                 let config,
                 let host = config.host,
-                let basic = try? await credentialVault.loadBasicCredential(providerID: account.providerID, accountID: account.id)
+                let basic = try? await credentialVault.loadBasicCredential(
+                    providerID: account.providerID,
+                    accountID: account.id
+                )
             else { return nil }
             let provider = FTPProvider()
             await provider.registerConfig(
@@ -92,18 +101,18 @@ public enum CloudProviderFactory {
 
     public static func displayName(for providerID: String) -> String {
         switch providerID {
-        case "s3": return "Amazon S3"
-        case "wasabi": return "Wasabi"
-        case "backblaze_b2": return "Backblaze B2"
-        case "cloudflare_r2": return "Cloudflare R2"
-        case "gdrive": return "Google Drive"
-        case "dropbox": return "Dropbox"
-        case "onedrive": return "OneDrive"
-        case "box": return "Box"
-        case "sftp": return "SFTP"
-        case "webdav": return "WebDAV"
-        case "ftp": return "FTP"
-        default: return providerID
+        case "s3": "Amazon S3"
+        case "wasabi": "Wasabi"
+        case "backblaze_b2": "Backblaze B2"
+        case "cloudflare_r2": "Cloudflare R2"
+        case "gdrive": "Google Drive"
+        case "dropbox": "Dropbox"
+        case "onedrive": "OneDrive"
+        case "box": "Box"
+        case "sftp": "SFTP"
+        case "webdav": "WebDAV"
+        case "ftp": "FTP"
+        default: providerID
         }
     }
 }
