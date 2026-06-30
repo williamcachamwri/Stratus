@@ -202,13 +202,33 @@ struct FileBrowserView: View {
         let accountID = account.id
 
         for provider in providers {
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                guard
-                    let data = item as? Data,
-                    let url = URL(dataRepresentation: data, relativeTo: nil)
-                else { return }
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+                if let error {
+                    Task { @MainActor in
+                        uploadFeedback = "Error: \(error.localizedDescription)"
+                    }
+                    return
+                }
+
+                let resolvedURL: URL?
+                if let url = item as? URL {
+                    resolvedURL = url
+                } else if let data = item as? Data {
+                    resolvedURL = URL(dataRepresentation: data, relativeTo: nil)
+                } else if let path = item as? String {
+                    resolvedURL = URL(fileURLWithPath: path)
+                } else {
+                    Task { @MainActor in
+                        uploadFeedback = "Unsupported drop item type"
+                    }
+                    return
+                }
+
+                guard let url = resolvedURL else { return }
+                let didStartAccessing = url.startAccessingSecurityScopedResource()
 
                 Task { @MainActor in
+                    if didStartAccessing { url.stopAccessingSecurityScopedResource() }
                     do {
                         _ = try await env.uploadEngine.upload(
                             fileURL: url,
@@ -218,11 +238,11 @@ struct FileBrowserView: View {
                         let name = url.lastPathComponent
                         uploadFeedback = "Queued \(name) for upload"
                         try? await Task.sleep(for: .seconds(3))
-                        uploadFeedback = nil
+                        if uploadFeedback == "Queued \(name) for upload" { uploadFeedback = nil }
                     } catch {
                         uploadFeedback = "Upload failed: \(error.localizedDescription)"
                         try? await Task.sleep(for: .seconds(4))
-                        uploadFeedback = nil
+                        if uploadFeedback == "Upload failed: \(error.localizedDescription)" { uploadFeedback = nil }
                     }
                 }
             }

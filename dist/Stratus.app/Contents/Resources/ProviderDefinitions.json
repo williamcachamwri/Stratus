@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "providers": [
+    {
+      "id": "s3",
+      "displayName": "Amazon S3",
+      "kind": "s3",
+      "endpointTemplate": "https://{bucket}.s3.{region}.amazonaws.com",
+      "supportsMultipartUpload": true,
+      "supportsParallelChunks": true,
+      "supportsTransferAcceleration": true,
+      "minimumChunkSizeBytes": 5242880,
+      "maximumChunkSizeBytes": 5368709120,
+      "recommendedChunkSizeBytes": 16777216
+    },
+    {
+      "id": "wasabi",
+      "displayName": "Wasabi",
+      "kind": "s3-compatible",
+      "endpointTemplate": "https://s3.{region}.wasabisys.com",
+      "supportsMultipartUpload": true,
+      "supportsParallelChunks": true,
+      "supportsTransferAcceleration": false,
+      "minimumChunkSizeBytes": 5242880,
+      "maximumChunkSizeBytes": 5368709120,
+      "recommendedChunkSizeBytes": 16777216
+    },
+    {
+      "id": "backblaze_b2",
+      "displayName": "Backblaze B2",
+      "kind": "s3-compatible",
+      "endpointTemplate": "https://s3.{region}.backblazeb2.com",
+      "supportsMultipartUpload": true,
+      "supportsParallelChunks": true,
+      "supportsTransferAcceleration": false,
+      "minimumChunkSizeBytes": 5242880,
+      "maximumChunkSizeBytes": 5368709120,
+      "recommendedChunkSizeBytes": 16777216
+    },
+    {
+      "id": "cloudflare_r2",
+      "displayName": "Cloudflare R2",
+      "kind": "s3-compatible",
+      "endpointTemplate": "https://{accountId}.r2.cloudflarestorage.com",
+      "supportsMultipartUpload": true,
+      "supportsParallelChunks": true,
+      "supportsTransferAcceleration": false,
+      "minimumChunkSizeBytes": 5242880,
+      "maximumChunkSizeBytes": 5368709120,
+      "recommendedChunkSizeBytes": 16777216
+    },
+    {
+      "id": "gdrive",
+      "displayName": "Google Drive",
+      "kind": "oauth-resumable",
+      "authURL": "https://accounts.google.com/o/oauth2/v2/auth",
+      "tokenURL": "https://oauth2.googleapis.com/token",
+      "apiBaseURL": "https://www.googleapis.com/drive/v3",
+      "uploadBaseURL": "https://www.googleapis.com/upload/drive/v3",
+      "supportsMultipartUpload": false,
+      "supportsResumableUpload": true,
+      "supportsParallelChunks": false,
+      "chunkMultipleBytes": 262144,
+      "recommendedChunkSizeBytes": 8388608
+    },
+    {
+      "id": "dropbox",
+      "displayName": "Dropbox",
+      "kind": "oauth-upload-session",
+      "authURL": "https://www.dropbox.com/oauth2/authorize",
+      "tokenURL": "https://api.dropboxapi.com/oauth2/token",
+      "apiBaseURL": "https://api.dropboxapi.com/2",
+      "contentBaseURL": "https://content.dropboxapi.com/2",
+      "supportsMultipartUpload": false,
+      "supportsResumableUpload": true,
+      "supportsParallelChunks": false,
+      "maximumChunkSizeBytes": 157286400,
+      "recommendedChunkSizeBytes": 8388608
+    },
+    {
+      "id": "onedrive",
+      "displayName": "OneDrive",
+      "kind": "oauth-upload-session",
+      "authURL": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      "tokenURL": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "apiBaseURL": "https://graph.microsoft.com/v1.0",
+      "supportsMultipartUpload": false,
+      "supportsResumableUpload": true,
+      "supportsParallelChunks": true,
+      "recommendedChunkSizeBytes": 10485760
+    },
+    {
+      "id": "box",
+      "displayName": "Box",
+      "kind": "oauth-chunked-upload",
+      "authURL": "https://account.box.com/api/oauth2/authorize",
+      "tokenURL": "https://api.box.com/oauth2/token",
+      "apiBaseURL": "https://api.box.com/2.0",
+      "uploadBaseURL": "https://upload.box.com/api/2.0",
+      "supportsMultipartUpload": true,
+      "supportsParallelChunks": true,
+      "recommendedChunkSizeBytes": 8388608
+    },
+    {
+      "id": "icloud",
+      "displayName": "iCloud Drive",
+      "kind": "file-provider",
+      "supportsMultipartUpload": false,
+      "supportsResumableUpload": true,
+      "supportsParallelChunks": false
+    },
+    {
+      "id": "sftp",
+      "displayName": "SFTP",
+      "kind": "ssh-file-transfer",
+      "defaultPort": 22,
+      "supportsMultipartUpload": false,
+      "supportsResumableUpload": true,
+      "supportsParallelChunks": true
+    },
+    {
+      "id": "webdav",
+      "displayName": "WebDAV",
+      "kind": "http-file-transfer",
+      "supportsMultipartUpload": false,
+      "supportsResumableUpload": false,
+      "supportsParallelChunks": false
+    },
+    {
+      "id": "ftp",
+      "displayName": "FTP / FTPS",
+      "kind": "ftp-file-transfer",
+      "supportsMultipartUpload": false,
+      "supportsResumableUpload": true,
+      "supportsParallelChunks": false
+    }
+  ]
+}

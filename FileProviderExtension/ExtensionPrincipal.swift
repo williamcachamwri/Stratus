@@ -1,4 +1,4 @@
-import FileProvider
+@preconcurrency import FileProvider
 import StratusCore
 
 /// Bundle principal class for the Stratus File Provider extension target.

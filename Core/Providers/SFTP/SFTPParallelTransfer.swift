@@ -1,4 +1,4 @@
-import Citadel
+@preconcurrency import Citadel
 import Foundation
 import NIOCore
 import os.log
