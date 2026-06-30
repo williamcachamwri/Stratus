@@ -408,7 +408,8 @@ final class UploadPipelineIntegrationTests: XCTestCase {
         XCTAssertFalse(uploadedChunks.contains(1), "Resume must not re-upload a completed chunk")
         XCTAssertTrue(uploadedChunks.contains(2), "Resume must upload the first missing chunk")
         XCTAssertTrue(uploadedChunks.contains(3), "Resume must upload the final missing chunk")
-        XCTAssertNil(try await ResumeStore.shared.loadSession(task.id.uuidString))
+        let remainingSession = try await ResumeStore.shared.loadSession(task.id.uuidString)
+        XCTAssertNil(remainingSession)
     }
 
     // MARK: - Test: ResumeStore checkpoint written per chunk
