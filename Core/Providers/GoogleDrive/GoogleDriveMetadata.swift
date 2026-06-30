@@ -1,10 +1,10 @@
 import Foundation
 
 // MARK: - Google Drive File Metadata
+
 // Codable models for the Google Drive Files API v3 responses.
 
 public struct GoogleDriveFile: Codable, Sendable {
-
     // MARK: - MIME type constant
 
     /// The MIME type Google Drive assigns to folder items.
@@ -24,10 +24,14 @@ public struct GoogleDriveFile: Codable, Sendable {
 
     // MARK: - Derived helpers
 
-    public var isFolder: Bool { mimeType == Self.folderMimeType }
+    public var isFolder: Bool {
+        mimeType == Self.folderMimeType
+    }
 
     /// Size in bytes, parsed from the `size` string field.
-    public var sizeBytes: Int64? { size.flatMap(Int64.init) }
+    public var sizeBytes: Int64? {
+        size.flatMap(Int64.init)
+    }
 
     /// `modifiedTime` parsed into a `Date`.  Returns `nil` if the string is
     /// absent or does not conform to ISO 8601.
