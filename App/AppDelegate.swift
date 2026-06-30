@@ -1,6 +1,6 @@
 import AppKit
-import StratusCore
 import os.log
+import StratusCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "AppDelegate")
@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false  // Keep running as a menu bar app after windows close
+        false // Keep running as a menu bar app after windows close
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
