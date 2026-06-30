@@ -1,6 +1,6 @@
 import Foundation
-import Security
 import os.log
+import Security
 
 // MARK: - Keychain Store
 
@@ -53,7 +53,7 @@ public actor KeychainStore {
                 kSecAttrAccount as String: accountID,
             ]
             let status = SecItemDelete(withAccessGroup(query) as CFDictionary)
-            if status != errSecSuccess && status != errSecItemNotFound {
+            if status != errSecSuccess, status != errSecItemNotFound {
                 throw KeychainError.deleteFailed(status: status)
             }
         }
@@ -146,15 +146,19 @@ public extension KeychainStore {
         static func accessToken(providerID: String, accountID: String) -> String {
             "com.stratus.oauth.access.\(providerID).\(accountID)"
         }
+
         static func refreshToken(providerID: String, accountID: String) -> String {
             "com.stratus.oauth.refresh.\(providerID).\(accountID)"
         }
+
         static func apiKey(providerID: String, accountID: String) -> String {
             "com.stratus.apikey.\(providerID).\(accountID)"
         }
+
         static func encryptionKey(vaultID: String) -> String {
             "com.stratus.vault.key.\(vaultID)"
         }
+
         static func sftpPassword(accountID: String) -> String {
             "com.stratus.sftp.password.\(accountID)"
         }
