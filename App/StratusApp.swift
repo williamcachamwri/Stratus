@@ -1,6 +1,6 @@
-import SwiftUI
-import StratusCore
 import AppKit
+import StratusCore
+import SwiftUI
 
 @main
 struct StratusApp: App {
