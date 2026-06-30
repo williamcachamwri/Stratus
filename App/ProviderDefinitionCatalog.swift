@@ -48,7 +48,7 @@ public struct ProviderDefinition: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
-private struct ProviderDefinitionFile: Codable, Sendable {
+private struct ProviderDefinitionFile: Codable {
     let schemaVersion: Int
     let providers: [ProviderDefinition]
 }
