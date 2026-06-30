@@ -1,20 +1,21 @@
-import Foundation
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - EncryptionHeader
+
 // Prefix for every encrypted Stratus payload.  Payload bytes after this header
 // are a sequence of independently authenticated AES-GCM chunk frames.
 
-private let encryptionMagic: [UInt8] = [0x53, 0x54, 0x52, 0x53]  // "STRS"
-private let legacyEncryptionMagic: [UInt8] = [0x53, 0x54, 0x52, 0x45]  // "STRE"
+private let encryptionMagic: [UInt8] = [0x53, 0x54, 0x52, 0x53] // "STRS"
+private let legacyEncryptionMagic: [UInt8] = [0x53, 0x54, 0x52, 0x45] // "STRE"
 private let encryptionVersion: UInt8 = 1
 private let aesGCMNonceLength = 12
 private let aesGCMTagLength = 16
 private let frameLengthByteCount = 4
 
 public struct EncryptionHeader: Sendable {
-    public let iv: Data             // 12 bytes: file-level identifier for AAD domain separation
+    public let iv: Data // 12 bytes: file-level identifier for AAD domain separation
     public let wrappedFileKey: Data // 60 bytes: 12 nonce + 32 key ciphertext + 16 tag
     public let originalSize: Int64
     static let byteLength = 4 + 1 + 12 + 60 + 8
@@ -31,15 +32,15 @@ public struct EncryptionHeader: Sendable {
 
     public static func parse(from data: Data) throws -> EncryptionHeader {
         guard data.count >= byteLength else { throw EncryptionError.decryptionFailed }
-        let magic = Array(data[0..<4])
+        let magic = Array(data[0 ..< 4])
         guard magic == encryptionMagic || magic == legacyEncryptionMagic else {
             throw EncryptionError.integrityCheckFailed
         }
         let version = data[4]
         guard version == encryptionVersion else { throw EncryptionError.unsupportedVersion(version) }
-        let iv = data[5..<17]
-        let wrappedKey = data[17..<77]
-        let sizeBytes = data[77..<85]
+        let iv = data[5 ..< 17]
+        let wrappedKey = data[17 ..< 77]
+        let sizeBytes = data[77 ..< 85]
         let size = sizeBytes.withUnsafeBytes { $0.loadUnaligned(as: Int64.self).bigEndian }
         return EncryptionHeader(iv: Data(iv), wrappedFileKey: Data(wrappedKey), originalSize: size)
     }
@@ -132,7 +133,10 @@ public actor ClientSideEncryption {
         guard bytesWritten == header.originalSize else {
             throw EncryptionError.integrityCheckFailed
         }
-        logger.debug("Decrypted \(encryptedURL.lastPathComponent): \(bytesWritten) plaintext bytes in \(chunkIndex) frames")
+        logger
+            .debug(
+                "Decrypted \(encryptedURL.lastPathComponent): \(bytesWritten) plaintext bytes in \(chunkIndex) frames"
+            )
     }
 
     // MARK: - In-memory Encrypt/Decrypt (for small payloads)
@@ -141,9 +145,13 @@ public actor ClientSideEncryption {
         let fileKey = SymmetricKey(size: .bits256)
         let fileIdentifier = try EncryptionKeyDerivation.secureRandomData(count: aesGCMNonceLength)
         let wrappedFileKey = try EncryptionKeyDerivation.wrapKey(fileKey, with: masterKey)
-        let header = EncryptionHeader(iv: fileIdentifier, wrappedFileKey: wrappedFileKey, originalSize: Int64(data.count))
+        let header = EncryptionHeader(
+            iv: fileIdentifier,
+            wrappedFileKey: wrappedFileKey,
+            originalSize: Int64(data.count)
+        )
         var encrypted = header.serialized()
-        encrypted.append(try Self.encryptFrame(
+        try encrypted.append(Self.encryptFrame(
             plaintext: data,
             fileKey: fileKey,
             fileIdentifier: fileIdentifier,
@@ -162,14 +170,15 @@ public actor ClientSideEncryption {
 
         while offset < data.count {
             guard data.count - offset >= frameLengthByteCount else { throw EncryptionError.decryptionFailed }
-            let lengthData = data[offset..<(offset + frameLengthByteCount)]
+            let lengthData = data[offset ..< (offset + frameLengthByteCount)]
             offset += frameLengthByteCount
             let encryptedLength = Int(lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).bigEndian })
             guard encryptedLength >= aesGCMTagLength else { throw EncryptionError.decryptionFailed }
-            guard data.count - offset >= aesGCMNonceLength + encryptedLength else { throw EncryptionError.decryptionFailed }
-            let nonceData = data[offset..<(offset + aesGCMNonceLength)]
+            guard data.count - offset >= aesGCMNonceLength + encryptedLength
+            else { throw EncryptionError.decryptionFailed }
+            let nonceData = data[offset ..< (offset + aesGCMNonceLength)]
             offset += aesGCMNonceLength
-            let encryptedPayload = data[offset..<(offset + encryptedLength)]
+            let encryptedPayload = data[offset ..< (offset + encryptedLength)]
             offset += encryptedLength
 
             let frame = EncryptedFrame(nonce: Data(nonceData), encryptedPayload: Data(encryptedPayload))
@@ -248,10 +257,14 @@ public actor ClientSideEncryption {
     private func readFrameBody(lengthData: Data, from inputHandle: FileHandle) throws -> EncryptedFrame? {
         let encryptedLength = Int(lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).bigEndian })
         guard encryptedLength >= aesGCMTagLength else { throw EncryptionError.decryptionFailed }
-        guard let nonceData = try inputHandle.read(upToCount: aesGCMNonceLength), nonceData.count == aesGCMNonceLength else {
+        guard let nonceData = try inputHandle.read(upToCount: aesGCMNonceLength),
+              nonceData.count == aesGCMNonceLength
+        else {
             throw EncryptionError.decryptionFailed
         }
-        guard let encryptedPayload = try inputHandle.read(upToCount: encryptedLength), encryptedPayload.count == encryptedLength else {
+        guard let encryptedPayload = try inputHandle.read(upToCount: encryptedLength),
+              encryptedPayload.count == encryptedLength
+        else {
             throw EncryptionError.decryptionFailed
         }
         return EncryptedFrame(nonce: nonceData, encryptedPayload: encryptedPayload)
