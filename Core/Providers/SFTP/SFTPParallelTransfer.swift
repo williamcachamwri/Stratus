@@ -1,17 +1,17 @@
-import Foundation
 import Citadel
+import Foundation
 import NIOCore
 import os.log
 
 // MARK: - SFTPParallelTransfer
+
 // Uploads or downloads a file using windowed sequential SFTP operations.
 // SFTPFile (Citadel) is non-Sendable and channel-bound; we use pipelined
 // window writes/reads on a single channel rather than concurrent tasks.
 
 public actor SFTPParallelTransfer {
-
     /// Size of each transfer window in bytes (SSH-packet-friendly).
-    private static let windowSize = 32 * 1024  // 32 KB
+    private static let windowSize = 32 * 1024 // 32 KB
 
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "SFTPParallelTransfer")
 
@@ -56,7 +56,7 @@ public actor SFTPParallelTransfer {
             var offset = 0
             while offset < data.count {
                 let length = min(windowSize, data.count - offset)
-                let slice = data[offset..<(offset + length)]
+                let slice = data[offset ..< (offset + length)]
                 var buffer = ByteBufferAllocator().buffer(capacity: length)
                 buffer.writeBytes(slice)
                 try await file.write(buffer, at: UInt64(offset))
