@@ -2,6 +2,7 @@ import Foundation
 import os.log
 
 // MARK: - WasabiProvider
+
 // Wasabi cloud storage accessed via the S3-compatible API.
 // Endpoint: https://s3.<region>.wasabisys.com
 //
@@ -9,7 +10,6 @@ import os.log
 // configured for the Wasabi endpoint.
 
 public actor WasabiProvider: CloudProvider {
-
     // MARK: - CloudProvider Identity
 
     public nonisolated let id = "wasabi"
@@ -31,8 +31,8 @@ public actor WasabiProvider: CloudProvider {
     ///   - region: Wasabi region, e.g. `"us-east-1"`, `"eu-central-1"`.
     public init(bucket: String, region: String = "us-east-1") {
         let provider = S3CompatibleProviders.wasabi(bucket: bucket, region: region)
-        self.inner = provider
-        self.capabilities = provider.capabilities
+        inner = provider
+        capabilities = provider.capabilities
     }
 
     // MARK: - Authentication
@@ -61,7 +61,11 @@ public actor WasabiProvider: CloudProvider {
 
     // MARK: - File Listing
 
-    public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
+    public func listDirectory(
+        path: CloudPath,
+        account: CloudAccount,
+        pageToken: String?
+    ) async throws -> PagedResult<[CloudFileItem]> {
         try await inner.listDirectory(path: path, account: account, pageToken: pageToken)
     }
 
@@ -71,15 +75,28 @@ public actor WasabiProvider: CloudProvider {
 
     // MARK: - Multipart Upload
 
-    public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String {
+    public func initiateMultipartUpload(
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> String {
         try await inner.initiateMultipartUpload(remotePath: remotePath, account: account, metadata: metadata)
     }
 
-    public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
+    public func uploadChunk(
+        uploadID: String,
+        chunkNumber: Int,
+        data: Data,
+        account: CloudAccount
+    ) async throws -> ChunkUploadResult {
         try await inner.uploadChunk(uploadID: uploadID, chunkNumber: chunkNumber, data: data, account: account)
     }
 
-    public func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
+    public func completeMultipartUpload(
+        uploadID: String,
+        parts: [CompletedPart],
+        account: CloudAccount
+    ) async throws -> CloudFileItem {
         try await inner.completeMultipartUpload(uploadID: uploadID, parts: parts, account: account)
     }
 
@@ -89,7 +106,12 @@ public actor WasabiProvider: CloudProvider {
 
     // MARK: - Small File Upload
 
-    public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
+    public func uploadSmallFile(
+        data: Data,
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> CloudFileItem {
         try await inner.uploadSmallFile(data: data, remotePath: remotePath, account: account, metadata: metadata)
     }
 
@@ -131,7 +153,9 @@ public actor WasabiProvider: CloudProvider {
         try await inner.remoteChecksum(path: path, account: account)
     }
 
-    public nonisolated var supportsBlockManifest: Bool { true }
+    public nonisolated var supportsBlockManifest: Bool {
+        true
+    }
 
     public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
         try await inner.fetchBlockManifest(path: path, account: account)
@@ -147,7 +171,10 @@ public actor WasabiProvider: CloudProvider {
         try await inner.trash(path: path, account: account)
     }
 
-    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] { [] }
+    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] {
+        []
+    }
+
     public func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {}
     public func emptyTrash(account: CloudAccount) async throws {}
 
@@ -163,7 +190,11 @@ public actor WasabiProvider: CloudProvider {
 
     // MARK: - Sharing
 
-    public func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink {
+    public func createShareLink(
+        path: CloudPath,
+        account: CloudAccount,
+        options: ShareOptions
+    ) async throws -> ShareLink {
         try await inner.createShareLink(path: path, account: account, options: options)
     }
 
