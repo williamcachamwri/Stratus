@@ -56,7 +56,6 @@ public struct DownloadEngineConfiguration: Sendable {
 ///   survive app restart.
 /// - Emits structured `DownloadEngineEvent` values via `AsyncStream`.
 public actor DownloadEngine {
-
     // MARK: Shared instance
 
     public static let shared = DownloadEngine()
@@ -75,9 +74,9 @@ public actor DownloadEngine {
 
     // MARK: Internal state
 
-    private var queue: [DownloadTask] = []                             // pending tasks, priority-ordered
-    private var activeTasks: [UUID: DownloadTask] = [:]               // currently running
-    private var taskHandles: [UUID: Task<Void, Never>] = [:]          // backing Tasks
+    private var queue: [DownloadTask] = [] // pending tasks, priority-ordered
+    private var activeTasks: [UUID: DownloadTask] = [:] // currently running
+    private var taskHandles: [UUID: Task<Void, Never>] = [:] // backing Tasks
     private var eventContinuations: [UUID: AsyncStream<DownloadEngineEvent>.Continuation] = [:]
     private var runLoopHandle: Task<Void, Never>?
 
@@ -225,17 +224,23 @@ public actor DownloadEngine {
     }
 
     public func pauseAll() async {
-        for id in activeTasks.keys { await pauseInternal(taskID: id) }
+        for id in activeTasks.keys {
+            await pauseInternal(taskID: id)
+        }
     }
 
     public func resumeAll() async {
         let ids = activeTasks.keys
-        for id in ids { await resume(taskID: id) }
+        for id in ids {
+            await resume(taskID: id)
+        }
     }
 
     public func cancelAll() async {
         let ids = Array(activeTasks.keys) + queue.map(\.id)
-        for id in ids { await cancel(taskID: id) }
+        for id in ids {
+            await cancel(taskID: id)
+        }
     }
 
     // MARK: - Events
@@ -270,7 +275,7 @@ public actor DownloadEngine {
         let available = configuration.maxConcurrentDownloads - activeTasks.count
         guard available > 0, !queue.isEmpty else { return }
 
-        for _ in 0..<available {
+        for _ in 0 ..< available {
             guard let task = queue.first else { break }
             queue.removeFirst()
             activeTasks[task.id] = task
@@ -291,7 +296,7 @@ public actor DownloadEngine {
     private func executeTask(_ task: DownloadTask) async {
         guard
             let provider = providers[task.accountID],
-            let account  = accounts[task.accountID]
+            let account = accounts[task.accountID]
         else {
             let err = DownloadError.providerError("Provider not found for account \(task.accountID)")
             await finishTask(task, with: .failure(err))
@@ -307,7 +312,7 @@ public actor DownloadEngine {
                 let meta = try await provider.fileMetadata(path: task.sourcePath, account: account)
                 fileSize = meta.size ?? 0
             } catch let provErr as ProviderError {
-                if case .fileNotFound(let p) = provErr {
+                if case let .fileNotFound(p) = provErr {
                     await finishTask(task, with: .failure(.fileNotFound(p)))
                 } else {
                     await finishTask(task, with: .failure(.providerError(provErr.localizedDescription)))
@@ -320,11 +325,10 @@ public actor DownloadEngine {
         }
 
         // Load prior segment progress for resume.
-        let alreadyCompleted: Set<Int>
-        if let session = try? await resumeStore.load(sessionID: task.id.uuidString) {
-            alreadyCompleted = session.completedSegmentSet
+        let alreadyCompleted: Set<Int> = if let session = try? await resumeStore.load(sessionID: task.id.uuidString) {
+            session.completedSegmentSet
         } else {
-            alreadyCompleted = []
+            []
         }
 
         let stagingURL = task.stagingURL ?? configuration.stagingDirectory
@@ -369,7 +373,7 @@ public actor DownloadEngine {
                     )
                 }
             }
-            _ = result  // destination URL; already known
+            _ = result // destination URL; already known
 
             // Move staging file to the final destination.
             do {
@@ -392,7 +396,7 @@ public actor DownloadEngine {
                 averageBPS: duration > 0 ? Double(fileSize) / duration : 0,
                 segmentsUsed: segmentsUsed,
                 localURL: task.destinationURL,
-                checksumVerified: false   // post-download verification is a caller responsibility
+                checksumVerified: false // post-download verification is a caller responsibility
             )
 
             await finishTask(task, with: .success(summary))
@@ -457,13 +461,16 @@ public actor DownloadEngine {
         activeTasks.removeValue(forKey: task.id)
 
         switch outcome {
-        case .success(let summary):
+        case let .success(summary):
             task.transition(to: .completed(summary: summary))
             try? await resumeStore.updateState(sessionID: task.id.uuidString, state: "completed")
             emit(.taskCompleted(task.id, summary))
-            logger.info("Download complete: \(task.sourcePath) (\(summary.totalBytes) bytes in \(String(format: "%.1f", summary.durationSeconds))s)")
+            logger
+                .info(
+                    "Download complete: \(task.sourcePath) (\(summary.totalBytes) bytes in \(String(format: "%.1f", summary.durationSeconds))s)"
+                )
 
-        case .failure(let err):
+        case let .failure(err):
             task.transition(to: .failed(error: err, attempt: task.retryCount))
             try? await resumeStore.updateState(
                 sessionID: task.id.uuidString,
@@ -486,7 +493,7 @@ public actor DownloadEngine {
         let token = DownloadResumeToken(
             sessionID: taskID.uuidString,
             resumeOffset: {
-                if case .downloading(let p) = task.state {
+                if case let .downloading(p) = task.state {
                     return p.receivedBytes
                 }
                 return 0
@@ -555,11 +562,11 @@ public actor DownloadEngine {
     private func isRetryable(_ error: DownloadError) -> Bool {
         switch error {
         case .networkUnavailable, .segmentFailed, .unknown:
-            return true
+            true
         case .fileNotFound, .checksumMismatch, .insufficientDiskSpace,
              .localIOError, .authenticationFailed, .cancelled,
              .providerError, .rangesNotSupported, .maxRetriesExceeded:
-            return false
+            false
         }
     }
 
