@@ -117,26 +117,26 @@ public enum UploadError: Error, Sendable, Equatable {
 extension UploadError: LocalizedError {
     public var errorDescription: String? {
         switch self {
-        case .fileNotFound(let url):
-            return "File not found: \(url.lastPathComponent)"
-        case .fileChanged(let url):
-            return "File changed during upload: \(url.lastPathComponent)"
-        case .chunkExhausted(let chunk, let attempts):
-            return "Chunk \(chunk) failed after \(attempts) attempts"
-        case .checksumMismatch(let expected, let actual):
-            return "Checksum mismatch — expected \(expected.prefix(8))…, got \(actual.prefix(8))…"
-        case .providerError(let msg):
-            return "Provider error: \(msg)"
+        case let .fileNotFound(url):
+            "File not found: \(url.lastPathComponent)"
+        case let .fileChanged(url):
+            "File changed during upload: \(url.lastPathComponent)"
+        case let .chunkExhausted(chunk, attempts):
+            "Chunk \(chunk) failed after \(attempts) attempts"
+        case let .checksumMismatch(expected, actual):
+            "Checksum mismatch — expected \(expected.prefix(8))…, got \(actual.prefix(8))…"
+        case let .providerError(msg):
+            "Provider error: \(msg)"
         case .networkUnavailable:
-            return "Network unavailable. Check your connection and try again."
+            "Network unavailable. Check your connection and try again."
         case .cancelled:
-            return "Upload was cancelled"
+            "Upload was cancelled"
         case .quotaExceeded:
-            return "Storage quota exceeded"
+            "Storage quota exceeded"
         case .authenticationFailed:
-            return "Authentication failed. Re-authorize the account."
-        case .unknown(let msg):
-            return msg.isEmpty ? "Unknown upload error" : msg
+            "Authentication failed. Re-authorize the account."
+        case let .unknown(msg):
+            msg.isEmpty ? "Unknown upload error" : msg
         }
     }
 }
@@ -156,9 +156,9 @@ public final class UploadTask: @unchecked Sendable, Identifiable {
     public let createdAt: Date
 
     // State is protected by explicit locking via the actor that owns this task
-    private(set) public var state: UploadState
-    private(set) public var retryCount: Int = 0
-    private(set) public var uploadID: String?
+    public private(set) var state: UploadState
+    public private(set) var retryCount: Int = 0
+    public private(set) var uploadID: String?
 
     public init(
         id: UUID = UUID(),
@@ -214,7 +214,7 @@ public struct UploadSession: Sendable, Codable {
     public let chunkSize: Int
     public let totalChunks: Int
     public var completedChunks: [Int]
-    public var etags: [Int: String]  // chunkNumber → ETag
+    public var etags: [Int: String] // chunkNumber → ETag
     public var state: String
     public var retryCount: Int
     public var errorDescription: String?
@@ -261,9 +261,12 @@ public struct UploadSession: Sendable, Codable {
         self.updatedAt = updatedAt
     }
 
-    public var isComplete: Bool { completedChunks.count == totalChunks }
+    public var isComplete: Bool {
+        completedChunks.count == totalChunks
+    }
+
     public var remainingChunks: [Int] {
         let done = Set(completedChunks)
-        return (0..<totalChunks).filter { !done.contains($0) }
+        return (0 ..< totalChunks).filter { !done.contains($0) }
     }
 }
