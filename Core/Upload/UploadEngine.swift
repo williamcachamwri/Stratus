@@ -17,6 +17,7 @@ public enum UploadEngineEvent: Sendable {
 }
 
 // MARK: - UploadEngine
+
 // Top-level actor: receives tasks, drives the scheduler, spawns ChunkEngine workers.
 
 public actor UploadEngine {
@@ -78,7 +79,11 @@ public actor UploadEngine {
                         task.setUploadID(session.uploadID ?? "")
                         await scheduler.enqueue(task, priority: .normal)
                     } catch {
-                        try? await resumeStore.updateSessionState(session.id, state: "failed", error: "Could not resolve security-scoped bookmark: \(error)")
+                        try? await resumeStore.updateSessionState(
+                            session.id,
+                            state: "failed",
+                            error: "Could not resolve security-scoped bookmark: \(error)"
+                        )
                     }
                 }
             }
@@ -259,7 +264,8 @@ public actor UploadEngine {
             guard let task = await scheduler.nextTask() else { continue }
 
             guard let provider = providers[task.accountID],
-                  let account = accounts[task.accountID] else {
+                  let account = accounts[task.accountID]
+            else {
                 await scheduler.markFailed(taskID: task.id)
                 emit(.taskFailed(task, .providerError("Provider not found for account \(task.accountID)")))
                 continue
@@ -299,7 +305,10 @@ public actor UploadEngine {
                     await self?.removeActiveUploadTask(forKey: taskID)
                     await self?.scheduler.markComplete(taskID: taskID)
                     await self?.emit(.taskCompleted(task, result))
-                    engineLogger.info("Completed \(task.sourceURL.lastPathComponent) — \(result.bytesUploaded) bytes in \(String(format: "%.1f", result.durationSeconds))s")
+                    engineLogger
+                        .info(
+                            "Completed \(task.sourceURL.lastPathComponent) — \(result.bytesUploaded) bytes in \(String(format: "%.1f", result.durationSeconds))s"
+                        )
                 } catch UploadError.cancelled {
                     progressContinuation.finish()
                     await self?.removeProgressStream(forKey: taskID)
