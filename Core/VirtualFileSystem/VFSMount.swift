@@ -1,5 +1,5 @@
-import Foundation
 import FileProvider
+import Foundation
 import os.log
 
 // MARK: - VFSMountError
@@ -16,15 +16,15 @@ extension VFSMountError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .alreadyMounted:
-            return "This account is already mounted in Finder."
+            "This account is already mounted in Finder."
         case .notMounted:
-            return "This account is not currently mounted."
-        case .domainRegistrationFailed(_, let underlying):
-            return "Finder mount failed: \(underlying.localizedDescription)"
-        case .domainRemovalFailed(_, let underlying):
-            return "Finder unmount failed: \(underlying.localizedDescription)"
-        case .managerUnavailable(let id):
-            return "File Provider manager unavailable for account \(id)."
+            "This account is not currently mounted."
+        case let .domainRegistrationFailed(_, underlying):
+            "Finder mount failed: \(underlying.localizedDescription)"
+        case let .domainRemovalFailed(_, underlying):
+            "Finder unmount failed: \(underlying.localizedDescription)"
+        case let .managerUnavailable(id):
+            "File Provider manager unavailable for account \(id)."
         }
     }
 }
@@ -132,10 +132,16 @@ public actor VFSMount {
             domains[account.id] = domain
             mountedAccountsByID[account.id] = account
             try await persistMountedRecord(for: account)
-            logger.info("Mounted Finder volume \(domain.displayName, privacy: .public) for account \(account.id, privacy: .public)")
+            logger
+                .info(
+                    "Mounted Finder volume \(domain.displayName, privacy: .public) for account \(account.id, privacy: .public)"
+                )
         } catch {
             try? await domainStore.markError(account: account, message: error.localizedDescription)
-            logger.error("Failed to add domain for account \(account.id, privacy: .public): \(error.localizedDescription)")
+            logger
+                .error(
+                    "Failed to add domain for account \(account.id, privacy: .public): \(error.localizedDescription)"
+                )
             throw VFSMountError.domainRegistrationFailed(accountID: account.id, underlying: error)
         }
     }
@@ -144,7 +150,8 @@ public actor VFSMount {
 
     public func unmount(account: CloudAccount) async throws {
         let domain = domains[account.id] ?? NSFileProviderDomain(
-            identifier: NSFileProviderDomainIdentifier(rawValue: FileProviderDomainStore.domainIdentifier(for: account.id)),
+            identifier: NSFileProviderDomainIdentifier(rawValue: FileProviderDomainStore
+                .domainIdentifier(for: account.id)),
             displayName: FileProviderDomainStore.finderDisplayName(for: account)
         )
 
@@ -156,7 +163,10 @@ public actor VFSMount {
             logger.info("Unmounted Finder volume for account \(account.id, privacy: .public)")
         } catch {
             try? await domainStore.markError(account: account, message: error.localizedDescription)
-            logger.error("Failed to remove domain for account \(account.id, privacy: .public): \(error.localizedDescription)")
+            logger
+                .error(
+                    "Failed to remove domain for account \(account.id, privacy: .public): \(error.localizedDescription)"
+                )
             throw VFSMountError.domainRemovalFailed(accountID: account.id, underlying: error)
         }
     }
@@ -172,8 +182,10 @@ public actor VFSMount {
         logger.debug("Signalled working set enumerator for account \(account.id, privacy: .public)")
     }
 
-    public func signalEnumerator(for itemIdentifier: NSFileProviderItemIdentifier,
-                                 account: CloudAccount) async throws {
+    public func signalEnumerator(
+        for itemIdentifier: NSFileProviderItemIdentifier,
+        account: CloudAccount
+    ) async throws {
         let domain = try domain(for: account)
         guard let manager = NSFileProviderManager(for: domain) else {
             throw VFSMountError.managerUnavailable(accountID: account.id)
