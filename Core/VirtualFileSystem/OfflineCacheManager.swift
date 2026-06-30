@@ -20,11 +20,10 @@ public enum OfflineCacheError: Error, Sendable {
 /// underlying `LocalCacheStore` is done via async calls so the two actors never
 /// create a lock-order dependency.
 public actor OfflineCacheManager {
-
     // MARK: - Types
 
     /// Identifies a cached item by account + path pair.
-    private struct CacheKey: Hashable, Sendable {
+    private struct CacheKey: Hashable {
         let accountID: String
         let path: CloudPath
     }
