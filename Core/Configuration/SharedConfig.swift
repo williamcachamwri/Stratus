@@ -97,7 +97,7 @@ public enum SharedConfig {
         // .build/debug/ or .build/release/ where cwd-relative search misses the root.
         if let execURL = Bundle.main.executableURL {
             var dir = execURL.deletingLastPathComponent()
-            for _ in 0..<6 {
+            for _ in 0 ..< 6 {
                 let candidate = dir.appendingPathComponent("shared", isDirectory: true)
                 if fileManager.fileExists(atPath: candidate.path) {
                     urls.append(candidate)
@@ -137,10 +137,10 @@ public enum SharedConfig {
 
     private static func unquote(_ value: String) -> String {
         guard value.count >= 2 else { return value }
-        if value.hasPrefix("\"") && value.hasSuffix("\"") {
+        if value.hasPrefix("\""), value.hasSuffix("\"") {
             return String(value.dropFirst().dropLast())
         }
-        if value.hasPrefix("'") && value.hasSuffix("'") {
+        if value.hasPrefix("'"), value.hasSuffix("'") {
             return String(value.dropFirst().dropLast())
         }
         return value
