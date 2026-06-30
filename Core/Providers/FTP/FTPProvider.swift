@@ -2,6 +2,7 @@ import Foundation
 import os.log
 
 // MARK: - FTPProvider
+
 // FTP/FTPS using URLSession's built-in FTP support (RFC 959).
 // Note: URLSession supports FTP download, but upload uses NSStream.
 // For FTPS (implicit TLS), uses ftps:// scheme; explicit STARTTLS uses ftp://.
@@ -23,13 +24,19 @@ public actor FTPProvider: CloudProvider {
     public struct FTPConfig: Sendable {
         let host: String
         let port: Int
-        let usesTLS: Bool  // true = FTPS (implicit TLS)
+        let usesTLS: Bool // true = FTPS (implicit TLS)
         let username: String
         let password: String
         let basePath: String
 
-        public init(host: String, port: Int = 21, usesTLS: Bool = false,
-                    username: String, password: String, basePath: String = "/") {
+        public init(
+            host: String,
+            port: Int = 21,
+            usesTLS: Bool = false,
+            username: String,
+            password: String,
+            basePath: String = "/"
+        ) {
             self.host = host
             self.port = port
             self.usesTLS = usesTLS
@@ -38,7 +45,10 @@ public actor FTPProvider: CloudProvider {
             self.basePath = basePath
         }
 
-        var scheme: String { usesTLS ? "ftps" : "ftp" }
+        var scheme: String {
+            usesTLS ? "ftps" : "ftp"
+        }
+
         var baseURL: URL {
             URL(string: "\(scheme)://\(host):\(port)\(basePath.hasPrefix("/") ? basePath : "/\(basePath)")")!
         }
@@ -62,14 +72,16 @@ public actor FTPProvider: CloudProvider {
     public func authenticate(account: CloudAccount) async throws {
         guard configs[account.id] != nil else { throw ProviderError.authenticationFailed("No FTP config for account") }
     }
+
     public func refreshCredentials(account: CloudAccount) async throws {}
     public func validateCredentials(account: CloudAccount) async throws -> Bool {
         guard let config = configs[account.id] else { return false }
         let url = config.baseURL
         var request = URLRequest(url: url)
         request.timeoutInterval = 10
-        return (try? await URLSession.shared.data(for: request)) != nil
+        return await (try? URLSession.shared.data(for: request)) != nil
     }
+
     public func revokeCredentials(account: CloudAccount) async throws {
         configs.removeValue(forKey: account.id)
     }
@@ -80,7 +92,11 @@ public actor FTPProvider: CloudProvider {
 
     // MARK: - Directory Listing
 
-    public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
+    public func listDirectory(
+        path: CloudPath,
+        account: CloudAccount,
+        pageToken: String?
+    ) async throws -> PagedResult<[CloudFileItem]> {
         guard let config = configs[account.id] else { throw ProviderError.authenticationFailed("No FTP config") }
         let url = config.baseURL.appendingPathComponent(path.path)
         var request = URLRequest(url: url)
@@ -101,14 +117,39 @@ public actor FTPProvider: CloudProvider {
 
     // MARK: - Upload
 
-    public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String { remotePath.path }
-    public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult { ChunkUploadResult(etag: nil) }
-    public func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
+    public func initiateMultipartUpload(
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> String {
+        remotePath.path
+    }
+
+    public func uploadChunk(
+        uploadID: String,
+        chunkNumber: Int,
+        data: Data,
+        account: CloudAccount
+    ) async throws -> ChunkUploadResult {
+        ChunkUploadResult(etag: nil)
+    }
+
+    public func completeMultipartUpload(
+        uploadID: String,
+        parts: [CompletedPart],
+        account: CloudAccount
+    ) async throws -> CloudFileItem {
         CloudFileItem(id: uploadID, name: (uploadID as NSString).lastPathComponent, path: CloudPath(uploadID))
     }
+
     public func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {}
 
-    public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
+    public func uploadSmallFile(
+        data: Data,
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> CloudFileItem {
         guard let config = configs[account.id] else { throw ProviderError.authenticationFailed("No FTP config") }
         let url = config.baseURL.appendingPathComponent(remotePath.path)
         var request = URLRequest(url: url)
@@ -118,7 +159,12 @@ public actor FTPProvider: CloudProvider {
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode < 400 else {
             throw ProviderError.invalidResponse("FTP upload failed for \(remotePath.path)")
         }
-        return CloudFileItem(id: remotePath.path, name: remotePath.lastComponent, path: remotePath, size: Int64(data.count))
+        return CloudFileItem(
+            id: remotePath.path,
+            name: remotePath.lastComponent,
+            path: remotePath,
+            size: Int64(data.count)
+        )
     }
 
     public func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL {
@@ -164,19 +210,45 @@ public actor FTPProvider: CloudProvider {
         throw ProviderError.unsupportedOperation("FTP rename requires raw FTP commands; use SFTP instead")
     }
 
-    public func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? { nil }
-    public nonisolated var supportsBlockManifest: Bool { false }
-    public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? { nil }
+    public func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? {
+        nil
+    }
+
+    public nonisolated var supportsBlockManifest: Bool {
+        false
+    }
+
+    public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
+        nil
+    }
+
     public func storeBlockManifest(_ manifest: BlockMap, path: CloudPath, account: CloudAccount) async throws {}
-    public func trash(path: CloudPath, account: CloudAccount) async throws { try await delete(path: path, account: account) }
-    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] { [] }
+    public func trash(path: CloudPath, account: CloudAccount) async throws {
+        try await delete(
+            path: path,
+            account: account
+        )
+    }
+
+    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] {
+        []
+    }
+
     public func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {}
     public func emptyTrash(account: CloudAccount) async throws {}
-    public func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] { [] }
+    public func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] {
+        []
+    }
+
     public func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
-    public func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink {
+    public func createShareLink(
+        path: CloudPath,
+        account: CloudAccount,
+        options: ShareOptions
+    ) async throws -> ShareLink {
         throw ProviderError.unsupportedOperation("FTP does not support share links")
     }
+
     public func revokeShareLink(link: ShareLink, account: CloudAccount) async throws {}
     public func streamingURL(path: CloudPath, account: CloudAccount) async throws -> URL {
         try await downloadURL(path: path, account: account, expiresIn: 0)
@@ -197,15 +269,23 @@ public actor FTPProvider: CloudProvider {
     private func parseFTPListing(listing: String, basePath: CloudPath) -> [CloudFileItem] {
         var items: [CloudFileItem] = []
         for line in listing.components(separatedBy: "\n") {
-            let parts = line.trimmingCharacters(in: .whitespaces).split(separator: " ", maxSplits: 8, omittingEmptySubsequences: true)
+            let parts = line.trimmingCharacters(in: .whitespaces).split(
+                separator: " ",
+                maxSplits: 8,
+                omittingEmptySubsequences: true
+            )
             guard parts.count >= 9 else { continue }
             let name = String(parts[8])
-            guard name != "." && name != ".." else { continue }
+            guard name != ".", name != ".." else { continue }
             let isDir = line.first == "d"
             let size = Int64(String(parts[4])) ?? 0
-            items.append(CloudFileItem(id: basePath.appendingComponent(name).path, name: name,
-                                        path: basePath.appendingComponent(name),
-                                        size: isDir ? nil : size, isDirectory: isDir))
+            items.append(CloudFileItem(
+                id: basePath.appendingComponent(name).path,
+                name: name,
+                path: basePath.appendingComponent(name),
+                size: isDir ? nil : size,
+                isDirectory: isDir
+            ))
         }
         return items
     }
