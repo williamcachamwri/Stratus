@@ -14,18 +14,18 @@ public struct ChangeEvent: Sendable {
     public let detectedAt: Date
 
     public init(pairID: UUID, localURL: URL, changeType: ChangeType, renamedFrom: URL? = nil) {
-        self.id = UUID()
+        id = UUID()
         self.pairID = pairID
         self.localURL = localURL
         self.changeType = changeType
         self.renamedFrom = renamedFrom
-        self.detectedAt = Date()
+        detectedAt = Date()
     }
 }
 
 // MARK: - ChangeJournal
 
-// Watches local directories for FSEvents and coalesces rapid changes.
+/// Watches local directories for FSEvents and coalesces rapid changes.
 public actor ChangeJournal {
     public static let shared = ChangeJournal()
 
@@ -103,7 +103,7 @@ public actor ChangeJournal {
 
 // MARK: - FSEventsMonitor
 
-// Box to hold callback context — passed via info pointer to C FSEventStreamCallback.
+/// Box to hold callback context — passed via info pointer to C FSEventStreamCallback.
 private final class FSEventsCallbackBox {
     let pairID: UUID
     let onEvent: (ChangeEvent) -> Void
@@ -127,7 +127,7 @@ private final class FSEventsMonitor: @unchecked Sendable {
 
     func start(onEvent: @escaping (ChangeEvent) -> Void) {
         let box = FSEventsCallbackBox(pairID: pairID, onEvent: onEvent)
-        self.callbackBox = box  // keep alive for stream duration
+        callbackBox = box // keep alive for stream duration
 
         let paths = [rootURL.path] as CFArray
         let infoPtr = Unmanaged.passUnretained(box).toOpaque()
@@ -141,15 +141,14 @@ private final class FSEventsMonitor: @unchecked Sendable {
             let flags = UnsafeBufferPointer(start: eventFlags, count: numEvents)
             for (path, flag) in zip(paths, flags) {
                 let url = URL(fileURLWithPath: path)
-                let changeType: ChangeType
-                if flag & UInt32(kFSEventStreamEventFlagItemRenamed) != 0 {
-                    changeType = .renamed
+                let changeType: ChangeType = if flag & UInt32(kFSEventStreamEventFlagItemRenamed) != 0 {
+                    .renamed
                 } else if flag & UInt32(kFSEventStreamEventFlagItemCreated) != 0 {
-                    changeType = .created
+                    .created
                 } else if flag & UInt32(kFSEventStreamEventFlagItemRemoved) != 0 {
-                    changeType = .deleted
+                    .deleted
                 } else {
-                    changeType = .modified
+                    .modified
                 }
                 box.onEvent(ChangeEvent(pairID: box.pairID, localURL: url, changeType: changeType))
             }
