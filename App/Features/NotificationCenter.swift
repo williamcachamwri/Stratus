@@ -23,9 +23,9 @@ public final class StratusNotificationCenter: ObservableObject {
     // MARK: - Permission
 
     public func requestAuthorization() async {
-        guard let center else { return }
+        guard Bundle.main.bundleIdentifier != nil else { return }
         do {
-            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
+            let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
             logger.info("Notification permission granted: \(granted)")
         } catch {
             logger.error("Notification permission request failed: \(error)")
