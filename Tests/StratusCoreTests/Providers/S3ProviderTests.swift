@@ -3,7 +3,7 @@ import XCTest
 
 final class S3ProviderTests: XCTestCase {
 
-    private let provider = S3Provider()
+    private let provider = S3Provider(config: S3Configuration(bucket: "stratus-unit-tests"))
 
     // MARK: - Identity
 
