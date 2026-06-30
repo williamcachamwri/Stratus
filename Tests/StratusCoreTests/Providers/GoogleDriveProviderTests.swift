@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class GoogleDriveProviderTests: XCTestCase {
-
     private let provider = GoogleDriveProvider()
 
     func test_provider_id() {
@@ -39,7 +38,7 @@ final class GoogleDriveProviderTests: XCTestCase {
     }
 
     func test_capabilities_sendable() {
-        func check<T: Sendable>(_: T) {}
+        func check(_: some Sendable) {}
         check(provider.capabilities)
     }
 
