@@ -60,7 +60,7 @@ public actor BiometricGuard {
     /// policy so the caller retains control over passcode fallback UX.
     public func authenticate(reason: String) async throws -> Bool {
         let context = LAContext()
-        context.localizedFallbackTitle = ""  // Hide "Enter Password" button.
+        context.localizedFallbackTitle = "" // Hide "Enter Password" button.
 
         var policyError: NSError?
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &policyError) else {
