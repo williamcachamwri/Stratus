@@ -1,7 +1,8 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 // MARK: - EncryptionManifest
+
 // JSON-serializable manifest stored alongside an encrypted file (or in a sidecar).
 // Maps original filenames to their encryption metadata.
 
@@ -17,7 +18,7 @@ public struct EncryptionManifest: Codable, Sendable {
         public let originalSize: Int64
         public let encryptedSize: Int64
         public let contentType: String?
-        public let originalChecksum: String  // SHA-256 hex of plaintext
+        public let originalChecksum: String // SHA-256 hex of plaintext
         public let encryptedAt: Date
     }
 
@@ -45,12 +46,12 @@ public struct EncryptionManifest: Codable, Sendable {
         entries.values.first { $0.encryptedName == encryptedName }?.originalName
     }
 
-    // Sidecar filename for a given remote path
+    /// Sidecar filename for a given remote path
     public static func sidecarName(for remotePath: String) -> String {
         ".stratus_enc_manifest"
     }
 
-    // Serializes to JSON, encrypted by the provided actor
+    /// Serializes to JSON, encrypted by the provided actor
     public func serializedJSON() throws -> Data {
         try JSONEncoder().encode(self)
     }
