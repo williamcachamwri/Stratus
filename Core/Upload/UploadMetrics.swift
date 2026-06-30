@@ -53,9 +53,11 @@ public struct UploadSessionMetrics: Codable, Sendable {
     public var totalChunks: Int = 0
     public var failedChunks: Int = 0
     public var retriedChunks: Int = 0
-    public var chunkSuccessRate: Double { totalChunks > 0 ? Double(totalChunks - failedChunks) / Double(totalChunks) : 1.0 }
+    public var chunkSuccessRate: Double {
+        totalChunks > 0 ? Double(totalChunks - failedChunks) / Double(totalChunks) : 1.0
+    }
 
-    // Per-file breakdown
+    /// Per-file breakdown
     public var fileSummaries: [FileUploadSummary] = []
 
     // Network quality
