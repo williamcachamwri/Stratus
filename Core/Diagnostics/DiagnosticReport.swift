@@ -33,7 +33,6 @@ public enum DiagnosticReportError: Error, Sendable {
 /// The returned URL is the root of that directory — suitable for sharing or
 /// compressing via `Process` / `NSFileCoordinatedWrite`.
 public actor DiagnosticReport {
-
     // MARK: Singleton
 
     public static let shared = DiagnosticReport()
@@ -64,7 +63,7 @@ public actor DiagnosticReport {
     ) {
         self.telemetry = telemetry
         self.networkDiagnostics = networkDiagnostics
-        self.fileManager = .default
+        fileManager = .default
     }
 
     // MARK: - Export
@@ -136,12 +135,12 @@ public actor DiagnosticReport {
         let summaries = await telemetry.exportSummaries()
         let summaryPayload = summaries.map { summary -> [String: Any] in
             [
-                "kind":  summary.kind.rawValue,
+                "kind": summary.kind.rawValue,
                 "count": summary.count,
-                "mean":  summary.mean,
-                "min":   summary.min,
-                "max":   summary.max,
-                "p95":   summary.p95,
+                "mean": summary.mean,
+                "min": summary.min,
+                "max": summary.max,
+                "p95": summary.p95,
             ]
         }
         let summaryData: Data
@@ -165,10 +164,10 @@ public actor DiagnosticReport {
             do {
                 let latency = try await networkDiagnostics.runLatencyProbe(host: host)
                 entry["latency_ms"] = latency * 1000
-                entry["success"]    = true
+                entry["success"] = true
             } catch {
                 entry["success"] = false
-                entry["error"]   = error.localizedDescription
+                entry["error"] = error.localizedDescription
             }
             results.append(entry)
         }
@@ -176,7 +175,7 @@ public actor DiagnosticReport {
         let isConnected = await networkDiagnostics.checkConnectivity()
         let payload: [String: Any] = [
             "connected": isConnected,
-            "probes":    results,
+            "probes": results,
             "timestamp": ISO8601DateFormatter().string(from: Date()),
         ]
         let data: Data
@@ -229,11 +228,11 @@ public actor DiagnosticReport {
         }
 
         let manifest: [String: Any] = [
-            "bundle_version":    1,
-            "generated_at":      timestamp,
-            "app_subsystem":     "com.stratus.cloudmanager",
-            "platform":          "macOS",
-            "files":             fileEntries,
+            "bundle_version": 1,
+            "generated_at": timestamp,
+            "app_subsystem": "com.stratus.cloudmanager",
+            "platform": "macOS",
+            "files": fileEntries,
         ]
 
         let data: Data
@@ -264,7 +263,7 @@ public actor DiagnosticReport {
 
         // Look back one hour
         let oneHourAgo = store.position(date: Date(timeIntervalSinceNow: -3600))
-        let predicate  = NSPredicate(
+        let predicate = NSPredicate(
             format: "subsystem == %@",
             "com.stratus.cloudmanager"
         )
@@ -283,14 +282,13 @@ public actor DiagnosticReport {
 
         let lines = entries.compactMap { entry -> String? in
             guard let msg = entry as? OSLogEntryLog else { return nil }
-            let levelTag: String
-            switch msg.level {
-            case .debug:   levelTag = "DEBUG"
-            case .info:    levelTag = "INFO"
-            case .notice:  levelTag = "NOTICE"
-            case .error:   levelTag = "ERROR"
-            case .fault:   levelTag = "FAULT"
-            default:       levelTag = "OTHER"
+            let levelTag = switch msg.level {
+            case .debug: "DEBUG"
+            case .info: "INFO"
+            case .notice: "NOTICE"
+            case .error: "ERROR"
+            case .fault: "FAULT"
+            default: "OTHER"
             }
             let ts = ISO8601DateFormatter().string(from: msg.date)
             return "[\(ts)] [\(levelTag)] [\(msg.category)] \(msg.composedMessage)"
