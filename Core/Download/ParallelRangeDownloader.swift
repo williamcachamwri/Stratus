@@ -4,16 +4,18 @@ import os.log
 // MARK: - Segment
 
 /// A single contiguous byte-range slice of a file to be downloaded independently.
-private struct Segment: Sendable {
+private struct Segment {
     let index: Int
     let range: ClosedRange<Int64>
 
-    var length: Int64 { range.upperBound - range.lowerBound + 1 }
+    var length: Int64 {
+        range.upperBound - range.lowerBound + 1
+    }
 }
 
 // MARK: - SegmentResult
 
-private struct SegmentResult: Sendable {
+private struct SegmentResult {
     let index: Int
     let data: Data
 }
@@ -31,7 +33,7 @@ public struct ParallelRangeDownloaderConfiguration: Sendable {
     public let retryBaseDelay: TimeInterval
 
     public static let `default` = ParallelRangeDownloaderConfiguration(
-        segmentSize: 8 * 1024 * 1024,   // 8 MiB per segment
+        segmentSize: 8 * 1024 * 1024, // 8 MiB per segment
         maxConcurrentSegments: 4,
         maxSegmentRetries: 3,
         retryBaseDelay: 0.5
@@ -67,7 +69,6 @@ public struct SegmentProgressUpdate: Sendable {
 /// The actor serialises bookkeeping (segment registry, byte-count tracking)
 /// while the heavy network I/O runs in concurrent child Tasks.
 public actor ParallelRangeDownloader {
-
     // MARK: Dependencies
 
     private let provider: any CloudProvider
@@ -127,7 +128,8 @@ public actor ParallelRangeDownloader {
 
                 // Seed the group with the initial window of tasks.
                 while inFlight < configuration.maxConcurrentSegments,
-                      let segment = pendingIterator.next() {
+                      let segment = pendingIterator.next()
+                {
                     let seg = segment
                     group.addTask {
                         try await self.downloadSegment(seg, path: path, account: account)
@@ -169,7 +171,10 @@ public actor ParallelRangeDownloader {
         assembled.reserveCapacity(Int(fileSize))
         for (index, chunk) in buffer.enumerated() {
             guard let chunk else {
-                throw DownloadError.segmentFailed(index: index, underlyingDescription: "Segment missing after all tasks completed")
+                throw DownloadError.segmentFailed(
+                    index: index,
+                    underlyingDescription: "Segment missing after all tasks completed"
+                )
             }
             assembled.append(chunk)
         }
@@ -226,7 +231,8 @@ public actor ParallelRangeDownloader {
                 var inFlight = 0
 
                 while inFlight < configuration.maxConcurrentSegments,
-                      let segment = pendingIterator.next() {
+                      let segment = pendingIterator.next()
+                {
                     let seg = segment
                     group.addTask {
                         try await self.downloadSegment(seg, path: path, account: account)
@@ -278,7 +284,7 @@ public actor ParallelRangeDownloader {
 
         while offset < fileSize {
             let end = min(offset + configuration.segmentSize - 1, fileSize - 1)
-            segments.append(Segment(index: index, range: offset...end))
+            segments.append(Segment(index: index, range: offset ... end))
             offset = end + 1
             index += 1
         }
@@ -304,7 +310,7 @@ public actor ParallelRangeDownloader {
                 return SegmentResult(index: segment.index, data: data)
             } catch let providerErr as ProviderError {
                 // Non-retryable errors.
-                if case .fileNotFound(let p) = providerErr {
+                if case let .fileNotFound(p) = providerErr {
                     throw DownloadError.fileNotFound(p)
                 }
                 attempt += 1
@@ -315,7 +321,10 @@ public actor ParallelRangeDownloader {
                     )
                 }
                 let delay = configuration.retryBaseDelay * pow(2.0, Double(attempt - 1))
-                logger.warning("Segment \(segment.index) attempt \(attempt) failed (\(providerErr.localizedDescription)); retrying in \(delay)s")
+                logger
+                    .warning(
+                        "Segment \(segment.index) attempt \(attempt) failed (\(providerErr.localizedDescription)); retrying in \(delay)s"
+                    )
                 try await Task.sleep(for: .seconds(delay))
             } catch {
                 attempt += 1
@@ -326,7 +335,10 @@ public actor ParallelRangeDownloader {
                     )
                 }
                 let delay = configuration.retryBaseDelay * pow(2.0, Double(attempt - 1))
-                logger.warning("Segment \(segment.index) attempt \(attempt) failed (\(error.localizedDescription)); retrying in \(delay)s")
+                logger
+                    .warning(
+                        "Segment \(segment.index) attempt \(attempt) failed (\(error.localizedDescription)); retrying in \(delay)s"
+                    )
                 try await Task.sleep(for: .seconds(delay))
             }
         }
