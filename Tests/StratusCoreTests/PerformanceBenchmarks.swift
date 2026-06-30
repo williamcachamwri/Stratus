@@ -1,9 +1,8 @@
-import XCTest
 import CryptoKit
+import XCTest
 @testable import StratusCore
 
 final class PerformanceBenchmarks: XCTestCase {
-
     private var tempDir: URL!
 
     override func setUp() async throws {
@@ -26,7 +25,7 @@ final class PerformanceBenchmarks: XCTestCase {
 
     // MARK: - CRC32c Performance
 
-    func test_crc32c_1MB_under5ms() async {
+    func test_crc32c_1MB_under5ms() {
         let data = Data(repeating: 0xAB, count: 1024 * 1024)
         let engine = ChecksumEngine.shared
         measure {
@@ -41,7 +40,7 @@ final class PerformanceBenchmarks: XCTestCase {
 
     // MARK: - SHA-256 Performance
 
-    func test_sha256_4MB_file() async throws {
+    func test_sha256_4MB_file() throws {
         let data = Data(repeating: 0xFF, count: 4 * 1024 * 1024)
         let url = tempDir.appendingPathComponent("sha256bench.bin")
         try data.write(to: url)
@@ -58,7 +57,7 @@ final class PerformanceBenchmarks: XCTestCase {
 
     // MARK: - Encryption Performance
 
-    func test_encryption_1MB_roundTrip() async throws {
+    func test_encryption_1MB_roundTrip() throws {
         let key = SymmetricKey(size: .bits256)
         let enc = ClientSideEncryption(masterKey: key)
         let data = Data(repeating: 0xAA, count: 1024 * 1024)
@@ -79,12 +78,12 @@ final class PerformanceBenchmarks: XCTestCase {
 
     // MARK: - BandwidthMonitor EWMA Performance
 
-    func test_bandwidthMonitor_10kSamples() async {
+    func test_bandwidthMonitor_10kSamples() {
         let monitor = BandwidthMonitor()
         measure {
             let exp = expectation(description: "bw_samples")
             Task {
-                for _ in 0..<10_000 {
+                for _ in 0 ..< 10000 {
                     await monitor.recordBytes(1_000_000, elapsed: 1.0)
                 }
                 exp.fulfill()
