@@ -1,6 +1,6 @@
-import SwiftUI
-import StratusCore
 import os.log
+import StratusCore
+import SwiftUI
 
 // MARK: - Upload Dashboard Presentation State
 
@@ -123,6 +123,7 @@ public struct DownloadDashboardSummary: Sendable {
 }
 
 // MARK: - AppEnvironment
+
 // Single source of truth for real app state and services injected into SwiftUI.
 
 @MainActor
@@ -130,6 +131,7 @@ public final class AppEnvironment: ObservableObject {
     public static let shared = AppEnvironment()
 
     // MARK: - Services
+
     let uploadEngine = UploadEngine.shared
     let downloadEngine = DownloadEngine.shared
     let syncEngine = SyncEngine.shared
@@ -143,6 +145,7 @@ public final class AppEnvironment: ObservableObject {
     private let credentialVault = CredentialVault.shared
 
     // MARK: - Observable State
+
     @Published public var accounts: [CloudAccount] = []
     @Published public var activeSyncPairs: [SyncPair] = []
     @Published public var pendingConflicts: [SyncConflict] = []
@@ -244,13 +247,17 @@ public final class AppEnvironment: ObservableObject {
         if uploadEvents.count > 200 { uploadEvents.removeFirst() }
 
         switch event {
-        case .taskAdded(let task):
-            uploadRowStore[task.id] = row(for: task, phase: .queued, detail: "Queued at scheduler priority \(task.priority.rawValue)")
-        case .taskStarted(let id):
+        case let .taskAdded(task):
+            uploadRowStore[task.id] = row(
+                for: task,
+                phase: .queued,
+                detail: "Queued at scheduler priority \(task.priority.rawValue)"
+            )
+        case let .taskStarted(id):
             updateUploadRow(id: id, phase: .hashing, detail: "Preparing checksum, delta check, and upload session")
-        case .taskProgress(let id, let progress):
+        case let .taskProgress(id, progress):
             updateUploadRow(id: id, progress: progress)
-        case .taskCompleted(let task, let result):
+        case let .taskCompleted(task, result):
             uploadRowStore[task.id] = row(
                 for: task,
                 phase: .completed,
@@ -266,7 +273,7 @@ public final class AppEnvironment: ObservableObject {
                 fileName: task.sourceURL.lastPathComponent,
                 providerName: providerName(for: task.providerID)
             )
-        case .taskFailed(let task, let error):
+        case let .taskFailed(task, error):
             uploadRowStore[task.id] = row(
                 for: task,
                 phase: .failed,
@@ -277,15 +284,15 @@ public final class AppEnvironment: ObservableObject {
                 fileName: task.sourceURL.lastPathComponent,
                 error: error.localizedDescription
             )
-        case .taskPaused(let id):
+        case let .taskPaused(id):
             updateUploadRow(id: id, phase: .paused, detail: "Paused with resume state preserved")
-        case .taskResumed(let id):
+        case let .taskResumed(id):
             updateUploadRow(id: id, phase: .queued, detail: "Queued for resume")
-        case .taskReprioritized(let id, let priority):
+        case let .taskReprioritized(id, priority):
             updateUploadRow(id: id, phase: .queued, detail: "Queued at scheduler priority \(priority.rawValue)")
-        case .taskCancelled(let id):
+        case let .taskCancelled(id):
             updateUploadRow(id: id, phase: .cancelled, detail: "Cancelled by user")
-        case .sessionRestored(let count):
+        case let .sessionRestored(count):
             logger.info("Upload engine restored \(count) persisted sessions")
         }
 
@@ -295,31 +302,35 @@ public final class AppEnvironment: ObservableObject {
 
     private func handleDownloadEvent(_ event: DownloadEngineEvent) {
         switch event {
-        case .taskAdded(let task):
-            downloadRowStore[task.id] = row(for: task, phase: .queued, detail: "Queued at priority \(task.priority.rawValue)")
-        case .taskStarted(let id):
+        case let .taskAdded(task):
+            downloadRowStore[task.id] = row(
+                for: task,
+                phase: .queued,
+                detail: "Queued at priority \(task.priority.rawValue)"
+            )
+        case let .taskStarted(id):
             updateDownloadRow(id: id, phase: .downloading, detail: "Resolving metadata and allocating range slots")
-        case .taskProgress(let id, let progress):
+        case let .taskProgress(id, progress):
             updateDownloadRow(id: id, progress: progress)
-        case .taskCompleted(let id, let summary):
+        case let .taskCompleted(id, summary):
             updateDownloadRow(id: id, summary: summary)
-        case .taskFailed(let id, let error):
+        case let .taskFailed(id, error):
             updateDownloadRow(id: id, phase: .failed, detail: error.localizedDescription)
-        case .taskPaused(let id, let token):
+        case let .taskPaused(id, token):
             let offset = token.map { formatBytes($0.resumeOffset) } ?? "0 B"
             updateDownloadRow(id: id, phase: .paused, detail: "Paused at \(offset)")
-        case .taskResumed(let id):
+        case let .taskResumed(id):
             updateDownloadRow(id: id, phase: .queued, detail: "Queued for resume")
-        case .taskCancelled(let id):
+        case let .taskCancelled(id):
             updateDownloadRow(id: id, phase: .cancelled, detail: "Cancelled by user")
-        case .sessionsRestored(let count):
+        case let .sessionsRestored(count):
             logger.info("Download engine restored \(count) persisted sessions")
         }
         publishDownloadState()
     }
 
     private func handleSyncEvent(_ event: SyncEngineEvent) {
-        if case .conflictDetected(let conflict) = event {
+        if case let .conflictDetected(conflict) = event {
             pendingConflicts.append(conflict)
             StratusNotificationCenter.shared.notifySyncConflict(
                 fileName: conflict.localURL.lastPathComponent,
@@ -327,11 +338,11 @@ public final class AppEnvironment: ObservableObject {
             )
             DockProgressManager.shared.updateConflictBadge(pendingConflicts.count)
         }
-        if case .conflictResolved(let conflict, _) = event {
+        if case let .conflictResolved(conflict, _) = event {
             pendingConflicts.removeAll { $0.id == conflict.id }
             DockProgressManager.shared.updateConflictBadge(pendingConflicts.count)
         }
-        if case .syncCompleted(_, let up, let down, _) = event {
+        if case let .syncCompleted(_, up, down, _) = event {
             StratusNotificationCenter.shared.notifySyncComplete(
                 pairName: "Stratus", uploaded: up, downloaded: down
             )
@@ -424,7 +435,7 @@ public final class AppEnvironment: ObservableObject {
             return lhs.updatedAt > rhs.updatedAt
         }
         uploadRows = rows
-        activeUploads = rows.filter { $0.phase == .hashing || $0.phase == .uploading }.count
+        activeUploads = rows.count(where: { $0.phase == .hashing || $0.phase == .uploading })
         uploadSummary = makeUploadSummary(rows: rows)
     }
 
@@ -435,11 +446,11 @@ public final class AppEnvironment: ObservableObject {
         let currentBPS = snapshot?.currentBPS ?? rows.reduce(Double(0)) { $0 + $1.speedBPS }
         let remaining = max(0, total - transferred)
         return UploadDashboardSummary(
-            activeCount: rows.filter { $0.phase == .hashing || $0.phase == .uploading }.count,
-            queuedCount: rows.filter { $0.phase == .queued }.count,
-            failedCount: rows.filter { $0.phase == .failed }.count,
-            pausedCount: rows.filter { $0.phase == .paused }.count,
-            completedCount: rows.filter { $0.phase == .completed }.count,
+            activeCount: rows.count(where: { $0.phase == .hashing || $0.phase == .uploading }),
+            queuedCount: rows.count(where: { $0.phase == .queued }),
+            failedCount: rows.count(where: { $0.phase == .failed }),
+            pausedCount: rows.count(where: { $0.phase == .paused }),
+            completedCount: rows.count(where: { $0.phase == .completed }),
             bytesTransferred: transferred,
             totalBytes: total,
             currentBPS: currentBPS,
@@ -450,12 +461,12 @@ public final class AppEnvironment: ObservableObject {
 
     private func uploadPhaseRank(_ phase: UploadDisplayPhase) -> Int {
         switch phase {
-        case .uploading, .hashing: return 0
-        case .queued: return 1
-        case .paused: return 2
-        case .failed: return 3
-        case .completed: return 4
-        case .cancelled, .skipped: return 5
+        case .uploading, .hashing: 0
+        case .queued: 1
+        case .paused: 2
+        case .failed: 3
+        case .completed: 4
+        case .cancelled, .skipped: 5
         }
     }
 
@@ -565,11 +576,11 @@ public final class AppEnvironment: ObservableObject {
             .reduce(Double(0)) { $0 + $1.speedBPS }
         let remaining = max(0, total - received)
         return DownloadDashboardSummary(
-            activeCount: rows.filter { $0.phase == .downloading }.count,
-            queuedCount: rows.filter { $0.phase == .queued || $0.phase == .restored }.count,
-            failedCount: rows.filter { $0.phase == .failed }.count,
-            pausedCount: rows.filter { $0.phase == .paused }.count,
-            completedCount: rows.filter { $0.phase == .completed }.count,
+            activeCount: rows.count(where: { $0.phase == .downloading }),
+            queuedCount: rows.count(where: { $0.phase == .queued || $0.phase == .restored }),
+            failedCount: rows.count(where: { $0.phase == .failed }),
+            pausedCount: rows.count(where: { $0.phase == .paused }),
+            completedCount: rows.count(where: { $0.phase == .completed }),
             bytesReceived: received,
             totalBytes: total,
             currentBPS: currentBPS,
@@ -579,12 +590,12 @@ public final class AppEnvironment: ObservableObject {
 
     private func downloadPhaseRank(_ phase: DownloadDisplayPhase) -> Int {
         switch phase {
-        case .downloading: return 0
-        case .queued, .restored: return 1
-        case .paused: return 2
-        case .failed: return 3
-        case .completed: return 4
-        case .cancelled: return 5
+        case .downloading: 0
+        case .queued, .restored: 1
+        case .paused: 2
+        case .failed: 3
+        case .completed: 4
+        case .cancelled: 5
         }
     }
 
