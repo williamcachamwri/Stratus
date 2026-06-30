@@ -1,10 +1,9 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 // MARK: - AWS SigV4 Request Signer
 
 public struct RequestSigner: Sendable {
-
     // MARK: - SigV4
 
     public static func signV4(
@@ -42,9 +41,10 @@ public struct RequestSigner: Sendable {
         let queryString = canonicalQueryString(from: request.url)
         let sortedHeaders = sortedSignedHeaders(from: request)
         let canonicalHeaders = sortedHeaders.map { "\($0.key):\($0.value)\n" }.joined()
-        let signedHeaderNames = sortedHeaders.map { $0.key }.joined(separator: ";")
+        let signedHeaderNames = sortedHeaders.map(\.key).joined(separator: ";")
 
-        let canonicalRequest = [method, uri, queryString, canonicalHeaders, signedHeaderNames, bodyHash].joined(separator: "\n")
+        let canonicalRequest = [method, uri, queryString, canonicalHeaders, signedHeaderNames, bodyHash]
+            .joined(separator: "\n")
 
         // String to sign
         let credentialScope = "\(dateString)/\(region)/\(service)/aws4_request"
@@ -52,7 +52,12 @@ public struct RequestSigner: Sendable {
         let stringToSign = ["AWS4-HMAC-SHA256", dateTimeString, credentialScope, canonicalHash].joined(separator: "\n")
 
         // Signing key
-        let signingKey = deriveSigningKey(secretKey: secretAccessKey, date: dateString, region: region, service: service)
+        let signingKey = deriveSigningKey(
+            secretKey: secretAccessKey,
+            date: dateString,
+            region: region,
+            service: service
+        )
 
         // Signature
         let signature = HMAC<SHA256>.authenticationCode(for: Data(stringToSign.utf8), using: signingKey)
@@ -102,10 +107,16 @@ public struct RequestSigner: Sendable {
         let uri = canonicalURI(from: presignURL)
         let queryString = canonicalQueryString(from: presignURL)
         let host = presignURL.host ?? ""
-        let canonicalRequest = [method, uri, queryString, "host:\(host)\n", "host", "UNSIGNED-PAYLOAD"].joined(separator: "\n")
+        let canonicalRequest = [method, uri, queryString, "host:\(host)\n", "host", "UNSIGNED-PAYLOAD"]
+            .joined(separator: "\n")
         let canonicalHash = SHA256.hash(data: Data(canonicalRequest.utf8)).map { String(format: "%02x", $0) }.joined()
         let stringToSign = ["AWS4-HMAC-SHA256", dateTimeString, credentialScope, canonicalHash].joined(separator: "\n")
-        let signingKey = deriveSigningKey(secretKey: secretAccessKey, date: dateString, region: region, service: service)
+        let signingKey = deriveSigningKey(
+            secretKey: secretAccessKey,
+            date: dateString,
+            region: region,
+            service: service
+        )
         let signature = HMAC<SHA256>.authenticationCode(for: Data(stringToSign.utf8), using: signingKey)
             .map { String(format: "%02x", $0) }.joined()
 
@@ -115,11 +126,22 @@ public struct RequestSigner: Sendable {
 
     // MARK: - Private
 
-    private static func deriveSigningKey(secretKey: String, date: String, region: String, service: String) -> SymmetricKey {
-        let kDate = HMAC<SHA256>.authenticationCode(for: Data(date.utf8), using: SymmetricKey(data: Data(("AWS4" + secretKey).utf8)))
+    private static func deriveSigningKey(
+        secretKey: String,
+        date: String,
+        region: String,
+        service: String
+    ) -> SymmetricKey {
+        let kDate = HMAC<SHA256>.authenticationCode(
+            for: Data(date.utf8),
+            using: SymmetricKey(data: Data(("AWS4" + secretKey).utf8))
+        )
         let kRegion = HMAC<SHA256>.authenticationCode(for: Data(region.utf8), using: SymmetricKey(data: kDate))
         let kService = HMAC<SHA256>.authenticationCode(for: Data(service.utf8), using: SymmetricKey(data: kRegion))
-        let kSigning = HMAC<SHA256>.authenticationCode(for: Data("aws4_request".utf8), using: SymmetricKey(data: kService))
+        let kSigning = HMAC<SHA256>.authenticationCode(
+            for: Data("aws4_request".utf8),
+            using: SymmetricKey(data: kService)
+        )
         return SymmetricKey(data: kSigning)
     }
 
@@ -171,7 +193,7 @@ public struct RequestSigner: Sendable {
     private static func sortedSignedHeaders(from request: URLRequest) -> [(key: String, value: String)] {
         let excluded = Set(["connection", "user-agent"])
         var headers: [(key: String, value: String)] = []
-        for (key, value) in (request.allHTTPHeaderFields ?? [:]) {
+        for (key, value) in request.allHTTPHeaderFields ?? [:] {
             let lower = key.lowercased()
             if !excluded.contains(lower) {
                 headers.append((key: lower, value: value.trimmingCharacters(in: .whitespaces)))
