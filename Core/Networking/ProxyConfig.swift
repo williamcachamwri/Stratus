@@ -10,7 +10,6 @@ import os.log
 /// proxy types with custom values before applying the config to a
 /// `URLSessionConfiguration`.
 public struct ProxyConfig: Codable, Sendable {
-
     // MARK: - Proxy Entry
 
     public struct ProxyEntry: Codable, Sendable, Equatable {
@@ -111,21 +110,24 @@ public struct ProxyConfig: Codable, Sendable {
         // HTTP
         if let enabled = s[kCFNetworkProxiesHTTPEnable as String] as? Int, enabled != 0,
            let host = s[kCFNetworkProxiesHTTPProxy as String] as? String,
-           let port = s[kCFNetworkProxiesHTTPPort as String] as? Int {
+           let port = s[kCFNetworkProxiesHTTPPort as String] as? Int
+        {
             httpProxy = ProxyEntry(host: host, port: port)
         }
 
         // HTTPS
         if let enabled = s[kCFNetworkProxiesHTTPSEnable as String] as? Int, enabled != 0,
            let host = s[kCFNetworkProxiesHTTPSProxy as String] as? String,
-           let port = s[kCFNetworkProxiesHTTPSPort as String] as? Int {
+           let port = s[kCFNetworkProxiesHTTPSPort as String] as? Int
+        {
             httpsProxy = ProxyEntry(host: host, port: port)
         }
 
         // SOCKS
         if let enabled = s[kCFNetworkProxiesSOCKSEnable as String] as? Int, enabled != 0,
            let host = s[kCFNetworkProxiesSOCKSProxy as String] as? String,
-           let port = s[kCFNetworkProxiesSOCKSPort as String] as? Int {
+           let port = s[kCFNetworkProxiesSOCKSPort as String] as? Int
+        {
             socks5Proxy = ProxyEntry(host: host, port: port)
         }
 
