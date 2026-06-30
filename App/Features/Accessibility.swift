@@ -1,23 +1,22 @@
-import SwiftUI
-import StratusCore
 import AppKit
+import StratusCore
+import SwiftUI
 
 // MARK: - Accessibility View Modifiers
 
 public extension View {
     /// Applies a standard accessibility label + hint for upload row items.
     func uploadRowAccessibility(fileName: String, progress: Double, state: String) -> some View {
-        self
-            .accessibilityElement(children: .combine)
+        accessibilityElement(children: .combine)
             .accessibilityLabel(Text("\(fileName), \(state)"))
             .accessibilityValue(Text(String(format: "%.0f%%", progress * 100)))
             .accessibilityHint(Text("Double-tap to view upload details"))
     }
 
     /// Reduces or disables an animation when Reduce Motion is enabled.
-    func reducedMotionAnimation<V: Equatable>(
+    func reducedMotionAnimation(
         _ animation: Animation?,
-        value: V
+        value: some Equatable
     ) -> some View {
         modifier(ReducedMotionModifier(animation: animation, value: value))
     }
@@ -60,14 +59,14 @@ public struct AccessibleProgressRing: View {
 extension View {
     /// Attaches a keyboard shortcut that applies only when the view is focused.
     func onReturnKey(perform action: @escaping () -> Void) -> some View {
-        self.onKeyPress(.return) {
+        onKeyPress(.return) {
             action()
             return .handled
         }
     }
 
     func onDeleteKey(perform action: @escaping () -> Void) -> some View {
-        self.onKeyPress(.delete) {
+        onKeyPress(.delete) {
             action()
             return .handled
         }
