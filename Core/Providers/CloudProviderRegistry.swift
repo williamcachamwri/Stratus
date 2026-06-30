@@ -1,11 +1,11 @@
 import Foundation
 
 // MARK: - CloudProviderRegistry Extensions
+
 // The CloudProviderRegistry actor is declared in CloudProvider.swift.
 // This file adds convenience accessors matching the documented labeled-parameter interface.
 
 public extension CloudProviderRegistry {
-
     /// Labeled-parameter form of `register(_:)` for call-site clarity.
     func register(provider: any CloudProvider) {
         register(provider)
