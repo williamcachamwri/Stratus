@@ -27,7 +27,9 @@ public actor AppDatabase {
             url = URL(fileURLWithPath: path)
         } else {
             let stratusDir: URL
-            if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: FileProviderDomainStore.appGroupIdentifier) {
+            if let groupURL = FileManager.default
+                .containerURL(forSecurityApplicationGroupIdentifier: FileProviderDomainStore.appGroupIdentifier)
+            {
                 stratusDir = groupURL.appendingPathComponent("Database", isDirectory: true)
             } else {
                 let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -44,7 +46,7 @@ public actor AppDatabase {
             // WAL mode: < 5ms checkpoint latency
             try db.execute(sql: "PRAGMA journal_mode = WAL")
             try db.execute(sql: "PRAGMA synchronous = NORMAL")
-            try db.execute(sql: "PRAGMA cache_size = -8000")  // 8 MB cache
+            try db.execute(sql: "PRAGMA cache_size = -8000") // 8 MB cache
             try db.execute(sql: "PRAGMA foreign_keys = ON")
             try db.execute(sql: "PRAGMA temp_store = MEMORY")
         }
@@ -53,7 +55,7 @@ public actor AppDatabase {
         try migrate()
     }
 
-    // In-memory database for tests
+    /// In-memory database for tests
     public static func makeInMemory() throws -> AppDatabase {
         try AppDatabase(inMemory: true)
     }
@@ -67,7 +69,7 @@ public actor AppDatabase {
 
     // MARK: - Migrations
 
-    nonisolated private func migrate() throws {
+    private nonisolated func migrate() throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("001_accounts") { db in
             try db.execute(sql: """
@@ -161,7 +163,10 @@ public actor AppDatabase {
                     updated_at REAL NOT NULL DEFAULT (unixepoch('now'))
                 )
             """)
-            try db.execute(sql: "CREATE INDEX idx_provider_account_configs_provider ON provider_account_configs(provider_id)")
+            try db
+                .execute(
+                    sql: "CREATE INDEX idx_provider_account_configs_provider ON provider_account_configs(provider_id)"
+                )
         }
 
         try migrator.migrate(dbWriter)
