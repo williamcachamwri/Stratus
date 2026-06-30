@@ -1,6 +1,6 @@
-import Foundation
-import CryptoKit
 import Accelerate
+import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - ChecksumEngine
@@ -8,7 +8,7 @@ import os.log
 public actor ChecksumEngine {
     public static let shared = ChecksumEngine()
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "ChecksumEngine")
-    private let streamingChunkSize = 4 * 1024 * 1024  // 4 MB streaming read chunks
+    private let streamingChunkSize = 4 * 1024 * 1024 // 4 MB streaming read chunks
 
     private init() {}
 
@@ -56,8 +56,8 @@ public actor ChecksumEngine {
 
     public func crc32c(of data: Data) async -> UInt32 {
         // Uses Accelerate vDSP for hardware-accelerated CRC32c
-        return data.withUnsafeBytes { bytes in
-            var crc: UInt32 = 0xFFFFFFFF
+        data.withUnsafeBytes { bytes in
+            var crc: UInt32 = 0xFFFF_FFFF
             let ptr = bytes.bindMemory(to: UInt8.self)
             for byte in ptr {
                 crc = crc32cTable[Int((crc ^ UInt32(byte)) & 0xFF)] ^ (crc >> 8)
@@ -68,14 +68,14 @@ public actor ChecksumEngine {
 
     // MARK: - S3 Multipart ETag
 
-    // S3 multipart ETag = MD5(MD5(p1) + MD5(p2) + ... + MD5(pN)) + "-N"
+    /// S3 multipart ETag = MD5(MD5(p1) + MD5(p2) + ... + MD5(pN)) + "-N"
     public func s3MultipartETag(chunkMD5s: [String]) async -> String {
         var concatenated = Data()
         for hex in chunkMD5s {
             let bytes = stride(from: 0, to: hex.count, by: 2).compactMap {
                 let start = hex.index(hex.startIndex, offsetBy: $0)
                 let end = hex.index(start, offsetBy: 2)
-                return UInt8(hex[start..<end], radix: 16)
+                return UInt8(hex[start ..< end], radix: 16)
             }
             concatenated.append(contentsOf: bytes)
         }
@@ -119,12 +119,12 @@ public actor ChecksumEngine {
 
 // MARK: - CRC32c Lookup Table
 
-// Precomputed Castagnoli polynomial table
+/// Precomputed Castagnoli polynomial table
 private let crc32cTable: [UInt32] = {
-    let poly: UInt32 = 0x82F63B78
-    return (0..<256).map { i -> UInt32 in
+    let poly: UInt32 = 0x82F6_3B78
+    return (0 ..< 256).map { i -> UInt32 in
         var crc = UInt32(i)
-        for _ in 0..<8 {
+        for _ in 0 ..< 8 {
             crc = (crc & 1) != 0 ? (crc >> 1) ^ poly : crc >> 1
         }
         return crc
