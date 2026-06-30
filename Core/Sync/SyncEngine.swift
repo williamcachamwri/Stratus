@@ -119,7 +119,7 @@ public actor SyncEngine {
             let remotePath = pair.remotePath.appendingComponent(relative)
             try? await provider.delete(path: remotePath, account: account)
         case .renamed, .moved:
-            break  // Handled via delete+create events from FSEvents
+            break // Handled via delete+create events from FSEvents
         }
     }
 
@@ -134,14 +134,22 @@ public actor SyncEngine {
             let localItems = try fetchAllLocalItems(at: pair.localPath)
 
             let remoteByName = Dictionary(remoteItems.map { ($0.name, $0) }, uniquingKeysWith: { _, new in new })
-            let localByName = Dictionary(localItems.map { ($0.lastPathComponent, $0) }, uniquingKeysWith: { _, new in new })
+            let localByName = Dictionary(
+                localItems.map { ($0.lastPathComponent, $0) },
+                uniquingKeysWith: { _, new in new }
+            )
 
             // Upload local-only files
             if pair.mode != .oneWayDownload {
                 for (name, localURL) in localByName where remoteByName[name] == nil {
                     let remotePath = pair.remotePath.appendingComponent(name)
                     if shouldExclude(url: localURL, rules: pair.rules) { continue }
-                    _ = try await uploadEngine.upload(fileURL: localURL, destination: remotePath, accountID: pair.accountID, priority: .low)
+                    _ = try await uploadEngine.upload(
+                        fileURL: localURL,
+                        destination: remotePath,
+                        accountID: pair.accountID,
+                        priority: .low
+                    )
                     emit(.fileUploaded(pairID: pair.id, localURL: localURL, remotePath: remotePath))
                     uploaded += 1
                 }
@@ -151,7 +159,11 @@ public actor SyncEngine {
             if pair.mode != .oneWayUpload && pair.mode != .mirror {
                 for (name, remoteItem) in remoteByName where localByName[name] == nil {
                     let localURL = pair.localPath.appendingPathComponent(name)
-                    let downloadURL = try await provider.downloadURL(path: remoteItem.path, account: account, expiresIn: 3600)
+                    let downloadURL = try await provider.downloadURL(
+                        path: remoteItem.path,
+                        account: account,
+                        expiresIn: 3600
+                    )
                     let (data, _) = try await URLSession.shared.data(from: downloadURL)
                     try data.write(to: localURL)
                     emit(.fileDownloaded(pairID: pair.id, remotePath: remoteItem.path, localURL: localURL))
@@ -163,20 +175,32 @@ public actor SyncEngine {
             if pair.mode == .bidirectional || pair.mode == .mirror {
                 for (name, remoteItem) in remoteByName {
                     guard let localURL = localByName[name] else { continue }
-                    let localMod = (try? localURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
+                    let localMod = (try? localURL.resourceValues(forKeys: [.contentModificationDateKey])
+                        .contentModificationDate) ?? Date.distantPast
                     let remoteMod = remoteItem.modificationDate ?? Date.distantPast
 
                     let localChanged = abs(localMod.timeIntervalSinceNow) < 86400
                     let remoteChanged = abs(remoteMod.timeIntervalSinceNow) < 86400
 
-                    if localChanged && remoteChanged {
-                        let localSize = (try? localURL.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
-                        let conflict = SyncConflict(pairID: pair.id, localURL: localURL,
-                                                     remotePath: remoteItem.path,
-                                                     localModDate: localMod, remoteModDate: remoteMod,
-                                                     localSize: localSize, remoteSize: remoteItem.size ?? 0)
+                    if localChanged, remoteChanged {
+                        let localSize = (try? localURL.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+                            .map(Int64.init) ?? 0
+                        let conflict = SyncConflict(
+                            pairID: pair.id,
+                            localURL: localURL,
+                            remotePath: remoteItem.path,
+                            localModDate: localMod,
+                            remoteModDate: remoteMod,
+                            localSize: localSize,
+                            remoteSize: remoteItem.size ?? 0
+                        )
                         emit(.conflictDetected(conflict))
-                        let action = try await conflictResolver.resolve(conflict: conflict, resolution: pair.conflictResolution, provider: provider, account: account)
+                        let action = try await conflictResolver.resolve(
+                            conflict: conflict,
+                            resolution: pair.conflictResolution,
+                            provider: provider,
+                            account: account
+                        )
                         emit(.conflictResolved(conflict, action))
                         try await executeAction(action, provider: provider, account: account, pair: pair)
                         conflicts += 1
@@ -192,16 +216,31 @@ public actor SyncEngine {
         }
     }
 
-    private func executeAction(_ action: ResolvedAction, provider: any CloudProvider, account: CloudAccount, pair: SyncPair) async throws {
+    private func executeAction(
+        _ action: ResolvedAction,
+        provider: any CloudProvider,
+        account: CloudAccount,
+        pair: SyncPair
+    ) async throws {
         switch action {
-        case .upload(let localURL, let remotePath):
-            _ = try await uploadEngine.upload(fileURL: localURL, destination: remotePath, accountID: pair.accountID, priority: .normal)
-        case .download(let remotePath, let localURL):
+        case let .upload(localURL, remotePath):
+            _ = try await uploadEngine.upload(
+                fileURL: localURL,
+                destination: remotePath,
+                accountID: pair.accountID,
+                priority: .normal
+            )
+        case let .download(remotePath, localURL):
             let url = try await provider.downloadURL(path: remotePath, account: account, expiresIn: 3600)
             let (data, _) = try await URLSession.shared.data(from: url)
             try data.write(to: localURL)
-        case .keepBoth(let uploadURL, let remotePath, _, let conflictCopy):
-            _ = try await uploadEngine.upload(fileURL: uploadURL, destination: remotePath, accountID: pair.accountID, priority: .normal)
+        case let .keepBoth(uploadURL, remotePath, _, conflictCopy):
+            _ = try await uploadEngine.upload(
+                fileURL: uploadURL,
+                destination: remotePath,
+                accountID: pair.accountID,
+                priority: .normal
+            )
             let url = try await provider.downloadURL(path: remotePath, account: account, expiresIn: 3600)
             let (data, _) = try await URLSession.shared.data(from: url)
             try data.write(to: conflictCopy)
@@ -210,7 +249,11 @@ public actor SyncEngine {
         }
     }
 
-    private func fetchAllRemoteItems(path: CloudPath, provider: any CloudProvider, account: CloudAccount) async throws -> [CloudFileItem] {
+    private func fetchAllRemoteItems(
+        path: CloudPath,
+        provider: any CloudProvider,
+        account: CloudAccount
+    ) async throws -> [CloudFileItem] {
         var all: [CloudFileItem] = []
         var pageToken: String? = nil
         repeat {
@@ -222,13 +265,18 @@ public actor SyncEngine {
     }
 
     private func fetchAllLocalItems(at url: URL) throws -> [URL] {
-        try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey], options: [.skipsHiddenFiles])
+        try FileManager.default.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        )
     }
 
     private func shouldExclude(url: URL, rules: [SyncRule]) -> Bool {
         let name = url.lastPathComponent
         let ext = url.pathExtension
-        return rules.filter { $0.type == .exclude }.contains { $0.matches(path: url.path, name: name, fileExtension: ext) }
+        return rules.filter { $0.type == .exclude }
+            .contains { $0.matches(path: url.path, name: name, fileExtension: ext) }
     }
 
     private func emit(_ event: SyncEngineEvent) {
