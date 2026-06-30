@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class S3ProviderTests: XCTestCase {
-
     private let provider = S3Provider(config: S3Configuration(bucket: "stratus-unit-tests"))
 
     // MARK: - Identity
@@ -66,7 +65,7 @@ final class S3ProviderTests: XCTestCase {
     // MARK: - ProviderCapabilities Sendable
 
     func test_capabilities_sendable() {
-        func check<T: Sendable>(_: T) {}
+        func check(_: some Sendable) {}
         check(provider.capabilities)
     }
 
