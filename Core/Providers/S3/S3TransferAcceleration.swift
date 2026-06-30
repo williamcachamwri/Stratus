@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - S3TransferAcceleration
+
 // Selects between the standard S3 regional endpoint and the S3 Transfer
 // Acceleration endpoint (bucket.s3-accelerate.amazonaws.com).
 //
@@ -9,7 +10,6 @@ import Foundation
 // on the bucket via the S3 console or API before use.
 
 public struct S3TransferAcceleration: Sendable {
-
     // MARK: - Configuration
 
     /// When `true`, `acceleratedEndpoint(for:)` returns the acceleration
@@ -50,7 +50,7 @@ public struct S3TransferAcceleration: Sendable {
         // Both branches above set a valid scheme and host, so comps.url is
         // never nil here.  The fallback URL is expressed as a fileURLWithPath
         // to avoid any optional-URL construction.
-        return comps.url ?? URL(fileURLWithPath: "/")  // unreachable; satisfies compiler
+        return comps.url ?? URL(fileURLWithPath: "/") // unreachable; satisfies compiler
     }
 
     /// Convenience: returns the virtual-hosted style object URL.
