@@ -7,7 +7,7 @@ struct FileBrowserView: View {
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var env: AppEnvironment
     @State private var selectedAccount: CloudAccount?
-    @State private var currentPath: CloudPath = CloudPath("/")
+    @State private var currentPath = CloudPath("/")
     @State private var items = [CloudFileItem]()
     @State private var isLoading = false
     @State private var error: String?
