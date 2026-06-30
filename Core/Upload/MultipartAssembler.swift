@@ -2,6 +2,7 @@ import Foundation
 import os.log
 
 // MARK: - MultipartAssembler
+
 // Thin wrapper over the provider's completeMultipartUpload / abortMultipartUpload.
 // Centralises the completion and abort paths so ChunkEngine doesn't call the
 // provider directly at the assembly step.
@@ -12,7 +13,6 @@ public enum MultipartAssemblerError: Error, Sendable {
 }
 
 public struct MultipartAssembler: Sendable {
-
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "MultipartAssembler")
 
     public init() {}
