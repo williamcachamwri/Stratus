@@ -3,15 +3,20 @@ import os.log
 
 // MARK: - Ring Buffer
 
-struct RingBuffer<T: Sendable>: Sendable {
+struct RingBuffer<T: Sendable> {
     private var buffer: [T?]
     private var writeIndex: Int = 0
     private(set) var count: Int = 0
     let capacity: Int
+    var isEmpty: Bool {
+        // RingBuffer count tracks occupied slots, not a collection count.
+        // swiftlint:disable:next empty_count
+        count == 0
+    }
 
     init(capacity: Int) {
         self.capacity = capacity
-        self.buffer = Array(repeating: nil, count: capacity)
+        buffer = Array(repeating: nil, count: capacity)
     }
 
     mutating func push(_ element: T) {
@@ -21,11 +26,11 @@ struct RingBuffer<T: Sendable>: Sendable {
     }
 
     var elements: [T] {
-        guard count > 0 else { return [] }
+        guard !isEmpty else { return [] }
         let start = count < capacity ? 0 : writeIndex % capacity
         var result: [T] = []
         result.reserveCapacity(count)
-        for i in 0..<count {
+        for i in 0 ..< count {
             let index = (start + i) % capacity
             if let element = buffer[index] {
                 result.append(element)
@@ -37,10 +42,12 @@ struct RingBuffer<T: Sendable>: Sendable {
 
 // MARK: - Bandwidth Sample
 
-struct BWSample: Sendable {
+struct BWSample {
     let bytes: Int64
     let elapsed: TimeInterval
-    var bps: Double { elapsed > 0 ? Double(bytes) / elapsed : 0 }
+    var bps: Double {
+        elapsed > 0 ? Double(bytes) / elapsed : 0
+    }
 }
 
 // MARK: - Bandwidth Snapshot (emitted to UI)
@@ -66,6 +73,7 @@ public enum BWTrend: Sendable {
 }
 
 // MARK: - BandwidthMonitor Actor
+
 // EWMA α = 0.2: weights recent samples higher without wild oscillation
 // Measurement resolution: 100ms
 // Smoothing window: 5 seconds (50 samples)
@@ -76,14 +84,14 @@ public actor BandwidthMonitor {
     private var samples: RingBuffer<BWSample>
     private var ewmaValue: Double = 0
     private var previousEWMA: Double = 0
-    private(set) public var peakBPS: Double = 0
+    public private(set) var peakBPS: Double = 0
     private var continuations: [UUID: AsyncStream<BWSnapshot>.Continuation] = [:]
-    private var lastUpdateTime: Date = Date()
+    private var lastUpdateTime: Date = .init()
     private let theoreticalMaxBPS: Double
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "BandwidthMonitor")
 
     public init(theoreticalMaxBPS: Double = Double.infinity) {
-        self.samples = RingBuffer(capacity: 50)
+        samples = RingBuffer(capacity: 50)
         self.theoreticalMaxBPS = theoreticalMaxBPS
     }
 
@@ -114,7 +122,9 @@ public actor BandwidthMonitor {
 
     // MARK: - Computed Properties
 
-    public var currentBPS: Double { ewmaValue }
+    public var currentBPS: Double {
+        ewmaValue
+    }
 
     public var averageBPS: Double {
         let all = samples.elements
@@ -127,7 +137,7 @@ public actor BandwidthMonitor {
 
     public var trend: BWTrend {
         let delta = ewmaValue - previousEWMA
-        let threshold = ewmaValue * 0.05  // 5% change threshold
+        let threshold = ewmaValue * 0.05 // 5% change threshold
         if delta > threshold { return .rising }
         if delta < -threshold { return .falling }
         return .stable
@@ -138,7 +148,9 @@ public actor BandwidthMonitor {
         return min(1.0, ewmaValue / theoreticalMaxBPS)
     }
 
-    public func currentSnapshot() -> BWSnapshot { makeSnapshot() }
+    public func currentSnapshot() -> BWSnapshot {
+        makeSnapshot()
+    }
 
     public func estimatedTimeRemaining(bytesLeft: Int64) -> TimeInterval {
         guard bytesLeft > 0, ewmaValue > 0 else { return TimeInterval.infinity }
