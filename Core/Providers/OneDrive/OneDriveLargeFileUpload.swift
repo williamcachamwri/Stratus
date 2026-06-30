@@ -2,6 +2,7 @@ import Foundation
 import os.log
 
 // MARK: - OneDriveLargeFileUpload
+
 // Implements the Microsoft Graph large-file upload session protocol.
 //
 // Flow:
@@ -19,7 +20,6 @@ public enum OneDriveLargeFileUploadError: Error, Sendable {
 }
 
 public actor OneDriveLargeFileUpload {
-
     // MARK: - Constants
 
     private static let graphBase = "https://graph.microsoft.com/v1.0/me/drive"
@@ -45,7 +45,8 @@ public actor OneDriveLargeFileUpload {
         httpClient: HTTPClient
     ) async throws -> String {
         guard let comps = URLComponents(string: "\(Self.graphBase)/root:\(remotePath.path):/createUploadSession") else {
-            throw OneDriveLargeFileUploadError.invalidUploadURL("\(Self.graphBase)/root:\(remotePath.path):/createUploadSession")
+            throw OneDriveLargeFileUploadError
+                .invalidUploadURL("\(Self.graphBase)/root:\(remotePath.path):/createUploadSession")
         }
         guard let url = comps.url else {
             throw OneDriveLargeFileUploadError.invalidUploadURL(remotePath.path)
