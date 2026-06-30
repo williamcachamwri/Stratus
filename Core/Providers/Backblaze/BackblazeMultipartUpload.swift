@@ -1,8 +1,9 @@
-import Foundation
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - BackblazeMultipartUpload
+
 // Implements the Backblaze B2 native large-file API (non-S3-compatible):
 //
 //   1. b2_start_large_file   → fileId
@@ -22,7 +23,6 @@ public enum BackblazeMultipartUploadError: Error, Sendable {
 }
 
 public struct BackblazeMultipartUpload: Sendable {
-
     // MARK: - Configuration
 
     public let applicationKeyID: String
@@ -193,7 +193,11 @@ public struct BackblazeMultipartUpload: Sendable {
         let response = try await httpClient.upload(request: req, from: data)
         guard response.isSuccess else {
             let text = String(data: response.data, encoding: .utf8) ?? ""
-            throw BackblazeMultipartUploadError.uploadPartFailed(partNumber: partNumber, statusCode: response.statusCode, body: text)
+            throw BackblazeMultipartUploadError.uploadPartFailed(
+                partNumber: partNumber,
+                statusCode: response.statusCode,
+                body: text
+            )
         }
         return sha1
     }
