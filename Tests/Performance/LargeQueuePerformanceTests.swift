@@ -3,8 +3,8 @@ import XCTest
 
 final class LargeQueuePerformanceTests: XCTestCase {
     func testPrioritySortForLargeQueueStaysDeterministic() {
-        let tasks = (0..<5_000).map { index in
-            QueueProbe(id: index, priority: index.isMultiple(of: 7) ? .high : .normal, bytes: Int64(5_000 - index))
+        let tasks = (0 ..< 5000).map { index in
+            QueueProbe(id: index, priority: index.isMultiple(of: 7) ? .high : .normal, bytes: Int64(5000 - index))
         }
 
         measure {
