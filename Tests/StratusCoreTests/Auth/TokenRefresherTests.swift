@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class TokenRefresherTests: XCTestCase {
-
     // MARK: - TokenError cases
 
     func test_token_error_sendable() {
@@ -19,7 +18,7 @@ final class TokenRefresherTests: XCTestCase {
 
     func test_no_credential_error_embeds_account_id() {
         let error = TokenError.noCredential("my-account")
-        if case .noCredential(let id) = error {
+        if case let .noCredential(id) = error {
             XCTAssertEqual(id, "my-account")
         } else {
             XCTFail("Expected noCredential case")
@@ -28,7 +27,7 @@ final class TokenRefresherTests: XCTestCase {
 
     func test_no_refresh_token_error_embeds_account_id() {
         let error = TokenError.noRefreshToken("another-account")
-        if case .noRefreshToken(let id) = error {
+        if case let .noRefreshToken(id) = error {
             XCTAssertEqual(id, "another-account")
         } else {
             XCTFail("Expected noRefreshToken case")
@@ -37,7 +36,7 @@ final class TokenRefresherTests: XCTestCase {
 
     func test_unsupported_provider_error_embeds_provider_id() {
         let error = TokenError.unsupportedProvider("box")
-        if case .unsupportedProvider(let pid) = error {
+        if case let .unsupportedProvider(pid) = error {
             XCTAssertEqual(pid, "box")
         } else {
             XCTFail("Expected unsupportedProvider case")
@@ -74,11 +73,11 @@ final class TokenRefresherTests: XCTestCase {
 
     // MARK: - Concurrent calls (deduplication must not crash)
 
-    func test_concurrent_valid_token_calls_do_not_crash() async throws {
+    func test_concurrent_valid_token_calls_do_not_crash() async {
         let refresher = TokenRefresher.shared
         let accountID = "concurrent-test-\(UUID())"
         await withTaskGroup(of: Void.self) { group in
-            for _ in 0..<10 {
+            for _ in 0 ..< 10 {
                 group.addTask {
                     _ = try? await refresher.validToken(providerID: "gdrive", accountID: accountID)
                 }
