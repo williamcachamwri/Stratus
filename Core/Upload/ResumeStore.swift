@@ -211,6 +211,19 @@ public actor ResumeStore {
         return url.path
     }
 
+    private nonisolated func intValue(from row: Row, column: String, default defaultValue: Int = 0) -> Int {
+        if let value = row[column] as? Int {
+            return value
+        }
+        if let value = row[column] as? Int64 {
+            return Int(value)
+        }
+        if let value = row[column] as? Int32 {
+            return Int(value)
+        }
+        return defaultValue
+    }
+
     private nonisolated func sessionFromRow(_ row: Row) throws -> UploadSession {
         let chunksStr = (row["completed_chunks"] as? String) ?? "[]"
         let etagsStr = (row["etags"] as? String) ?? "{}"
@@ -231,12 +244,12 @@ public actor ResumeStore {
             uploadID: row["upload_id"] as? String,
             fileSize: (row["file_size"] as? Int64) ?? 0,
             fileChecksum: (row["file_checksum"] as? String) ?? "",
-            chunkSize: (row["chunk_size"] as? Int) ?? 0,
-            totalChunks: (row["total_chunks"] as? Int) ?? 0,
+            chunkSize: intValue(from: row, column: "chunk_size"),
+            totalChunks: intValue(from: row, column: "total_chunks"),
             completedChunks: chunks,
             etags: etags,
             state: (row["state"] as? String) ?? "unknown",
-            retryCount: (row["retry_count"] as? Int) ?? 0,
+            retryCount: intValue(from: row, column: "retry_count"),
             errorDescription: row["error_description"] as? String,
             createdAt: createdAt,
             updatedAt: updatedAt
