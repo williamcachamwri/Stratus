@@ -13,7 +13,7 @@ public struct SyncSchedule: Codable, Sendable {
     }
 
     public var triggers: Set<Trigger>
-    public var periodicIntervalMinutes: Int  // Used only if .periodic in triggers
+    public var periodicIntervalMinutes: Int // Used only if .periodic in triggers
     public var skipOnBattery: Bool
     public var skipOnMeteredConnection: Bool
 
