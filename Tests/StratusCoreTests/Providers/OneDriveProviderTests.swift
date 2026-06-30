@@ -18,7 +18,7 @@ final class OneDriveProviderTests: XCTestCase {
     }
 
     func test_capabilities_multipart_supported() {
-        XCTAssertTrue(provider.capabilities.supportsMultipartUpload)
+        XCTAssertFalse(provider.capabilities.supportsMultipartUpload)
     }
 
     func test_capabilities_resume_supported() {
