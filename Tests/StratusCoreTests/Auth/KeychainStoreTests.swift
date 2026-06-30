@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class KeychainStoreTests: XCTestCase {
-
     private let store = KeychainStore.shared
     private let testService = "com.stratus.test.keychain"
     private let testAccount = "unit-test-\(UUID().uuidString)"
@@ -81,7 +80,9 @@ final class KeychainStoreTests: XCTestCase {
 
     func test_binary_data_survives_round_trip() async throws {
         var bytes = [UInt8](repeating: 0, count: 256)
-        for i in 0..<256 { bytes[i] = UInt8(i) }
+        for i in 0 ..< 256 {
+            bytes[i] = UInt8(i)
+        }
         let original = Data(bytes)
         try await store.saveSecret(original, service: testService, account: testAccount)
         let loaded = try await store.loadSecret(service: testService, account: testAccount)
