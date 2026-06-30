@@ -9,7 +9,7 @@ require_tools="${STRATUS_REQUIRE_LINT_TOOLS:-0}"
 missing=0
 
 if command -v swiftformat >/dev/null 2>&1; then
-  swiftformat --lint App Core Features DesignSystem Tests Package.swift
+  swiftformat App Core Features DesignSystem Tests Package.swift --lint
 else
   echo "SwiftFormat is not installed. Install with: brew install swiftformat" >&2
   missing=1
