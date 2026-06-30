@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class SyncRuleTests: XCTestCase {
-
     // MARK: - Name scope matching
 
     func test_name_scope_exact_match() {
@@ -70,22 +69,22 @@ final class SyncRuleTests: XCTestCase {
     func test_default_excludes_all_builtin() {
         let excludes = SyncRule.defaultExcludes
         XCTAssertFalse(excludes.isEmpty)
-        XCTAssertTrue(excludes.allSatisfy { $0.isBuiltIn })
+        XCTAssertTrue(excludes.allSatisfy(\.isBuiltIn))
         XCTAssertTrue(excludes.allSatisfy { $0.type == .exclude })
     }
 
     func test_default_excludes_contains_ds_store() {
-        let patterns = SyncRule.defaultExcludes.map { $0.pattern }
+        let patterns = SyncRule.defaultExcludes.map(\.pattern)
         XCTAssertTrue(patterns.contains(".DS_Store"))
     }
 
     func test_default_excludes_contains_git() {
-        let patterns = SyncRule.defaultExcludes.map { $0.pattern }
+        let patterns = SyncRule.defaultExcludes.map(\.pattern)
         XCTAssertTrue(patterns.contains(".git"))
     }
 
     func test_default_excludes_contains_node_modules() {
-        let patterns = SyncRule.defaultExcludes.map { $0.pattern }
+        let patterns = SyncRule.defaultExcludes.map(\.pattern)
         XCTAssertTrue(patterns.contains("node_modules"))
     }
 
