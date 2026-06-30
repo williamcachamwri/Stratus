@@ -104,9 +104,9 @@ public actor DiagnosticReport {
         }
 
         // Collect all sections concurrently, gathering partial failures
-        async let metricsResult   = collectMetrics(outputDir: outputDir)
-        async let networkResult   = collectNetworkLatency(outputDir: outputDir)
-        async let logResult       = collectOSLog(outputDir: outputDir)
+        async let metricsResult: Void = collectMetrics(outputDir: outputDir)
+        async let networkResult: Void = collectNetworkLatency(outputDir: outputDir)
+        async let logResult: Void = collectOSLog(outputDir: outputDir)
 
         // Await and surface the first error (rethrows)
         try await metricsResult
