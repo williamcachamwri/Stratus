@@ -1,6 +1,6 @@
-import SwiftUI
 import CryptoKit
 import StratusCore
+import SwiftUI
 
 struct PreferencesView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -52,10 +52,10 @@ private struct BandwidthPrefsTab: View {
     var body: some View {
         Form {
             LabeledContent("Upload limit:") {
-                BandwidthSlider(limitMBps: $uploadLimit, range: 1...500)
+                BandwidthSlider(limitMBps: $uploadLimit, range: 1 ... 500)
             }
             LabeledContent("Download limit:") {
-                BandwidthSlider(limitMBps: $downloadLimit, range: 1...500)
+                BandwidthSlider(limitMBps: $downloadLimit, range: 1 ... 500)
             }
             Section("Schedule") {
                 Text("Bandwidth scheduling available per sync pair")
@@ -92,10 +92,10 @@ private struct EncryptionPrefsTab: View {
                 }
                 .disabled(password.isEmpty || password != confirm || isSaving)
                 switch feedback {
-                case .success(let msg):
+                case let .success(msg):
                     Label(msg, systemImage: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                case .failure(let msg):
+                case let .failure(msg):
                     Label(msg, systemImage: "xmark.circle.fill")
                         .foregroundColor(.red)
                 case nil:
