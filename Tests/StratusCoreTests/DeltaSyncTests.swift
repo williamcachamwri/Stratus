@@ -1,49 +1,186 @@
 import XCTest
 @testable import StratusCore
 
-// Minimal mock provider for DeltaSync tests
+/// Minimal mock provider for DeltaSync tests
 actor MockCloudProvider: CloudProvider {
-    nonisolated var id: String { "mock" }
-    nonisolated var displayName: String { "Mock" }
-    nonisolated var iconName: String { "mock" }
-    nonisolated var capabilities: ProviderCapabilities { ProviderCapabilities() }
-    nonisolated var supportsBlockManifest: Bool { false }
+    nonisolated var id: String {
+        "mock"
+    }
+
+    nonisolated var displayName: String {
+        "Mock"
+    }
+
+    nonisolated var iconName: String {
+        "mock"
+    }
+
+    nonisolated var capabilities: ProviderCapabilities {
+        ProviderCapabilities()
+    }
+
+    nonisolated var supportsBlockManifest: Bool {
+        false
+    }
 
     func authenticate(account: CloudAccount) async throws {}
     func refreshCredentials(account: CloudAccount) async throws {}
-    func validateCredentials(account: CloudAccount) async throws -> Bool { false }
+    func validateCredentials(account: CloudAccount) async throws -> Bool {
+        false
+    }
+
     func revokeCredentials(account: CloudAccount) async throws {}
-    func quota(for account: CloudAccount) async throws -> StorageQuota { StorageQuota(totalBytes: nil, usedBytes: 0, availableBytes: nil) }
-    func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> { PagedResult(items: []) }
-    func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem { throw ProviderError.fileNotFound(path) }
-    func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String { "" }
-    func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult { ChunkUploadResult(etag: nil) }
-    func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: CloudPath("/")) }
+    func quota(for account: CloudAccount) async throws -> StorageQuota {
+        StorageQuota(
+            totalBytes: nil,
+            usedBytes: 0,
+            availableBytes: nil
+        )
+    }
+
+    func listDirectory(
+        path: CloudPath,
+        account: CloudAccount,
+        pageToken: String?
+    ) async throws -> PagedResult<[CloudFileItem]> {
+        PagedResult(items: [])
+    }
+
+    func fileMetadata(
+        path: CloudPath,
+        account: CloudAccount
+    ) async throws -> CloudFileItem {
+        throw ProviderError.fileNotFound(path)
+    }
+
+    func initiateMultipartUpload(
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> String {
+        ""
+    }
+
+    func uploadChunk(
+        uploadID: String,
+        chunkNumber: Int,
+        data: Data,
+        account: CloudAccount
+    ) async throws -> ChunkUploadResult {
+        ChunkUploadResult(etag: nil)
+    }
+
+    func completeMultipartUpload(
+        uploadID: String,
+        parts: [CompletedPart],
+        account: CloudAccount
+    ) async throws -> CloudFileItem {
+        CloudFileItem(
+            id: "",
+            name: "",
+            path: CloudPath("/")
+        )
+    }
+
     func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {}
-    func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: CloudPath("/")) }
-    func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL { throw ProviderError.unsupportedOperation("") }
-    func downloadRange(path: CloudPath, range: ClosedRange<Int64>, account: CloudAccount) async throws -> Data { Data() }
-    func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: path, isDirectory: true) }
-    func move(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: to) }
-    func copy(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: "", path: to) }
+    func uploadSmallFile(
+        data: Data,
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> CloudFileItem {
+        CloudFileItem(
+            id: "",
+            name: "",
+            path: CloudPath("/")
+        )
+    }
+
+    func downloadURL(
+        path: CloudPath,
+        account: CloudAccount,
+        expiresIn: TimeInterval
+    ) async throws -> URL {
+        throw ProviderError.unsupportedOperation("")
+    }
+
+    func downloadRange(path: CloudPath, range: ClosedRange<Int64>, account: CloudAccount) async throws -> Data {
+        Data()
+    }
+
+    func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
+        CloudFileItem(
+            id: "",
+            name: "",
+            path: path,
+            isDirectory: true
+        )
+    }
+
+    func move(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
+        CloudFileItem(
+            id: "",
+            name: "",
+            path: to
+        )
+    }
+
+    func copy(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
+        CloudFileItem(
+            id: "",
+            name: "",
+            path: to
+        )
+    }
+
     func delete(path: CloudPath, account: CloudAccount) async throws {}
-    func rename(path: CloudPath, newName: String, account: CloudAccount) async throws -> CloudFileItem { CloudFileItem(id: "", name: newName, path: path) }
-    func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? { nil }
-    func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? { nil }
+    func rename(path: CloudPath, newName: String, account: CloudAccount) async throws -> CloudFileItem {
+        CloudFileItem(
+            id: "",
+            name: newName,
+            path: path
+        )
+    }
+
+    func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? {
+        nil
+    }
+
+    func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
+        nil
+    }
+
     func storeBlockManifest(_ manifest: BlockMap, path: CloudPath, account: CloudAccount) async throws {}
     func trash(path: CloudPath, account: CloudAccount) async throws {}
-    func listTrash(account: CloudAccount) async throws -> [CloudFileItem] { [] }
+    func listTrash(account: CloudAccount) async throws -> [CloudFileItem] {
+        []
+    }
+
     func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {}
     func emptyTrash(account: CloudAccount) async throws {}
-    func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] { [] }
+    func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] {
+        []
+    }
+
     func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
-    func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink { throw ProviderError.unsupportedOperation("") }
+    func createShareLink(
+        path: CloudPath,
+        account: CloudAccount,
+        options: ShareOptions
+    ) async throws -> ShareLink {
+        throw ProviderError.unsupportedOperation("")
+    }
+
     func revokeShareLink(link: ShareLink, account: CloudAccount) async throws {}
-    func streamingURL(path: CloudPath, account: CloudAccount) async throws -> URL { throw ProviderError.unsupportedOperation("") }
+    func streamingURL(
+        path: CloudPath,
+        account: CloudAccount
+    ) async throws -> URL {
+        throw ProviderError.unsupportedOperation("")
+    }
 }
 
 final class DeltaSyncTests: XCTestCase {
-
     private var tempDir: URL!
     private var deltaSync: DeltaSync!
 
@@ -115,7 +252,7 @@ final class DeltaSyncTests: XCTestCase {
         try Data(repeating: 0, count: size).write(to: url)
         let provider = MockCloudProvider()
         let useDelta = await deltaSync.shouldUseDelta(fileSize: Int64(size), provider: provider, fileURL: url)
-        XCTAssertFalse(useDelta)  // False: provider doesn't support block manifest
+        XCTAssertFalse(useDelta) // False: provider doesn't support block manifest
     }
 
     func test_allBlocksChanged_allBlocksReturned() async throws {
