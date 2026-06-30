@@ -1,11 +1,12 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 // MARK: - SpeedGraph
+
 // A tiny sparkline-style bandwidth graph for the upload center header.
 
 struct SpeedGraph: View {
-    var samples: [Double]  // BPS values, most recent last
+    var samples: [Double] // BPS values, most recent last
     var color: Color = .accentColor
     var lineWidth: CGFloat = 1.5
 
@@ -50,7 +51,7 @@ struct SpeedGraph: View {
 struct BandwidthSlider: View {
     @Binding var limitMBps: Double
     let range: ClosedRange<Double>
-    var onCommit: ((Double) -> Void)? = nil
+    var onCommit: ((Double) -> Void)?
 
     var body: some View {
         HStack(spacing: Spacing.sm) {
@@ -60,8 +61,8 @@ struct BandwidthSlider: View {
                 if !editing { onCommit?(limitMBps) }
             }
             Text(limitMBps >= range.upperBound
-                 ? "Unlimited"
-                 : String(format: "%.0f MB/s", limitMBps))
+                ? "Unlimited"
+                : String(format: "%.0f MB/s", limitMBps))
                 .font(.stratusMonospace)
                 .frame(width: 80, alignment: .trailing)
         }
