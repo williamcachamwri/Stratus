@@ -2,6 +2,7 @@ import Foundation
 import os.log
 
 // MARK: - ChunkUploader
+
 // Wraps a single chunk upload attempt with exponential backoff retry logic.
 // Used internally by ChunkEngine for per-chunk resilience.
 
@@ -12,7 +13,6 @@ public enum ChunkRetryError: Error, Sendable {
 }
 
 public struct ChunkUploader: Sendable {
-
     private static let maxAttempts = 5
     // Base backoff intervals in seconds: 1, 2, 4, 8, 16
     private static let backoffBase: [TimeInterval] = [1, 2, 4, 8, 16]
@@ -36,7 +36,7 @@ public struct ChunkUploader: Sendable {
     ) async throws -> ChunkUploadResult {
         var lastError: (any Error)?
 
-        for attempt in 0..<Self.maxAttempts {
+        for attempt in 0 ..< Self.maxAttempts {
             // Check cancellation before each attempt
             if Task.isCancelled {
                 throw ChunkRetryError.cancelled
@@ -60,11 +60,13 @@ public struct ChunkUploader: Sendable {
                 if isNonRetriable(error) {
                     logger.error("Chunk \(chunkNumber) failed with non-retriable error: \(error)")
                     if let providerError = error as? ProviderError,
-                       case .serverError(let code, _) = providerError {
+                       case let .serverError(code, _) = providerError
+                    {
                         throw ChunkRetryError.nonRetryableHTTPStatus(code)
                     }
                     if let httpError = error as? HTTPClientError,
-                       case .requestFailed(let code, _) = httpError {
+                       case let .requestFailed(code, _) = httpError
+                    {
                         throw ChunkRetryError.nonRetryableHTTPStatus(code)
                     }
                     throw ChunkRetryError.nonRetryableHTTPStatus(0)
@@ -77,9 +79,12 @@ public struct ChunkUploader: Sendable {
 
                 // Exponential backoff with ±25% jitter
                 let base = Self.backoffBase[attempt]
-                let jitter = base * Self.jitterFraction * Double.random(in: -1.0...1.0)
+                let jitter = base * Self.jitterFraction * Double.random(in: -1.0 ... 1.0)
                 let delay = max(0, base + jitter)
-                logger.warning("Chunk \(chunkNumber) attempt \(attempt + 1) failed (\(error)). Retrying in \(String(format: "%.2f", delay))s")
+                logger
+                    .warning(
+                        "Chunk \(chunkNumber) attempt \(attempt + 1) failed (\(error)). Retrying in \(String(format: "%.2f", delay))s"
+                    )
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
@@ -95,7 +100,7 @@ public struct ChunkUploader: Sendable {
     private func isNonRetriable(_ error: any Error) -> Bool {
         if let providerError = error as? ProviderError {
             switch providerError {
-            case .serverError(let code, _):
+            case let .serverError(code, _):
                 // Non-retriable: 400, 401, 403, 404, 409
                 return [400, 401, 403, 404, 409].contains(code)
             case .accessDenied:
@@ -115,7 +120,7 @@ public struct ChunkUploader: Sendable {
 
         if let httpError = error as? HTTPClientError {
             switch httpError {
-            case .requestFailed(let code, _):
+            case let .requestFailed(code, _):
                 return [400, 401, 403, 404, 409].contains(code)
             case .cancelled:
                 return true
