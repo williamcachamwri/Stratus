@@ -1,8 +1,9 @@
-import Foundation
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - S3MultipartUpload
+
 // Helper that encapsulates the three-step AWS S3 multipart-upload protocol:
 //   1. CreateMultipartUpload  → obtain uploadID
 //   2. UploadPart × N        → accumulate CompletedPart list
@@ -19,7 +20,6 @@ public enum S3MultipartUploadError: Error, Sendable {
 }
 
 public actor S3MultipartUpload {
-
     // MARK: - State
 
     private let bucket: String
@@ -63,7 +63,7 @@ public actor S3MultipartUpload {
         } else {
             // Force-try is safe: the literal is always valid.
             self.endpoint = URL(string: "https://s3.\(region).amazonaws.com")
-                ?? URL(string: "https://s3.amazonaws.com")!  // fallback; literal always valid
+                ?? URL(string: "https://s3.amazonaws.com")! // fallback; literal always valid
         }
     }
 
@@ -138,7 +138,11 @@ public actor S3MultipartUpload {
         )
         guard response.isSuccess else {
             let body = String(data: response.data, encoding: .utf8) ?? ""
-            throw S3MultipartUploadError.partUploadFailed(partNumber: partNumber, statusCode: response.statusCode, body: body)
+            throw S3MultipartUploadError.partUploadFailed(
+                partNumber: partNumber,
+                statusCode: response.statusCode,
+                body: body
+            )
         }
         guard let rawETag = response.headers["ETag"] ?? response.headers["etag"] else {
             throw S3MultipartUploadError.missingETag(partNumber: partNumber)
@@ -208,7 +212,11 @@ public actor S3MultipartUpload {
             service: "s3"
         )
         do {
-            _ = try await http.data(for: HTTPRequest(url: url, method: .DELETE, headers: request.allHTTPHeaderFields ?? [:]))
+            _ = try await http.data(for: HTTPRequest(
+                url: url,
+                method: .DELETE,
+                headers: request.allHTTPHeaderFields ?? [:]
+            ))
         } catch {
             logger.warning("S3 abort failed: \(error)")
         }
