@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 struct MenuBarView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -30,8 +30,10 @@ struct MenuBarView: View {
                         BandwidthLabel(bps: env.uploadBandwidthSnapshot?.currentBPS ?? env.uploadSummary.currentBPS)
                     }
                     ProgressView(value: combinedProgress)
-                    Text("\(env.uploadSummary.queuedCount + env.downloadSummary.queuedCount) queued · \(env.uploadSummary.failedCount + env.downloadSummary.failedCount) failed")
-                        .stratusCaption()
+                    Text(
+                        "\(env.uploadSummary.queuedCount + env.downloadSummary.queuedCount) queued · \(env.uploadSummary.failedCount + env.downloadSummary.failedCount) failed"
+                    )
+                    .stratusCaption()
                 }
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.sm)
