@@ -12,13 +12,13 @@ import Foundation
 
 /// The kind of event captured by the telemetry system.
 public enum TelemetryEventKind: String, Sendable, Codable, CaseIterable {
-    case uploadSpeed      = "upload_speed"       // Bytes/sec for a completed upload
-    case downloadSpeed    = "download_speed"     // Bytes/sec for a completed download
-    case chunkError       = "chunk_error"        // A chunk-level transfer failure
-    case sessionDuration  = "session_duration"   // Seconds a user session lasted
-    case syncCycle        = "sync_cycle"         // Duration of one full sync pass
-    case providerError    = "provider_error"     // An unrecoverable provider-level error
-    case encryptionTiming = "encryption_timing"  // Milliseconds to encrypt/decrypt data
+    case uploadSpeed = "upload_speed" // Bytes/sec for a completed upload
+    case downloadSpeed = "download_speed" // Bytes/sec for a completed download
+    case chunkError = "chunk_error" // A chunk-level transfer failure
+    case sessionDuration = "session_duration" // Seconds a user session lasted
+    case syncCycle = "sync_cycle" // Duration of one full sync pass
+    case providerError = "provider_error" // An unrecoverable provider-level error
+    case encryptionTiming = "encryption_timing" // Milliseconds to encrypt/decrypt data
 }
 
 // MARK: - TelemetryEvent
@@ -60,21 +60,24 @@ public struct TelemetrySummary: Sendable {
     public let mean: Double
     public let min: Double
     public let max: Double
-    public let p95: Double   // 95th percentile
+    public let p95: Double // 95th percentile
 
     public init(kind: TelemetryEventKind, samples: [Double]) {
         self.kind = kind
-        self.count = samples.count
+        count = samples.count
 
         guard !samples.isEmpty else {
-            mean = 0; min = 0; max = 0; p95 = 0
+            mean = 0
+            min = 0
+            max = 0
+            p95 = 0
             return
         }
 
         let sorted = samples.sorted()
         mean = sorted.reduce(0, +) / Double(sorted.count)
-        min  = sorted.first ?? 0
-        max  = sorted.last ?? 0
+        min = sorted.first ?? 0
+        max = sorted.last ?? 0
 
         let p95Index = Int(ceil(Double(sorted.count) * 0.95)) - 1
         p95 = sorted[Swift.max(0, Swift.min(p95Index, sorted.count - 1))]
@@ -95,7 +98,6 @@ public enum TelemetryError: Error, Sendable {
 /// Events are held in memory up to `storageLimit`. Callers can persist them
 /// via `exportMetrics()` at any time (e.g., on app background / termination).
 public actor TelemetryReporter {
-
     // MARK: Singleton
 
     public static let shared = TelemetryReporter()
@@ -114,7 +116,7 @@ public actor TelemetryReporter {
 
     // MARK: Init
 
-    public init(storageLimit: Int = 10_000) {
+    public init(storageLimit: Int = 10000) {
         self.storageLimit = storageLimit
     }
 
@@ -153,9 +155,11 @@ public actor TelemetryReporter {
     ) throws {
         var meta: [String: String] = [:]
         if let pid = providerID { meta["provider"] = pid }
-        try record(event: TelemetryEvent(kind: .uploadSpeed,
-                                          value: bytesPerSecond,
-                                          metadata: meta))
+        try record(event: TelemetryEvent(
+            kind: .uploadSpeed,
+            value: bytesPerSecond,
+            metadata: meta
+        ))
     }
 
     /// Convenience: record a download speed sample.
@@ -165,9 +169,11 @@ public actor TelemetryReporter {
     ) throws {
         var meta: [String: String] = [:]
         if let pid = providerID { meta["provider"] = pid }
-        try record(event: TelemetryEvent(kind: .downloadSpeed,
-                                          value: bytesPerSecond,
-                                          metadata: meta))
+        try record(event: TelemetryEvent(
+            kind: .downloadSpeed,
+            value: bytesPerSecond,
+            metadata: meta
+        ))
     }
 
     /// Convenience: record a chunk-level transfer error.
@@ -178,24 +184,32 @@ public actor TelemetryReporter {
         errorCode: String,
         providerID: String? = nil
     ) throws {
-        var meta: [String: String] = ["chunk_index": "\(chunkIndex)",
-                                       "error_code": errorCode]
+        var meta: [String: String] = [
+            "chunk_index": "\(chunkIndex)",
+            "error_code": errorCode
+        ]
         if let pid = providerID { meta["provider"] = pid }
-        try record(event: TelemetryEvent(kind: .chunkError,
-                                          value: 1,
-                                          metadata: meta))
+        try record(event: TelemetryEvent(
+            kind: .chunkError,
+            value: 1,
+            metadata: meta
+        ))
     }
 
     /// Convenience: record a sync-cycle duration.
     public func recordSyncCycle(durationSeconds: Double) throws {
-        try record(event: TelemetryEvent(kind: .syncCycle,
-                                          value: durationSeconds))
+        try record(event: TelemetryEvent(
+            kind: .syncCycle,
+            value: durationSeconds
+        ))
     }
 
     /// Convenience: record an encryption or decryption operation duration.
     public func recordEncryptionTiming(milliseconds: Double) throws {
-        try record(event: TelemetryEvent(kind: .encryptionTiming,
-                                          value: milliseconds))
+        try record(event: TelemetryEvent(
+            kind: .encryptionTiming,
+            value: milliseconds
+        ))
     }
 
     // MARK: - Export
