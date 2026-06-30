@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - UploadQueue
+
 // Observable priority queue backed by a heap.
 // Higher priority dequeued first; equal priority → smaller file first.
 
@@ -80,12 +81,25 @@ public actor UploadQueue {
 
     // MARK: - Query
 
-    public var count: Int { heap.count }
-    public var isEmpty: Bool { heap.isEmpty }
-    public var peek: UploadTask? { heap.first }
-    public var tasks: [UploadTask] { heap }
+    public var count: Int {
+        heap.count
+    }
 
-    public func task(id: UUID) -> UploadTask? { tasksByID[id] }
+    public var isEmpty: Bool {
+        heap.isEmpty
+    }
+
+    public var peek: UploadTask? {
+        heap.first
+    }
+
+    public var tasks: [UploadTask] {
+        heap
+    }
+
+    public func task(id: UUID) -> UploadTask? {
+        tasksByID[id]
+    }
 
     // MARK: - Observation
 
@@ -103,14 +117,14 @@ public actor UploadQueue {
     // MARK: - Heap Internals (max-heap by priority, tie-break by smaller file first)
 
     private func priority(of task: UploadTask) -> (Int, Int64) {
-        (task.priority.rawValue, -task.fileSize)  // negate size: smaller = higher
+        (task.priority.rawValue, -task.fileSize) // negate size: smaller = higher
     }
 
     private func isHigherPriority(_ a: UploadTask, _ b: UploadTask) -> Bool {
         let pa = priority(of: a)
         let pb = priority(of: b)
         if pa.0 != pb.0 { return pa.0 > pb.0 }
-        return pa.1 > pb.1  // smaller file (less negative) wins
+        return pa.1 > pb.1 // smaller file (less negative) wins
     }
 
     private func siftUp(from index: Int) {
@@ -131,8 +145,8 @@ public actor UploadQueue {
             let left = 2 * parent + 1
             let right = left + 1
             var highest = parent
-            if left < count && isHigherPriority(heap[left], heap[highest]) { highest = left }
-            if right < count && isHigherPriority(heap[right], heap[highest]) { highest = right }
+            if left < count, isHigherPriority(heap[left], heap[highest]) { highest = left }
+            if right < count, isHigherPriority(heap[right], heap[highest]) { highest = right }
             guard highest != parent else { break }
             heap.swapAt(parent, highest)
             parent = highest
