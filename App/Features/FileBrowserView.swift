@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import StratusCore
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct FileBrowserView: View {
@@ -141,7 +141,8 @@ struct FileBrowserView: View {
     @ViewBuilder
     private func googleDriveQuickActions(for item: CloudFileItem) -> some View {
         if selectedAccount?.providerID == "gdrive",
-           let url = GoogleDriveWebLink.url(fileID: item.id, mimeType: item.contentType) {
+           let url = GoogleDriveWebLink.url(fileID: item.id, mimeType: item.contentType)
+        {
             Button(GoogleDriveWebLink.actionTitle(mimeType: item.contentType), systemImage: "safari") {
                 openURL(url)
             }
@@ -173,7 +174,7 @@ struct FileBrowserView: View {
         Task {
             guard let provider = await env.providerRegistry.provider(id: account.providerID) else {
                 await MainActor.run {
-                    self.error = "No provider is registered for \(account.displayName). Check account configuration."
+                    error = "No provider is registered for \(account.displayName). Check account configuration."
                     isLoading = false
                 }
                 return
