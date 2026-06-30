@@ -1,9 +1,8 @@
-import XCTest
 import GRDB
+import XCTest
 @testable import StratusCore
 
 final class ResumeStoreTests: XCTestCase {
-
     private var db: AppDatabase!
     private var store: ResumeStore!
 
@@ -43,11 +42,11 @@ final class ResumeStoreTests: XCTestCase {
     }
 
     func test_multipleSessionsCoexist() async throws {
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             try await store.saveSession(makeSession(id: "multi-session-\(i)", uploadID: "mpu-\(i)"))
         }
         let pending = try await store.loadPendingSessions()
-        XCTAssertEqual(pending.filter { $0.id.hasPrefix("multi-session-") }.count, 5)
+        XCTAssertEqual(pending.count(where: { $0.id.hasPrefix("multi-session-") }), 5)
     }
 
     func test_loadSession_nonexistent_returnsNil() async throws {
@@ -102,7 +101,7 @@ final class ResumeStoreTests: XCTestCase {
     func test_etags_persistedCorrectly() async throws {
         let session = makeSession(id: "etag-persist", uploadID: "mpu-etag")
         try await store.saveSession(session)
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             try await store.markChunkComplete(sessionID: "etag-persist", chunk: i, etag: "etag-\(i)")
         }
         let loaded = try await store.loadSession("etag-persist")
