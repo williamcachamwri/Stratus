@@ -13,7 +13,7 @@ final class ChunkSlicerPromptContractTests: XCTestCase {
     func testChunkOffsetsAreContiguousForLargeFile() {
         let chunkSize = 16 * 1024 * 1024
         let chunks = ChunkSlicer.slice(fileSize: Int64(chunkSize * 3 + 4096), chunkSize: chunkSize)
-        XCTAssertEqual(chunks.map(\.number), Array(0..<chunks.count))
+        XCTAssertEqual(chunks.map(\.number), Array(0 ..< chunks.count))
         for pair in zip(chunks, chunks.dropFirst()) {
             XCTAssertEqual(pair.1.offset, pair.0.offset + Int64(pair.0.size))
         }
