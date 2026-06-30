@@ -2,7 +2,6 @@ import XCTest
 @testable import StratusCore
 
 final class UploadQueueTests: XCTestCase {
-
     func test_enqueueDequeue_respectsPriority() async {
         let queue = UploadQueue()
         let t1 = makeTask(priority: .low)
@@ -20,7 +19,7 @@ final class UploadQueueTests: XCTestCase {
     func test_tieBreak_smallerFileSizeWins() async {
         let queue = UploadQueue()
         let t1 = makeTask(priority: .normal, fileSize: 100_000_000)
-        let t2 = makeTask(priority: .normal, fileSize: 1_000)
+        let t2 = makeTask(priority: .normal, fileSize: 1000)
         await queue.enqueue(t1)
         await queue.enqueue(t2)
         let first = await queue.dequeue()
@@ -59,7 +58,7 @@ final class UploadQueueTests: XCTestCase {
 
     func test_count_matches_enqueued() async {
         let queue = UploadQueue()
-        for _ in 0..<10 {
+        for _ in 0 ..< 10 {
             await queue.enqueue(makeTask(priority: .normal))
         }
         let count = await queue.count
@@ -92,8 +91,10 @@ final class UploadQueueTests: XCTestCase {
 
     func test_tasks_returnsAllEnqueued() async {
         let queue = UploadQueue()
-        let tasks = (0..<5).map { _ in makeTask(priority: .normal) }
-        for t in tasks { await queue.enqueue(t) }
+        let tasks = (0 ..< 5).map { _ in makeTask(priority: .normal) }
+        for t in tasks {
+            await queue.enqueue(t)
+        }
         let all = await queue.tasks
         XCTAssertEqual(all.count, 5)
     }
