@@ -41,8 +41,12 @@ public actor ConflictResolver {
 
         case .keepBoth:
             let conflictURL = makeConflictCopy(of: conflict.localURL, date: conflict.localModDate)
-            return .keepBoth(uploadOriginal: conflict.localURL, remotePath: conflict.remotePath,
-                              downloadTo: conflict.localURL, conflictCopyURL: conflictURL)
+            return .keepBoth(
+                uploadOriginal: conflict.localURL,
+                remotePath: conflict.remotePath,
+                downloadTo: conflict.localURL,
+                conflictCopyURL: conflictURL
+            )
 
         case .askUser:
             return .needsUserDecision(conflict)
