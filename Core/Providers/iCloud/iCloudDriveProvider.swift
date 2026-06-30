@@ -1,11 +1,12 @@
 import Foundation
 import os.log
 
-// MARK: - iCloudDriveProvider
+// MARK: - ICloudDriveProvider
+
 // Bridges NSFileManager's ubiquitous container APIs into the CloudProvider interface.
 // Uses NSMetadataQuery to enumerate iCloud files and triggers download on demand.
 
-public actor iCloudDriveProvider: CloudProvider {
+public actor ICloudDriveProvider: CloudProvider {
     public nonisolated let id = "icloud"
     public nonisolated let displayName = "iCloud Drive"
     public nonisolated let iconName = "icloud"
@@ -23,7 +24,7 @@ public actor iCloudDriveProvider: CloudProvider {
     private let fileManager = FileManager.default
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "iCloudDriveProvider")
 
-    // Container root URL resolved lazily
+    /// Container root URL resolved lazily
     private var containerURL: URL? {
         fileManager.url(forUbiquityContainerIdentifier: containerID)?.appendingPathComponent("Documents")
     }
@@ -37,8 +38,12 @@ public actor iCloudDriveProvider: CloudProvider {
             throw ProviderError.authenticationFailed("iCloud Drive container unavailable — user may not be signed in")
         }
     }
+
     public func refreshCredentials(account: CloudAccount) async throws {}
-    public func validateCredentials(account: CloudAccount) async throws -> Bool { containerURL != nil }
+    public func validateCredentials(account: CloudAccount) async throws -> Bool {
+        containerURL != nil
+    }
+
     public func revokeCredentials(account: CloudAccount) async throws {}
 
     // MARK: - Quota
@@ -50,12 +55,24 @@ public actor iCloudDriveProvider: CloudProvider {
 
     // MARK: - Directory Listing
 
-    public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
-        guard let base = containerURL else { throw ProviderError.authenticationFailed("iCloud container not available") }
+    public func listDirectory(
+        path: CloudPath,
+        account: CloudAccount,
+        pageToken: String?
+    ) async throws -> PagedResult<[CloudFileItem]> {
+        guard let base = containerURL
+        else { throw ProviderError.authenticationFailed("iCloud container not available") }
         let dir = path.path == "/" ? base : base.appendingPathComponent(path.path)
-        let entries = try fileManager.contentsOfDirectory(at: dir,
-            includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .ubiquitousItemIsDownloadingKey],
-            options: [.skipsHiddenFiles])
+        let entries = try fileManager.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [
+                .isDirectoryKey,
+                .fileSizeKey,
+                .contentModificationDateKey,
+                .ubiquitousItemIsDownloadingKey
+            ],
+            options: [.skipsHiddenFiles]
+        )
         let items = try entries.map { url -> CloudFileItem in
             let rv = try url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey])
             let isDir = rv.isDirectory ?? false
@@ -90,14 +107,39 @@ public actor iCloudDriveProvider: CloudProvider {
 
     // MARK: - Upload
 
-    public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String { remotePath.path }
-    public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult { ChunkUploadResult(etag: nil) }
-    public func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
+    public func initiateMultipartUpload(
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> String {
+        remotePath.path
+    }
+
+    public func uploadChunk(
+        uploadID: String,
+        chunkNumber: Int,
+        data: Data,
+        account: CloudAccount
+    ) async throws -> ChunkUploadResult {
+        ChunkUploadResult(etag: nil)
+    }
+
+    public func completeMultipartUpload(
+        uploadID: String,
+        parts: [CompletedPart],
+        account: CloudAccount
+    ) async throws -> CloudFileItem {
         CloudFileItem(id: uploadID, name: (uploadID as NSString).lastPathComponent, path: CloudPath(uploadID))
     }
+
     public func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {}
 
-    public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
+    public func uploadSmallFile(
+        data: Data,
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> CloudFileItem {
         guard let base = containerURL else { throw ProviderError.authenticationFailed("iCloud container unavailable") }
         let dest = base.appendingPathComponent(remotePath.path)
         try fileManager.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -105,7 +147,12 @@ public actor iCloudDriveProvider: CloudProvider {
         // Trigger iCloud upload
         try fileManager.setUbiquitous(true, itemAt: dest, destinationURL: dest)
         logger.debug("Uploaded to iCloud: \(remotePath.path)")
-        return CloudFileItem(id: remotePath.path, name: remotePath.lastComponent, path: remotePath, size: Int64(data.count))
+        return CloudFileItem(
+            id: remotePath.path,
+            name: remotePath.lastComponent,
+            path: remotePath,
+            size: Int64(data.count)
+        )
     }
 
     // MARK: - Download
@@ -162,21 +209,47 @@ public actor iCloudDriveProvider: CloudProvider {
         try await move(from: path, to: path.deletingLastComponent.appendingComponent(newName), account: account)
     }
 
-    public func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? { nil }
-    public nonisolated var supportsBlockManifest: Bool { false }
-    public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? { nil }
+    public func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? {
+        nil
+    }
+
+    public nonisolated var supportsBlockManifest: Bool {
+        false
+    }
+
+    public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
+        nil
+    }
+
     public func storeBlockManifest(_ manifest: BlockMap, path: CloudPath, account: CloudAccount) async throws {}
-    public func trash(path: CloudPath, account: CloudAccount) async throws { try await delete(path: path, account: account) }
-    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] { [] }
+    public func trash(path: CloudPath, account: CloudAccount) async throws {
+        try await delete(
+            path: path,
+            account: account
+        )
+    }
+
+    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] {
+        []
+    }
+
     public func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {}
     public func emptyTrash(account: CloudAccount) async throws {}
-    public func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] { [] }
+    public func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] {
+        []
+    }
+
     public func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
-    public func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink {
+    public func createShareLink(
+        path: CloudPath,
+        account: CloudAccount,
+        options: ShareOptions
+    ) async throws -> ShareLink {
         guard let base = containerURL else { throw ProviderError.authenticationFailed("iCloud container unavailable") }
         let url = base.appendingPathComponent(path.path)
         return ShareLink(url: url, id: path.path)
     }
+
     public func revokeShareLink(link: ShareLink, account: CloudAccount) async throws {}
     public func streamingURL(path: CloudPath, account: CloudAccount) async throws -> URL {
         try await downloadURL(path: path, account: account, expiresIn: 0)
