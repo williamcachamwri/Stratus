@@ -26,6 +26,7 @@ public enum DeltaUploadPlan: Sendable {
 }
 
 // MARK: - DeltaSync
+
 // Block-level diff planner.  Providers in the current protocol cannot patch
 // arbitrary object byte ranges safely, so this actor only performs true delta
 // skips when the remote manifest proves the file is unchanged.  Changed blocks
@@ -50,7 +51,9 @@ public actor DeltaSync {
         let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
         let fileSize = (attrs[.size] as? Int64) ?? 0
         guard fileSize > 50 * 1024 * 1024 else {
-            return .unavailable(reason: "Files smaller than 50 MB use normal upload because block manifests cost more than they save.")
+            return .unavailable(
+                reason: "Files smaller than 50 MB use normal upload because block manifests cost more than they save."
+            )
         }
         guard provider.supportsBlockManifest else {
             return .unavailable(reason: "Provider does not support Stratus block manifests.")
@@ -62,10 +65,14 @@ public actor DeltaSync {
         let remoteMap = providerMap ?? localCachedMap
 
         guard let remoteMap else {
-            return .uploadFull(localMap: localMap, diff: nil, reason: "No previous block manifest exists for this object.")
+            return .uploadFull(
+                localMap: localMap,
+                diff: nil,
+                reason: "No previous block manifest exists for this object."
+            )
         }
 
-        if localMap.sha256 == remoteMap.sha256 && localMap.fileSize == remoteMap.fileSize {
+        if localMap.sha256 == remoteMap.sha256, localMap.fileSize == remoteMap.fileSize {
             logger.info("Delta skip: local SHA-256 matches remote manifest for \(remotePath.path, privacy: .private)")
             return .skip(localMap: localMap, bytesSkipped: localMap.fileSize)
         }
@@ -90,7 +97,13 @@ public actor DeltaSync {
         let modDate = (attrs[.modificationDate] as? Date) ?? Date()
 
         guard fileSize > 0 else {
-            return BlockMap(fileSize: 0, blockSize: Self.defaultBlockSize, checksums: [], sha256: emptyHash, modificationDate: modDate)
+            return BlockMap(
+                fileSize: 0,
+                blockSize: Self.defaultBlockSize,
+                checksums: [],
+                sha256: emptyHash,
+                modificationDate: modDate
+            )
         }
 
         let fileHandle = try FileHandle(forReadingFrom: url)
@@ -109,7 +122,13 @@ public actor DeltaSync {
         }
 
         let wholeSHA256 = try await checksumEngine.sha256Stream(url: url)
-        return BlockMap(fileSize: fileSize, blockSize: Self.defaultBlockSize, checksums: checksums, sha256: wholeSHA256, modificationDate: modDate)
+        return BlockMap(
+            fileSize: fileSize,
+            blockSize: Self.defaultBlockSize,
+            checksums: checksums,
+            sha256: wholeSHA256,
+            modificationDate: modDate
+        )
     }
 
     // MARK: - Diff
@@ -120,13 +139,13 @@ public actor DeltaSync {
         let commonCount = min(localCount, remoteCount)
 
         var changed: [Int] = []
-        for i in 0..<commonCount {
+        for i in 0 ..< commonCount {
             if local.checksums[i] != remote.checksums[i] {
                 changed.append(i)
             }
         }
-        let added = localCount > remoteCount ? Array(remoteCount..<localCount) : []
-        let removed = remoteCount > localCount ? Array(localCount..<remoteCount) : []
+        let added = localCount > remoteCount ? Array(remoteCount ..< localCount) : []
+        let removed = remoteCount > localCount ? Array(localCount ..< remoteCount) : []
 
         return BlockDiff(
             changedBlocks: changed,
