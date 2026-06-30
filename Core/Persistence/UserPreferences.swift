@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 import os.log
 
 // MARK: - Preference Keys
@@ -44,19 +44,19 @@ public final class UserPreferences: ObservableObject {
 
     /// Maximum number of file uploads that may run simultaneously (1–32).
     public var maxConcurrentUploads: Int {
-        get { clamped(defaults.integer(forKey: PreferenceKey.maxConcurrentUploads), in: 1...32) }
+        get { clamped(defaults.integer(forKey: PreferenceKey.maxConcurrentUploads), in: 1 ... 32) }
         set {
             objectWillChange.send()
-            defaults.set(clamped(newValue, in: 1...32), forKey: PreferenceKey.maxConcurrentUploads)
+            defaults.set(clamped(newValue, in: 1 ... 32), forKey: PreferenceKey.maxConcurrentUploads)
         }
     }
 
     /// Maximum number of file downloads that may run simultaneously (1–32).
     public var maxConcurrentDownloads: Int {
-        get { clamped(defaults.integer(forKey: PreferenceKey.maxConcurrentDownloads), in: 1...32) }
+        get { clamped(defaults.integer(forKey: PreferenceKey.maxConcurrentDownloads), in: 1 ... 32) }
         set {
             objectWillChange.send()
-            defaults.set(clamped(newValue, in: 1...32), forKey: PreferenceKey.maxConcurrentDownloads)
+            defaults.set(clamped(newValue, in: 1 ... 32), forKey: PreferenceKey.maxConcurrentDownloads)
         }
     }
 
@@ -175,7 +175,9 @@ public final class UserPreferences: ObservableObject {
             PreferenceKey.autoStartUploads,
         ]
         objectWillChange.send()
-        for key in keys { defaults.removeObject(forKey: key) }
+        for key in keys {
+            defaults.removeObject(forKey: key)
+        }
         registerDefaults(in: defaults)
         logger.info("UserPreferences reset to defaults")
     }
