@@ -9,9 +9,17 @@ public struct CloudPath: Hashable, Sendable, Codable, CustomStringConvertible {
         self.path = path.hasPrefix("/") ? path : "/" + path
     }
 
-    public var description: String { path }
-    public var lastComponent: String { (path as NSString).lastPathComponent }
-    public var deletingLastComponent: CloudPath { CloudPath((path as NSString).deletingLastPathComponent) }
+    public var description: String {
+        path
+    }
+
+    public var lastComponent: String {
+        (path as NSString).lastPathComponent
+    }
+
+    public var deletingLastComponent: CloudPath {
+        CloudPath((path as NSString).deletingLastPathComponent)
+    }
 
     public func appendingComponent(_ name: String) -> CloudPath {
         CloudPath(path + "/" + name)
@@ -308,30 +316,30 @@ public enum ProviderError: Error, Sendable {
 extension ProviderError: LocalizedError {
     public var errorDescription: String? {
         switch self {
-        case .accessDenied(let msg):
-            return "Access denied: \(msg)"
-        case .fileNotFound(let path):
-            return "File not found: \(path.lastComponent)"
+        case let .accessDenied(msg):
+            "Access denied: \(msg)"
+        case let .fileNotFound(path):
+            "File not found: \(path.lastComponent)"
         case .sessionExpired:
-            return "Session expired. Please re-authorize the account."
+            "Session expired. Please re-authorize the account."
         case .quotaExceeded:
-            return "Storage quota exceeded"
+            "Storage quota exceeded"
         case .networkUnavailable:
-            return "Network unavailable. Check your connection."
-        case .rateLimited(let retryAfter):
-            return "Rate limited — retry in \(Int(retryAfter))s"
-        case .serverError(let code, let msg):
-            return "Server error \(code): \(msg)"
-        case .checksumMismatch(let expected, let actual):
-            return "Checksum mismatch — expected \(expected.prefix(8))…, got \(actual.prefix(8))…"
-        case .unsupportedOperation(let op):
-            return "Unsupported operation: \(op)"
-        case .authenticationFailed(let msg):
-            return "Authentication failed: \(msg)"
-        case .invalidResponse(let msg):
-            return "Invalid response: \(msg)"
-        case .providerSpecific(let code, let msg):
-            return "Provider error \(code): \(msg)"
+            "Network unavailable. Check your connection."
+        case let .rateLimited(retryAfter):
+            "Rate limited — retry in \(Int(retryAfter))s"
+        case let .serverError(code, msg):
+            "Server error \(code): \(msg)"
+        case let .checksumMismatch(expected, actual):
+            "Checksum mismatch — expected \(expected.prefix(8))…, got \(actual.prefix(8))…"
+        case let .unsupportedOperation(op):
+            "Unsupported operation: \(op)"
+        case let .authenticationFailed(msg):
+            "Authentication failed: \(msg)"
+        case let .invalidResponse(msg):
+            "Invalid response: \(msg)"
+        case let .providerSpecific(code, msg):
+            "Provider error \(code): \(msg)"
         }
     }
 }
@@ -339,7 +347,6 @@ extension ProviderError: LocalizedError {
 // MARK: - CloudProvider Protocol
 
 public protocol CloudProvider: Actor, Sendable {
-
     nonisolated var id: String { get }
     nonisolated var displayName: String { get }
     nonisolated var iconName: String { get }
@@ -351,10 +358,10 @@ public protocol CloudProvider: Actor, Sendable {
     func validateCredentials(account: CloudAccount) async throws -> Bool
     func revokeCredentials(account: CloudAccount) async throws
 
-    // Quota
+    /// Quota
     func quota(for account: CloudAccount) async throws -> StorageQuota
 
-    // File listing
+    /// File listing
     func listDirectory(
         path: CloudPath,
         account: CloudAccount,
@@ -363,7 +370,7 @@ public protocol CloudProvider: Actor, Sendable {
 
     func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem
 
-    // Multipart upload
+    /// Multipart upload
     func initiateMultipartUpload(
         remotePath: CloudPath,
         account: CloudAccount,
@@ -385,7 +392,7 @@ public protocol CloudProvider: Actor, Sendable {
 
     func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws
 
-    // Small file upload
+    /// Small file upload
     func uploadSmallFile(
         data: Data,
         remotePath: CloudPath,
@@ -404,7 +411,7 @@ public protocol CloudProvider: Actor, Sendable {
     func delete(path: CloudPath, account: CloudAccount) async throws
     func rename(path: CloudPath, newName: String, account: CloudAccount) async throws -> CloudFileItem
 
-    // Checksums
+    /// Checksums
     func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum?
 
     // Delta sync
@@ -426,7 +433,7 @@ public protocol CloudProvider: Actor, Sendable {
     func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink
     func revokeShareLink(link: ShareLink, account: CloudAccount) async throws
 
-    // Streaming
+    /// Streaming
     func streamingURL(path: CloudPath, account: CloudAccount) async throws -> URL
 }
 
