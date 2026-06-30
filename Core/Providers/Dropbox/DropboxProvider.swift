@@ -8,7 +8,7 @@ public actor DropboxProvider: CloudProvider {
     public nonisolated let capabilities = ProviderCapabilities(
         supportsMultipartUpload: false,
         supportsResumeUpload: true,
-        supportsParallelChunks: false,  // Dropbox upload sessions are sequential
+        supportsParallelChunks: false, // Dropbox upload sessions are sequential
         maxChunkSize: 150 * 1024 * 1024,
         minChunkSize: 1,
         maxConcurrentUploads: 5,
@@ -30,34 +30,48 @@ public actor DropboxProvider: CloudProvider {
             throw ProviderError.authenticationFailed("No OAuth credential stored.")
         }
     }
+
     public func refreshCredentials(account: CloudAccount) async throws {}
     public func validateCredentials(account: CloudAccount) async throws -> Bool {
-        guard let cred = try await vault.loadOAuthCredential(providerID: id, accountID: account.id) else { return false }
-        let request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/users/get_current_account") ?? URL(fileURLWithPath: "/"),
-                                  method: .POST, headers: ["Authorization": "Bearer \(cred.accessToken)"])
+        guard let cred = try await vault.loadOAuthCredential(providerID: id, accountID: account.id)
+        else { return false }
+        let request = HTTPRequest(
+            url: URL(string: "https://api.dropboxapi.com/2/users/get_current_account") ?? URL(fileURLWithPath: "/"),
+            method: .POST,
+            headers: ["Authorization": "Bearer \(cred.accessToken)"]
+        )
         let response = try await http.data(for: request)
         return response.isSuccess
     }
+
     public func revokeCredentials(account: CloudAccount) async throws {
         try await vault.deleteOAuthCredential(providerID: id, accountID: account.id)
     }
 
     public func quota(for account: CloudAccount) async throws -> StorageQuota {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/users/get_space_usage") ?? URL(fileURLWithPath: "/"), method: .POST)
+        var request = HTTPRequest(
+            url: URL(string: "https://api.dropboxapi.com/2/users/get_space_usage") ?? URL(fileURLWithPath: "/"),
+            method: .POST
+        )
         request.headers["Authorization"] = "Bearer \(token)"
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
               let used = json["used"] as? Int64,
               let allocation = json["allocation"] as? [String: Any],
-              let total = allocation["allocated"] as? Int64 else {
+              let total = allocation["allocated"] as? Int64
+        else {
             return StorageQuota(totalBytes: nil, usedBytes: 0, availableBytes: nil)
         }
         return StorageQuota(totalBytes: total, usedBytes: used, availableBytes: total - used)
     }
 
-    public func listDirectory(path: CloudPath, account: CloudAccount, pageToken: String?) async throws -> PagedResult<[CloudFileItem]> {
+    public func listDirectory(
+        path: CloudPath,
+        account: CloudAccount,
+        pageToken: String?
+    ) async throws -> PagedResult<[CloudFileItem]> {
         let token = try await accessToken(account: account)
         let body: [String: Any] = pageToken == nil
             ? ["path": path.path == "/" ? "" : path.path, "recursive": false, "limit": 1000]
@@ -76,7 +90,8 @@ public actor DropboxProvider: CloudProvider {
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
-              let entries = json["entries"] as? [[String: Any]] else {
+              let entries = json["entries"] as? [[String: Any]]
+        else {
             throw ProviderError.invalidResponse("Failed to parse Dropbox list")
         }
         let items = entries.map { entry -> CloudFileItem in
@@ -97,45 +112,86 @@ public actor DropboxProvider: CloudProvider {
 
     public func fileMetadata(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/get_metadata") ?? URL(fileURLWithPath: "/"), method: .POST)
+        var request = HTTPRequest(
+            url: URL(string: "https://api.dropboxapi.com/2/files/get_metadata") ?? URL(fileURLWithPath: "/"),
+            method: .POST
+        )
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["path": path.path])
         let response = try await http.data(for: request)
         guard response.isSuccess,
-              let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
+              let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any]
+        else {
             throw ProviderError.fileNotFound(path)
         }
         let isDir = (json[".tag"] as? String) == "folder"
-        return CloudFileItem(id: (json["id"] as? String) ?? "", name: (json["name"] as? String) ?? "",
-                              path: path, size: json["size"] as? Int64, isDirectory: isDir,
-                              etag: json["content_hash"] as? String)
+        return CloudFileItem(
+            id: (json["id"] as? String) ?? "",
+            name: (json["name"] as? String) ?? "",
+            path: path,
+            size: json["size"] as? Int64,
+            isDirectory: isDir,
+            etag: json["content_hash"] as? String
+        )
     }
 
-    public func initiateMultipartUpload(remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> String {
+    public func initiateMultipartUpload(
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> String {
         let token = try await accessToken(account: account)
         return try await chunkedUpload.startSession(accessToken: token)
     }
 
-    public func uploadChunk(uploadID: String, chunkNumber: Int, data: Data, account: CloudAccount) async throws -> ChunkUploadResult {
+    public func uploadChunk(
+        uploadID: String,
+        chunkNumber: Int,
+        data: Data,
+        account: CloudAccount
+    ) async throws -> ChunkUploadResult {
         let token = try await accessToken(account: account)
         let offset = Int64(chunkNumber - 1) * Int64(50 * 1024 * 1024)
-        try await chunkedUpload.appendChunk(sessionID: uploadID, data: data, offset: offset, isLast: false, accessToken: token)
+        try await chunkedUpload.appendChunk(
+            sessionID: uploadID,
+            data: data,
+            offset: offset,
+            isLast: false,
+            accessToken: token
+        )
         return ChunkUploadResult(etag: nil)
     }
 
-    public func completeMultipartUpload(uploadID: String, parts: [CompletedPart], account: CloudAccount) async throws -> CloudFileItem {
+    public func completeMultipartUpload(
+        uploadID: String,
+        parts: [CompletedPart],
+        account: CloudAccount
+    ) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
         let totalOffset = parts.reduce(0) { $0 + Int64($1.partNumber) }
-        let id = try await chunkedUpload.finishSession(sessionID: uploadID, offset: totalOffset, remotePath: "/", accessToken: token)
+        let id = try await chunkedUpload.finishSession(
+            sessionID: uploadID,
+            offset: totalOffset,
+            remotePath: "/",
+            accessToken: token
+        )
         return CloudFileItem(id: id, name: "", path: CloudPath("/"))
     }
 
     public func abortMultipartUpload(uploadID: String, account: CloudAccount) async throws {}
 
-    public func uploadSmallFile(data: Data, remotePath: CloudPath, account: CloudAccount, metadata: UploadMetadata) async throws -> CloudFileItem {
+    public func uploadSmallFile(
+        data: Data,
+        remotePath: CloudPath,
+        account: CloudAccount,
+        metadata: UploadMetadata
+    ) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://content.dropboxapi.com/2/files/upload") ?? URL(fileURLWithPath: "/"), method: .POST)
+        var request = HTTPRequest(
+            url: URL(string: "https://content.dropboxapi.com/2/files/upload") ?? URL(fileURLWithPath: "/"),
+            method: .POST
+        )
         let apiArg = "{\"path\":\"\(remotePath.path)\",\"mode\":\"overwrite\"}"
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Dropbox-API-Arg"] = apiArg
@@ -144,7 +200,8 @@ public actor DropboxProvider: CloudProvider {
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
-              let id = json["id"] as? String else {
+              let id = json["id"] as? String
+        else {
             throw ProviderError.serverError(statusCode: response.statusCode, message: "")
         }
         return CloudFileItem(id: id, name: remotePath.lastComponent, path: remotePath, size: Int64(data.count))
@@ -152,14 +209,18 @@ public actor DropboxProvider: CloudProvider {
 
     public func downloadURL(path: CloudPath, account: CloudAccount, expiresIn: TimeInterval) async throws -> URL {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/get_temporary_link") ?? URL(fileURLWithPath: "/"), method: .POST)
+        var request = HTTPRequest(
+            url: URL(string: "https://api.dropboxapi.com/2/files/get_temporary_link") ?? URL(fileURLWithPath: "/"),
+            method: .POST
+        )
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["path": path.path])
         let response = try await http.data(for: request)
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
-              let link = json["link"] as? String, let url = URL(string: link) else {
+              let link = json["link"] as? String, let url = URL(string: link)
+        else {
             throw ProviderError.invalidResponse("No download link")
         }
         return url
@@ -175,7 +236,10 @@ public actor DropboxProvider: CloudProvider {
 
     public func createDirectory(path: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/create_folder_v2") ?? URL(fileURLWithPath: "/"), method: .POST)
+        var request = HTTPRequest(
+            url: URL(string: "https://api.dropboxapi.com/2/files/create_folder_v2") ?? URL(fileURLWithPath: "/"),
+            method: .POST
+        )
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["path": path.path])
@@ -183,7 +247,8 @@ public actor DropboxProvider: CloudProvider {
         guard response.isSuccess,
               let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
               let metadata = json["metadata"] as? [String: Any],
-              let id = metadata["id"] as? String else {
+              let id = metadata["id"] as? String
+        else {
             throw ProviderError.serverError(statusCode: response.statusCode, message: "")
         }
         return CloudFileItem(id: id, name: path.lastComponent, path: path, isDirectory: true)
@@ -191,7 +256,10 @@ public actor DropboxProvider: CloudProvider {
 
     public func move(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/move_v2") ?? URL(fileURLWithPath: "/"), method: .POST)
+        var request = HTTPRequest(
+            url: URL(string: "https://api.dropboxapi.com/2/files/move_v2") ?? URL(fileURLWithPath: "/"),
+            method: .POST
+        )
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["from_path": from.path, "to_path": to.path])
@@ -202,7 +270,10 @@ public actor DropboxProvider: CloudProvider {
 
     public func copy(from: CloudPath, to: CloudPath, account: CloudAccount) async throws -> CloudFileItem {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/copy_v2") ?? URL(fileURLWithPath: "/"), method: .POST)
+        var request = HTTPRequest(
+            url: URL(string: "https://api.dropboxapi.com/2/files/copy_v2") ?? URL(fileURLWithPath: "/"),
+            method: .POST
+        )
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["from_path": from.path, "to_path": to.path])
@@ -213,7 +284,10 @@ public actor DropboxProvider: CloudProvider {
 
     public func delete(path: CloudPath, account: CloudAccount) async throws {
         let token = try await accessToken(account: account)
-        var request = HTTPRequest(url: URL(string: "https://api.dropboxapi.com/2/files/delete_v2") ?? URL(fileURLWithPath: "/"), method: .POST)
+        var request = HTTPRequest(
+            url: URL(string: "https://api.dropboxapi.com/2/files/delete_v2") ?? URL(fileURLWithPath: "/"),
+            method: .POST
+        )
         request.headers["Authorization"] = "Bearer \(token)"
         request.headers["Content-Type"] = "application/json"
         request.body = try JSONSerialization.data(withJSONObject: ["path": path.path])
@@ -228,24 +302,51 @@ public actor DropboxProvider: CloudProvider {
     public func remoteChecksum(path: CloudPath, account: CloudAccount) async throws -> RemoteChecksum? {
         let item = try await fileMetadata(path: path, account: account)
         guard let etag = item.etag else { return nil }
-        return RemoteChecksum(algorithm: .sha256, value: etag)  // Dropbox uses content_hash (SHA-256 based)
+        return RemoteChecksum(algorithm: .sha256, value: etag) // Dropbox uses content_hash (SHA-256 based)
     }
 
-    public nonisolated var supportsBlockManifest: Bool { false }
-    public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? { nil }
+    public nonisolated var supportsBlockManifest: Bool {
+        false
+    }
+
+    public func fetchBlockManifest(path: CloudPath, account: CloudAccount) async throws -> BlockMap? {
+        nil
+    }
+
     public func storeBlockManifest(_ manifest: BlockMap, path: CloudPath, account: CloudAccount) async throws {}
 
-    public func trash(path: CloudPath, account: CloudAccount) async throws { try await delete(path: path, account: account) }
-    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] { [] }
+    public func trash(path: CloudPath, account: CloudAccount) async throws {
+        try await delete(
+            path: path,
+            account: account
+        )
+    }
+
+    public func listTrash(account: CloudAccount) async throws -> [CloudFileItem] {
+        []
+    }
+
     public func restoreFromTrash(item: CloudFileItem, account: CloudAccount) async throws {}
     public func emptyTrash(account: CloudAccount) async throws {}
-    public func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] { [] }
+    public func listVersions(path: CloudPath, account: CloudAccount) async throws -> [FileVersion] {
+        []
+    }
+
     public func restoreVersion(_ version: FileVersion, account: CloudAccount) async throws {}
 
-    public func createShareLink(path: CloudPath, account: CloudAccount, options: ShareOptions) async throws -> ShareLink {
-        let url = try await downloadURL(path: path, account: account, expiresIn: options.expiresAt?.timeIntervalSinceNow ?? 3600)
+    public func createShareLink(
+        path: CloudPath,
+        account: CloudAccount,
+        options: ShareOptions
+    ) async throws -> ShareLink {
+        let url = try await downloadURL(
+            path: path,
+            account: account,
+            expiresIn: options.expiresAt?.timeIntervalSinceNow ?? 3600
+        )
         return ShareLink(url: url, expiresAt: options.expiresAt, id: UUID().uuidString)
     }
+
     public func revokeShareLink(link: ShareLink, account: CloudAccount) async throws {}
     public func streamingURL(path: CloudPath, account: CloudAccount) async throws -> URL {
         try await downloadURL(path: path, account: account, expiresIn: 86400)
