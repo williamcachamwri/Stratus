@@ -2,11 +2,12 @@ import Foundation
 import os.log
 
 // MARK: - Google Drive Resumable Upload
+
 // Protocol: https://developers.google.com/drive/api/guides/resumable-upload
 // Chunk size MUST be multiple of 256 KB.
 
 public actor GoogleDriveResumableUpload {
-    private static let chunkSize = 8 * 1024 * 1024  // 8 MB (multiple of 256 KB)
+    private static let chunkSize = 8 * 1024 * 1024 // 8 MB (multiple of 256 KB)
     private static let baseURL = "https://www.googleapis.com/upload/drive/v3/files"
     private let http = HTTPClient()
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "GoogleDriveUpload")
@@ -43,8 +44,10 @@ public actor GoogleDriveResumableUpload {
         request.body = bodyData
 
         let response = try await http.data(for: request)
-        guard response.statusCode == 200, let locationStr = response.headers["Location"] ?? response.headers["location"],
-              let sessionURI = URL(string: locationStr) else {
+        guard response.statusCode == 200,
+              let locationStr = response.headers["Location"] ?? response.headers["location"],
+              let sessionURI = URL(string: locationStr)
+        else {
             throw GoogleDriveError.sessionInitFailed(response.statusCode)
         }
         logger.debug("Initiated resumable session: \(sessionURI.absoluteString.prefix(80))…")
@@ -58,7 +61,7 @@ public actor GoogleDriveResumableUpload {
         sessionURI: URL,
         fileSize: Int64,
         progressHandler: @Sendable @escaping (Int64, Int64) -> Void
-    ) async throws -> String {  // Returns file ID
+    ) async throws -> String { // Returns file ID
         let fileHandle = try FileHandle(forReadingFrom: fileURL)
         defer { try? fileHandle.close() }
 
@@ -80,7 +83,8 @@ public actor GoogleDriveResumableUpload {
             case 200, 201:
                 // Upload complete
                 guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
-                      let fileID = json["id"] as? String else {
+                      let fileID = json["id"] as? String
+                else {
                     throw GoogleDriveError.missingFileID
                 }
                 progressHandler(fileSize, fileSize)
@@ -89,7 +93,9 @@ public actor GoogleDriveResumableUpload {
             case 308:
                 // Resume Incomplete — server accepted bytes, send next chunk
                 let rangeHeader = response.headers["Range"] ?? response.headers["range"]
-                if let rangeStr = rangeHeader, let lastByte = rangeStr.components(separatedBy: "-").last.flatMap({ Int64($0) }) {
+                if let rangeStr = rangeHeader,
+                   let lastByte = rangeStr.components(separatedBy: "-").last.flatMap({ Int64($0) })
+                {
                     offset = lastByte + 1
                 } else {
                     offset += Int64(chunkSize)
@@ -114,14 +120,16 @@ public actor GoogleDriveResumableUpload {
         let response = try await http.data(for: request)
 
         if response.statusCode == 200 || response.statusCode == 201 {
-            return fileSize  // already complete
+            return fileSize // already complete
         }
         if response.statusCode == 308 {
             let rangeHeader = response.headers["Range"] ?? response.headers["range"]
-            if let rangeStr = rangeHeader, let lastByte = rangeStr.components(separatedBy: "-").last.flatMap({ Int64($0) }) {
+            if let rangeStr = rangeHeader,
+               let lastByte = rangeStr.components(separatedBy: "-").last.flatMap({ Int64($0) })
+            {
                 return lastByte + 1
             }
-            return 0  // server has nothing yet
+            return 0 // server has nothing yet
         }
         throw GoogleDriveError.uploadFailed(statusCode: response.statusCode)
     }
