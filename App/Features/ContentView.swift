@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -7,25 +7,27 @@ struct ContentView: View {
     @State private var inspectorVisible = true
 
     enum AppTab: String, CaseIterable, Identifiable {
-        case accounts  = "Accounts"
-        case uploads   = "Uploads"
+        case accounts = "Accounts"
+        case uploads = "Uploads"
         case downloads = "Downloads"
-        case sync      = "Sync"
-        case mounts    = "Mounts"
-        case browse    = "Files"
-        case prefs     = "Preferences"
+        case sync = "Sync"
+        case mounts = "Mounts"
+        case browse = "Files"
+        case prefs = "Preferences"
 
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
 
         var icon: String {
             switch self {
-            case .accounts: return "person.crop.circle.badge.plus"
-            case .uploads:  return "arrow.up.circle"
-            case .downloads: return "arrow.down.circle"
-            case .sync:     return "arrow.triangle.2.circlepath"
-            case .mounts:   return "externaldrive"
-            case .browse:   return "folder"
-            case .prefs:    return "gearshape"
+            case .accounts: "person.crop.circle.badge.plus"
+            case .uploads: "arrow.up.circle"
+            case .downloads: "arrow.down.circle"
+            case .sync: "arrow.triangle.2.circlepath"
+            case .mounts: "externaldrive"
+            case .browse: "folder"
+            case .prefs: "gearshape"
             }
         }
     }
@@ -119,7 +121,7 @@ struct ContentView: View {
                             downloadSummary: env.downloadSummary,
                             selectedTab: selectedTab
                         )
-                            .frame(width: 280)
+                        .frame(width: 280)
                     }
                 }
 
@@ -178,12 +180,12 @@ struct ContentView: View {
     private var selectedContent: some View {
         switch selectedTab {
         case .accounts: AccountsView()
-        case .uploads:  UploadCenterView()
+        case .uploads: UploadCenterView()
         case .downloads: DownloadCenterView()
-        case .sync:     SyncManagerView()
-        case .mounts:   MountManagerView()
-        case .browse:   FileBrowserView()
-        case .prefs:    PreferencesView()
+        case .sync: SyncManagerView()
+        case .mounts: MountManagerView()
+        case .browse: FileBrowserView()
+        case .prefs: PreferencesView()
         }
     }
 }
@@ -217,7 +219,10 @@ private struct TransferInspectorView: View {
 
             InspectorGroup(title: "Selection") {
                 InspectorRow(label: "View", value: selectedTab.rawValue)
-                InspectorRow(label: "Status", value: uploadSummary.activeCount + downloadSummary.activeCount > 0 ? "Transferring" : "Idle")
+                InspectorRow(
+                    label: "Status",
+                    value: uploadSummary.activeCount + downloadSummary.activeCount > 0 ? "Transferring" : "Idle"
+                )
             }
 
             InspectorGroup(title: "Upload Session") {
@@ -235,7 +240,10 @@ private struct TransferInspectorView: View {
                 InspectorRow(label: "Queued", value: "\(uploadSummary.queuedCount + downloadSummary.queuedCount)")
                 InspectorRow(label: "Paused", value: "\(uploadSummary.pausedCount + downloadSummary.pausedCount)")
                 InspectorRow(label: "Failed", value: "\(uploadSummary.failedCount + downloadSummary.failedCount)")
-                InspectorRow(label: "Completed", value: "\(uploadSummary.completedCount + downloadSummary.completedCount)")
+                InspectorRow(
+                    label: "Completed",
+                    value: "\(uploadSummary.completedCount + downloadSummary.completedCount)"
+                )
             }
 
             Spacer()
@@ -301,8 +309,10 @@ private struct TransferStatusBar: View {
             Text("·")
             Text("ETA \(formatStatusETA(uploadSummary.etaSeconds ?? downloadSummary.etaSeconds))")
             Spacer()
-            Text("↑ \(formatStatusBytes(uploadSummary.bytesTransferred)) / \(formatStatusBytes(uploadSummary.totalBytes)) · ↓ \(formatStatusBytes(downloadSummary.bytesReceived)) / \(formatStatusBytes(downloadSummary.totalBytes))")
-                .font(.stratusSmallMono)
+            Text(
+                "↑ \(formatStatusBytes(uploadSummary.bytesTransferred)) / \(formatStatusBytes(uploadSummary.totalBytes)) · ↓ \(formatStatusBytes(downloadSummary.bytesReceived)) / \(formatStatusBytes(downloadSummary.totalBytes))"
+            )
+            .font(.stratusSmallMono)
         }
         .font(.caption)
         .foregroundColor(.textSecondary)
