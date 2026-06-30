@@ -1,9 +1,10 @@
+import AppKit
 import SwiftUI
 import StratusCore
-import QuickLook
 import UniformTypeIdentifiers
 
 struct FileBrowserView: View {
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var env: AppEnvironment
     @State private var selectedAccount: CloudAccount?
     @State private var currentPath: CloudPath = CloudPath("/")
@@ -67,7 +68,10 @@ struct FileBrowserView: View {
                             FileItemRow(item: item)
                                 .tag(item)
                                 .onTapGesture(count: 2) {
-                                    if item.isDirectory { navigate(to: item.path) }
+                                    activate(item)
+                                }
+                                .contextMenu {
+                                    googleDriveQuickActions(for: item)
                                 }
                         }
                         .listStyle(.inset)
@@ -112,6 +116,43 @@ struct FileBrowserView: View {
         pathHistory.append(currentPath)
         currentPath = path
         loadItems()
+    }
+
+    private func activate(_ item: CloudFileItem) {
+        if item.isDirectory {
+            navigate(to: item.path)
+            return
+        }
+
+        guard selectedAccount?.providerID == "gdrive",
+              let url = GoogleDriveWebLink.url(fileID: item.id, mimeType: item.contentType) else { return }
+        openURL(url)
+    }
+
+    @ViewBuilder
+    private func googleDriveQuickActions(for item: CloudFileItem) -> some View {
+        if selectedAccount?.providerID == "gdrive",
+           let url = GoogleDriveWebLink.url(fileID: item.id, mimeType: item.contentType) {
+            Button(GoogleDriveWebLink.actionTitle(mimeType: item.contentType), systemImage: "safari") {
+                openURL(url)
+            }
+
+            Button("Copy Google Drive Link", systemImage: "link") {
+                copyGoogleDriveLink(url)
+            }
+        }
+    }
+
+    private func copyGoogleDriveLink(_ url: URL) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        uploadFeedback = "Copied Google Drive link"
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            if uploadFeedback == "Copied Google Drive link" {
+                uploadFeedback = nil
+            }
+        }
     }
 
     private func loadItems() {
