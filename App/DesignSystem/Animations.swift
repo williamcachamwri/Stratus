@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - StratusAnimation
+
 // Centralised animation constants for the Stratus design system.
 //
 // All values automatically degrade to `.default` (a minimal, near-instant
@@ -14,7 +15,6 @@ import SwiftUI
 //   .reducedMotionAnimation(StratusAnimation.progressSmooth, value: progress)
 
 public enum StratusAnimation {
-
     // MARK: - Token Definitions
 
     /// Fade + slide for list row insertion (150 ms ease-out).
@@ -77,6 +77,7 @@ public enum StratusAnimation {
 }
 
 // MARK: - ViewModifier: ShakeEffect
+
 // Drives the errorShake animation. Usage:
 //   .modifier(ShakeEffect(trigger: hasError))
 
@@ -85,7 +86,7 @@ public struct ShakeEffect: GeometryEffect {
     var shakes: CGFloat = 3
     var trigger: Bool
 
-    // GeometryEffect requires an animatable data value to drive the shake.
+    /// GeometryEffect requires an animatable data value to drive the shake.
     public var animatableData: CGFloat {
         get { trigger ? 1 : 0 }
         set { _ = newValue }
@@ -101,8 +102,7 @@ public struct ShakeEffect: GeometryEffect {
 public extension View {
     /// Applies the standard Stratus error-shake animation when `trigger` is `true`.
     func stratusErrorShake(trigger: Bool) -> some View {
-        self
-            .modifier(ShakeEffect(trigger: trigger))
+        modifier(ShakeEffect(trigger: trigger))
             .animation(StratusAnimation.errorShake, value: trigger)
     }
 }
