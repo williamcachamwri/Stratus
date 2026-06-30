@@ -9,9 +9,17 @@ public struct HTTPResponse: Sendable {
     public let headers: [String: String]
     public let data: Data
 
-    public var isSuccess: Bool { (200...299).contains(statusCode) }
-    public var isRetryable: Bool { [429, 500, 502, 503, 504].contains(statusCode) }
-    public var isNonRetryable: Bool { [400, 401, 403, 404, 409].contains(statusCode) }
+    public var isSuccess: Bool {
+        (200 ... 299).contains(statusCode)
+    }
+
+    public var isRetryable: Bool {
+        [429, 500, 502, 503, 504].contains(statusCode)
+    }
+
+    public var isNonRetryable: Bool {
+        [400, 401, 403, 404, 409].contains(statusCode)
+    }
 
     public func retryAfter() -> TimeInterval? {
         guard let value = headers["Retry-After"] ?? headers["retry-after"] else { return nil }
@@ -66,14 +74,14 @@ public actor HTTPClient {
 
     public init(configuration: URLSessionConfiguration? = nil) {
         let config = configuration ?? HTTPClient.makeDefaultConfiguration()
-        self.session = URLSession(configuration: config)
+        session = URLSession(configuration: config)
     }
 
     private static func makeDefaultConfiguration() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.ephemeral
         config.httpMaximumConnectionsPerHost = 6
         config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 0  // unlimited for large files
+        config.timeoutIntervalForResource = 0 // unlimited for large files
         config.waitsForConnectivity = true
         config.allowsCellularAccess = true
         config.allowsConstrainedNetworkAccess = true
@@ -117,7 +125,7 @@ public actor HTTPClient {
         }
     }
 
-    // Streaming upload with progress reporting
+    /// Streaming upload with progress reporting
     public func uploadStream(
         request: HTTPRequest,
         stream: InputStream,
@@ -144,7 +152,7 @@ public actor HTTPClient {
         }
     }
 
-    // JSON convenience
+    /// JSON convenience
     public func json<T: Decodable & Sendable>(
         for request: HTTPRequest,
         decoder: JSONDecoder = JSONDecoder()
@@ -195,21 +203,23 @@ public actor HTTPClient {
 
     private func mapURLError(_ error: URLError) -> HTTPClientError {
         switch error.code {
-        case .timedOut: return .timeout
-        case .cancelled: return .cancelled
+        case .timedOut: .timeout
+        case .cancelled: .cancelled
         case .secureConnectionFailed, .serverCertificateUntrusted, .clientCertificateRejected:
-            return .tlsError(error.localizedDescription)
+            .tlsError(error.localizedDescription)
         case .redirectToNonExistentLocation, .httpTooManyRedirects:
-            return .redirectLoop
+            .redirectLoop
         default:
-            return .networkError(error)
+            .networkError(error)
         }
     }
 }
 
 // MARK: - Upload Progress Delegate
 
-private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
+private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, URLSessionDataDelegate,
+    @unchecked Sendable
+{
     let contentLength: Int64
     let progressHandler: @Sendable (Int64, Int64) -> Void
     var continuation: CheckedContinuation<HTTPResponse, any Error>?
@@ -222,7 +232,13 @@ private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, UR
         self.progressHandler = progressHandler
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
         progressHandler(totalBytesSent, contentLength)
     }
 
@@ -249,12 +265,21 @@ private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, UR
         }
     }
 
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
         self.response = response as? HTTPURLResponse
         completionHandler(.allow)
     }
 
-    func urlSession(_ session: URLSession, task: URLSessionTask, needNewBodyStream completionHandler: @escaping @Sendable (InputStream?) -> Void) {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        needNewBodyStream completionHandler: @escaping @Sendable (InputStream?) -> Void
+    ) {
         completionHandler(inputStream)
     }
 }
