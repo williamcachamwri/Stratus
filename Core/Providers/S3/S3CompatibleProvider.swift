@@ -1,10 +1,10 @@
 import Foundation
 
 // MARK: - S3-Compatible Provider Factory
+
 // Wasabi, Backblaze B2, Cloudflare R2, MinIO all reuse S3Provider with different endpoints.
 
 public enum S3CompatibleProviders {
-
     public static func wasabi(bucket: String, region: String = "us-east-1") -> S3Provider {
         let endpoint = URL(string: "https://s3.\(region).wasabisys.com")!
         return S3Provider(
@@ -37,7 +37,7 @@ public enum S3CompatibleProviders {
     }
 
     public static func minIO(endpoint: URL, bucket: String) -> S3Provider {
-        return S3Provider(
+        S3Provider(
             id: "minio",
             displayName: "MinIO",
             iconName: "minio",
@@ -45,8 +45,14 @@ public enum S3CompatibleProviders {
         )
     }
 
-    public static func custom(endpoint: URL, bucket: String, region: String, providerID: String, displayName: String) -> S3Provider {
-        return S3Provider(
+    public static func custom(
+        endpoint: URL,
+        bucket: String,
+        region: String,
+        providerID: String,
+        displayName: String
+    ) -> S3Provider {
+        S3Provider(
             id: providerID,
             displayName: displayName,
             iconName: "s3",
