@@ -1,11 +1,3 @@
-// NetworkDiagnostics.swift
-// StratusCore — Network speed test + latency probe
-//
-// Uses URLSession for all network operations.
-// NWPathMonitor (Network framework) is used for connectivity checks.
-//
-// Swift 6: actor-isolated, no force-unwraps, typed errors.
-
 import Foundation
 import Network
 
@@ -45,7 +37,6 @@ public enum NetworkDiagnosticsError: Error, Sendable {
 /// All methods are safe to call concurrently; each creates its own
 /// `URLSession` task and does not share mutable state with siblings.
 public actor NetworkDiagnostics {
-
     // MARK: Singleton
 
     public static let shared = NetworkDiagnostics()
@@ -58,13 +49,13 @@ public actor NetworkDiagnostics {
     // MARK: Init
 
     public init(timeoutSeconds: Double = 10.0) {
-        self.defaultTimeoutSeconds = timeoutSeconds
+        defaultTimeoutSeconds = timeoutSeconds
 
         let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest  = timeoutSeconds
+        config.timeoutIntervalForRequest = timeoutSeconds
         config.timeoutIntervalForResource = timeoutSeconds * 3
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        self.session = URLSession(configuration: config)
+        session = URLSession(configuration: config)
     }
 
     // MARK: - Latency Probe
@@ -86,8 +77,8 @@ public actor NetworkDiagnostics {
         // Build a simple HTTPS HEAD request
         var components = URLComponents()
         components.scheme = "https"
-        components.host   = trimmed
-        components.path   = "/"
+        components.host = trimmed
+        components.path = "/"
 
         guard let url = components.url else {
             throw NetworkDiagnosticsError.invalidHost(host)
@@ -113,7 +104,7 @@ public actor NetworkDiagnostics {
 
         if let httpResponse = response as? HTTPURLResponse {
             let code = httpResponse.statusCode
-            guard (200...399).contains(code) else {
+            guard (200 ... 399).contains(code) else {
                 throw NetworkDiagnosticsError.unexpectedResponse(statusCode: code)
             }
         }
@@ -133,7 +124,7 @@ public actor NetworkDiagnostics {
         var request = URLRequest(url: downloadURL)
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        request.timeoutInterval = defaultTimeoutSeconds * 3  // longer for large payloads
+        request.timeoutInterval = defaultTimeoutSeconds * 3 // longer for large payloads
 
         let start = Date()
         let (data, response): (Data, URLResponse)
@@ -145,11 +136,11 @@ public actor NetworkDiagnostics {
                 reason: error.localizedDescription
             )
         }
-        let elapsed = max(Date().timeIntervalSince(start), 0.001)  // avoid /0
+        let elapsed = max(Date().timeIntervalSince(start), 0.001) // avoid /0
 
         if let httpResponse = response as? HTTPURLResponse {
             let code = httpResponse.statusCode
-            guard (200...299).contains(code) else {
+            guard (200 ... 299).contains(code) else {
                 throw NetworkDiagnosticsError.unexpectedResponse(statusCode: code)
             }
         }
@@ -177,8 +168,10 @@ public actor NetworkDiagnostics {
     public func checkConnectivity() async -> Bool {
         await withCheckedContinuation { continuation in
             let monitor = NWPathMonitor()
-            let queue = DispatchQueue(label: "com.stratus.cloudmanager.connectivity",
-                                      qos: .utility)
+            let queue = DispatchQueue(
+                label: "com.stratus.cloudmanager.connectivity",
+                qos: .utility
+            )
             // Use a class so both closures can safely share the flag.
             final class ResumeFlag: @unchecked Sendable {
                 var value = false
@@ -208,7 +201,6 @@ public actor NetworkDiagnostics {
 // MARK: - Private Helpers
 
 extension NetworkDiagnostics {
-
     /// Runs `operation` and maps a thrown `CancellationError` / timeout to a
     /// domain error produced by `mapTimeout`.
     ///
