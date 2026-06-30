@@ -1,9 +1,10 @@
 import AppKit
-import SwiftUI
-import StratusCore
 import os.log
+import StratusCore
+import SwiftUI
 
 // MARK: - MenuBarManager
+
 // Manages the NSStatusItem in the system menu bar, displaying the current upload
 // speed as a text label that updates every second. The full interactive popover
 // is handled by the MenuBarExtra scene in StratusApp; this class provides the
@@ -11,7 +12,6 @@ import os.log
 
 @MainActor
 final class MenuBarManager: ObservableObject {
-
     // MARK: - Published State
 
     @Published private(set) var currentBPS: Double = 0
@@ -28,7 +28,7 @@ final class MenuBarManager: ObservableObject {
 
     init(bandwidthMonitor: BandwidthMonitor = BandwidthMonitor()) {
         self.bandwidthMonitor = bandwidthMonitor
-        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         configureButton()
         startTicker()
         startBandwidthListener()
@@ -69,7 +69,7 @@ final class MenuBarManager: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 guard let self else { return }
-                self.refreshLabel()
+                refreshLabel()
             }
         }
     }
@@ -78,7 +78,7 @@ final class MenuBarManager: ObservableObject {
     private func startBandwidthListener() {
         snapshotTask = Task { [weak self] in
             guard let self else { return }
-            for await snapshot in await self.bandwidthMonitor.updates {
+            for await snapshot in await bandwidthMonitor.updates {
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     self.currentBPS = snapshot.currentBPS
@@ -102,14 +102,14 @@ final class MenuBarManager: ObservableObject {
 
     private func formattedSpeed(_ bps: Double) -> String {
         switch bps {
-        case ..<1_024:
-            return String(format: "%.0f B/s", bps)
-        case ..<(1_024 * 1_024):
-            return String(format: "%.1f KB/s", bps / 1_024)
-        case ..<(1_024 * 1_024 * 1_024):
-            return String(format: "%.1f MB/s", bps / (1_024 * 1_024))
+        case ..<1024:
+            String(format: "%.0f B/s", bps)
+        case ..<(1024 * 1024):
+            String(format: "%.1f KB/s", bps / 1024)
+        case ..<(1024 * 1024 * 1024):
+            String(format: "%.1f MB/s", bps / (1024 * 1024))
         default:
-            return String(format: "%.1f GB/s", bps / (1_024 * 1_024 * 1_024))
+            String(format: "%.1f GB/s", bps / (1024 * 1024 * 1024))
         }
     }
 }
