@@ -2,11 +2,11 @@ import Foundation
 import os.log
 
 // MARK: - SFTPKeychain
+
 // Stores SFTP credentials (passwords and private keys) securely in the system Keychain.
 // Delegates all raw Keychain access to KeychainStore — no SecItem calls here.
 
 public actor SFTPKeychain {
-
     public static let shared = SFTPKeychain()
 
     private let keychain = KeychainStore.shared
@@ -80,7 +80,7 @@ public actor SFTPKeychain {
                 service: passwordService(host: host, username: username),
                 account: username
             )
-        } catch KeychainError.deleteFailed(let status) where status == -25300 /* errSecItemNotFound */ {
+        } catch let KeychainError.deleteFailed(status) where status == -25300 /* errSecItemNotFound */ {
             // Nothing to delete — not an error
         }
 
@@ -90,7 +90,7 @@ public actor SFTPKeychain {
                 service: privateKeyService(host: host, username: username),
                 account: username
             )
-        } catch KeychainError.deleteFailed(let status) where status == -25300 /* errSecItemNotFound */ {
+        } catch let KeychainError.deleteFailed(status) where status == -25300 /* errSecItemNotFound */ {
             // Nothing to delete — not an error
         }
 
