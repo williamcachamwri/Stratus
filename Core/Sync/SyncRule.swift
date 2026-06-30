@@ -13,7 +13,14 @@ public struct SyncRule: Codable, Sendable, Identifiable {
     public let recursive: Bool
     public let isBuiltIn: Bool
 
-    public init(id: UUID = UUID(), type: RuleType, pattern: String, scope: RuleScope, recursive: Bool = true, isBuiltIn: Bool = false) {
+    public init(
+        id: UUID = UUID(),
+        type: RuleType,
+        pattern: String,
+        scope: RuleScope,
+        recursive: Bool = true,
+        isBuiltIn: Bool = false
+    ) {
         self.id = id
         self.type = type
         self.pattern = pattern
@@ -53,7 +60,7 @@ public struct SyncRule: Codable, Sendable, Identifiable {
             let pat = pattern.hasPrefix("*.") ? String(pattern.dropFirst(2)) : pattern
             return fileExtension.lowercased() == pat.lowercased()
         case .size, .date:
-            return false  // Handled by SyncEngine directly
+            return false // Handled by SyncEngine directly
         }
     }
 }
@@ -95,19 +102,19 @@ public struct SyncPair: Codable, Sendable, Identifiable {
 // MARK: - Sync Modes
 
 public enum SyncMode: String, Codable, Sendable, CaseIterable {
-    case oneWayUpload    = "one_way_upload"
-    case oneWayDownload  = "one_way_download"
-    case bidirectional   = "bidirectional"
-    case mirror          = "mirror"
-    case backup          = "backup"
+    case oneWayUpload = "one_way_upload"
+    case oneWayDownload = "one_way_download"
+    case bidirectional
+    case mirror
+    case backup
 
     public var displayName: String {
         switch self {
-        case .oneWayUpload:   return "Upload Only"
-        case .oneWayDownload: return "Download Only"
-        case .bidirectional:  return "Two-Way Sync"
-        case .mirror:         return "Mirror (local → cloud)"
-        case .backup:         return "Backup (keep all versions)"
+        case .oneWayUpload: "Upload Only"
+        case .oneWayDownload: "Download Only"
+        case .bidirectional: "Two-Way Sync"
+        case .mirror: "Mirror (local → cloud)"
+        case .backup: "Backup (keep all versions)"
         }
     }
 }
@@ -115,21 +122,21 @@ public enum SyncMode: String, Codable, Sendable, CaseIterable {
 // MARK: - Conflict Resolution
 
 public enum ConflictResolution: String, Codable, Sendable, CaseIterable {
-    case keepLocal   = "keep_local"
-    case keepRemote  = "keep_remote"
-    case keepNewer   = "keep_newer"
-    case keepLarger  = "keep_larger"
-    case keepBoth    = "keep_both"
-    case askUser     = "ask_user"
+    case keepLocal = "keep_local"
+    case keepRemote = "keep_remote"
+    case keepNewer = "keep_newer"
+    case keepLarger = "keep_larger"
+    case keepBoth = "keep_both"
+    case askUser = "ask_user"
 
     public var displayName: String {
         switch self {
-        case .keepLocal:  return "Keep Local"
-        case .keepRemote: return "Keep Remote"
-        case .keepNewer:  return "Keep Newer"
-        case .keepLarger: return "Keep Larger"
-        case .keepBoth:   return "Keep Both"
-        case .askUser:    return "Ask Me"
+        case .keepLocal: "Keep Local"
+        case .keepRemote: "Keep Remote"
+        case .keepNewer: "Keep Newer"
+        case .keepLarger: "Keep Larger"
+        case .keepBoth: "Keep Both"
+        case .askUser: "Ask Me"
         }
     }
 }
@@ -147,9 +154,16 @@ public struct SyncConflict: Sendable, Identifiable {
     public let remoteSize: Int64
     public let detectedAt: Date
 
-    public init(pairID: UUID, localURL: URL, remotePath: CloudPath,
-                localModDate: Date, remoteModDate: Date, localSize: Int64, remoteSize: Int64) {
-        self.id = UUID()
+    public init(
+        pairID: UUID,
+        localURL: URL,
+        remotePath: CloudPath,
+        localModDate: Date,
+        remoteModDate: Date,
+        localSize: Int64,
+        remoteSize: Int64
+    ) {
+        id = UUID()
         self.pairID = pairID
         self.localURL = localURL
         self.remotePath = remotePath
@@ -157,6 +171,6 @@ public struct SyncConflict: Sendable, Identifiable {
         self.remoteModDate = remoteModDate
         self.localSize = localSize
         self.remoteSize = remoteSize
-        self.detectedAt = Date()
+        detectedAt = Date()
     }
 }
