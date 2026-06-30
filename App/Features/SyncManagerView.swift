@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 struct SyncManagerView: View {
     @EnvironmentObject private var env: AppEnvironment
@@ -97,10 +97,10 @@ private struct SyncPairRowView: View {
 
     private func syncModeIcon(_ mode: SyncMode) -> String {
         switch mode {
-        case .oneWayUpload:   return "arrow.up"
-        case .oneWayDownload: return "arrow.down"
-        case .bidirectional:  return "arrow.up.arrow.down"
-        case .mirror, .backup: return "arrow.up.doc"
+        case .oneWayUpload: "arrow.up"
+        case .oneWayDownload: "arrow.down"
+        case .bidirectional: "arrow.up.arrow.down"
+        case .mirror, .backup: "arrow.up.doc"
         }
     }
 }
@@ -117,8 +117,10 @@ private struct ConflictRowView: View {
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(conflict.localURL.lastPathComponent)
                     .font(.stratusHeadline)
-                Text("Local: \(conflict.localModDate, style: .relative) · Remote: \(conflict.remoteModDate, style: .relative)")
-                    .stratusCaption()
+                Text(
+                    "Local: \(conflict.localModDate, style: .relative) · Remote: \(conflict.remoteModDate, style: .relative)"
+                )
+                .stratusCaption()
             }
         }
         .padding(.vertical, Spacing.xs)
