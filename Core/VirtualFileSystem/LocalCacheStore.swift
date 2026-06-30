@@ -24,21 +24,20 @@ public enum LocalCacheStoreError: Error, Sendable {
 /// Default capacity: 10 GiB.  Pass a custom `sizeLimitBytes` to `init` to
 /// override.
 public actor LocalCacheStore {
-
     // MARK: - Configuration
 
-    public static let defaultSizeLimitBytes: Int64 = 10 * 1024 * 1024 * 1024  // 10 GiB
+    public static let defaultSizeLimitBytes: Int64 = 10 * 1024 * 1024 * 1024 // 10 GiB
 
     // MARK: - Types
 
-    private struct CacheEntry: Sendable {
+    private struct CacheEntry {
         let url: URL
         let size: Int64
         var lastAccessedAt: Date
         let cachedAt: Date
     }
 
-    private struct EntryKey: Hashable, Sendable {
+    private struct EntryKey: Hashable {
         let accountID: String
         let path: CloudPath
     }
@@ -59,8 +58,10 @@ public actor LocalCacheStore {
     ) throws {
         self.cacheDirectory = cacheDirectory
         self.sizeLimitBytes = sizeLimitBytes
-        try FileManager.default.createDirectory(at: cacheDirectory,
-                                                withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: cacheDirectory,
+            withIntermediateDirectories: true
+        )
     }
 
     // MARK: - Cache a file
