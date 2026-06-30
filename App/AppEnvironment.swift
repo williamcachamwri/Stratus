@@ -198,15 +198,21 @@ public final class AppEnvironment: ObservableObject {
 
     // MARK: - Event Listeners
 
+    private static func emptyStream<Element>() -> AsyncStream<Element> {
+        AsyncStream { continuation in
+            continuation.finish()
+        }
+    }
+
     private func startListeningForEvents() {
         uploadEventTask = Task { @MainActor [weak self] in
-            for await event in await self?.uploadEngine.events ?? AsyncStream<UploadEngineEvent> { $0.finish() } {
+            for await event in await self?.uploadEngine.events ?? Self.emptyStream() {
                 self?.handleUploadEvent(event)
             }
         }
 
         uploadBandwidthTask = Task { @MainActor [weak self] in
-            for await snapshot in await self?.uploadEngine.bandwidthUpdates ?? AsyncStream<BWSnapshot> { $0.finish() } {
+            for await snapshot in await self?.uploadEngine.bandwidthUpdates ?? Self.emptyStream() {
                 self?.uploadBandwidthSnapshot = snapshot
                 self?.recordUploadSpeed(snapshot.currentBPS)
                 self?.publishUploadState()
@@ -214,13 +220,13 @@ public final class AppEnvironment: ObservableObject {
         }
 
         downloadEventTask = Task { @MainActor [weak self] in
-            for await event in await self?.downloadEngine.events ?? AsyncStream<DownloadEngineEvent> { $0.finish() } {
+            for await event in await self?.downloadEngine.events ?? Self.emptyStream() {
                 self?.handleDownloadEvent(event)
             }
         }
 
         syncEventTask = Task { @MainActor [weak self] in
-            for await event in await self?.syncEngine.events ?? AsyncStream<SyncEngineEvent> { $0.finish() } {
+            for await event in await self?.syncEngine.events ?? Self.emptyStream() {
                 self?.handleSyncEvent(event)
             }
         }
