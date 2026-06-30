@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct VaultSetupFlow: View {
     @State private var selectedMode: VaultMode = .stratusNative
@@ -50,21 +50,23 @@ public enum VaultMode: String, CaseIterable, Identifiable, Sendable {
     case stratusNative
     case cryptomatorCompatible
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var title: String {
         switch self {
-        case .stratusNative: return "Stratus Native"
-        case .cryptomatorCompatible: return "Cryptomator"
+        case .stratusNative: "Stratus Native"
+        case .cryptomatorCompatible: "Cryptomator"
         }
     }
 
     public var detail: String {
         switch self {
         case .stratusNative:
-            return "AES-256-GCM per chunk with encrypted manifest metadata."
+            "AES-256-GCM per chunk with encrypted manifest metadata."
         case .cryptomatorCompatible:
-            return "Interoperable vault layout for users who need external readers."
+            "Interoperable vault layout for users who need external readers."
         }
     }
 }
