@@ -3,13 +3,13 @@ import XCTest
 
 final class UploadSummaryIntegrationTests: XCTestCase {
     func testCompletedUploadSummaryCarriesIntegrityAndThroughputFields() {
-        let item = CloudFileItem(id: "remote-1", name: "video.mov", path: CloudPath("/media/video.mov"), size: 10_000)
+        let item = CloudFileItem(id: "remote-1", name: "video.mov", path: CloudPath("/media/video.mov"), size: 10000)
         let summary = UploadSummary(
-            fileSize: 10_000,
-            bytesUploaded: 9_000,
-            bytesSkippedByDelta: 1_000,
+            fileSize: 10000,
+            bytesUploaded: 9000,
+            bytesSkippedByDelta: 1000,
             durationSeconds: 2,
-            averageBPS: 4_500,
+            averageBPS: 4500,
             checksumVerified: true,
             remoteItem: item
         )
