@@ -1,10 +1,11 @@
+import AppKit
 import Foundation
+import os.log
 import StratusCore
 import UserNotifications
-import AppKit
-import os.log
 
 // MARK: - StratusNotificationCenter
+
 // Manages user-facing notifications for upload completion, failures, and sync conflicts.
 
 @MainActor
@@ -14,6 +15,7 @@ public final class StratusNotificationCenter: ObservableObject {
         guard Bundle.main.bundleIdentifier != nil else { return nil }
         return UNUserNotificationCenter.current()
     }
+
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "Notifications")
 
     private init() {}
@@ -84,7 +86,7 @@ public final class StratusNotificationCenter: ObservableObject {
     public func registerCategories() {
         guard let center else { return }
         let retryAction = UNNotificationAction(identifier: "RETRY", title: "Retry", options: [])
-        let openAction  = UNNotificationAction(identifier: "OPEN",  title: "Open Stratus", options: [.foreground])
+        let openAction = UNNotificationAction(identifier: "OPEN", title: "Open Stratus", options: [.foreground])
         let resolveAction = UNNotificationAction(identifier: "RESOLVE", title: "Resolve", options: [.foreground])
 
         let uploadFailedCategory = UNNotificationCategory(
