@@ -1,19 +1,21 @@
 import AppKit
-import SwiftUI
 import os.log
+import SwiftUI
 
 // MARK: - WindowID
+
 // Centralised string constants matching the `id:` parameters in StratusApp's
 // WindowGroup / Settings scenes. Keeping them here avoids magic-string drift
 // across call sites.
 
 public enum WindowID {
-    static let main        = "main"         // ContentView (upload center + file browser)
-    static let preferences = "preferences"  // PreferencesView via Settings scene
+    static let main = "main" // ContentView (upload center + file browser)
+    static let preferences = "preferences" // PreferencesView via Settings scene
     static let fileBrowser = "file-browser" // Standalone FileBrowserView window
 }
 
 // MARK: - SceneCoordinator
+
 // Coordinates window and scene lifecycle for the Stratus macOS app.
 //
 // Design notes:
@@ -27,7 +29,6 @@ public enum WindowID {
 
 @MainActor
 public final class SceneCoordinator: ObservableObject {
-
     // MARK: - Singleton
 
     public static let shared = SceneCoordinator()
