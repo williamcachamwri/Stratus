@@ -47,7 +47,10 @@ public actor ChangeJournal {
         let monitor = FSEventsMonitor(pairID: pair.id, rootURL: pair.localPath)
         monitors[pair.id] = monitor
         monitor.start { [weak self] event in
-            Task { await self?.receiveEvent(event) }
+            guard let self else { return }
+            Task { [self] in
+                await self.receiveEvent(event)
+            }
         }
         logger.info("Started watching \(pair.localPath.path) for pair \(pair.id)")
     }

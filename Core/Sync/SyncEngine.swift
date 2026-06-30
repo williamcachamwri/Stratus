@@ -30,7 +30,10 @@ public actor SyncEngine {
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "SyncEngine")
 
     public private(set) lazy var events: AsyncStream<SyncEngineEvent> = AsyncStream { [weak self] continuation in
-        Task { await self?.setEventContinuation(continuation) }
+        guard let self else { return }
+        Task { [self] in
+            await self.setEventContinuation(continuation)
+        }
     }
 
     private init() {}
