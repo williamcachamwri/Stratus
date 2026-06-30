@@ -1,5 +1,5 @@
-import SwiftUI
 import StratusCore
+import SwiftUI
 
 public struct TransferPreferencesView: View {
     @AppStorage("transfer.maxConcurrentFiles") private var maxConcurrentFiles = 4
@@ -13,15 +13,15 @@ public struct TransferPreferencesView: View {
     public var body: some View {
         Form {
             Section("Parallelism") {
-                Stepper("Concurrent files: \(maxConcurrentFiles)", value: $maxConcurrentFiles, in: 1...16)
-                Stepper("Global chunk slots: \(maxConcurrentChunks)", value: $maxConcurrentChunks, in: 1...64)
+                Stepper("Concurrent files: \(maxConcurrentFiles)", value: $maxConcurrentFiles, in: 1 ... 16)
+                Stepper("Global chunk slots: \(maxConcurrentChunks)", value: $maxConcurrentChunks, in: 1 ... 64)
                 Text("The scheduler still respects provider caps and congestion feedback.")
                     .stratusCaption()
             }
 
             Section("Bandwidth") {
                 HStack {
-                    Slider(value: $bandwidthLimitMBPS, in: 0...500, step: 1)
+                    Slider(value: $bandwidthLimitMBPS, in: 0 ... 500, step: 1)
                     Text(bandwidthTitle)
                         .font(.stratusSmallMono)
                         .frame(width: 96, alignment: .trailing)
