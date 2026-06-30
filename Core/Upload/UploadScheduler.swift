@@ -2,13 +2,14 @@ import Foundation
 import os.log
 
 // MARK: - UploadScheduler
+
 // Manages global concurrency: which files upload and in what order.
 // Small files promoted ahead of large ones for better perceived throughput.
 
 public actor UploadScheduler {
     public var maxConcurrentFiles: Int = 4
     public var maxConcurrentChunksTotal: Int = 32
-    public var maxBandwidthBPS: Double? = nil
+    public var maxBandwidthBPS: Double?
 
     private let queue = UploadQueue()
     private var activeTasks: [UUID: UploadTask] = [:]
@@ -16,7 +17,7 @@ public actor UploadScheduler {
     private let throttle = UploadThrottlePolicy.shared
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "UploadScheduler")
 
-    // Slot availability stream
+    /// Slot availability stream
     private var slotContinuations: [UUID: AsyncStream<Void>.Continuation] = [:]
 
     public init() {}
@@ -66,9 +67,13 @@ public actor UploadScheduler {
 
     public func cancelAll() async {
         let ids = Array(activeTasks.keys)
-        for id in ids { activeTasks.removeValue(forKey: id) }
+        for id in ids {
+            activeTasks.removeValue(forKey: id)
+        }
         // Drain queue
-        while await queue.peek != nil { _ = await queue.dequeue() }
+        while await queue.peek != nil {
+            _ = await queue.dequeue()
+        }
         notifySlotAvailable()
     }
 
@@ -126,14 +131,24 @@ public actor UploadScheduler {
 
     // MARK: - Stats
 
-    public var activeCount: Int { activeTasks.count }
-    public var queuedCount: Int { get async { await queue.count } }
-    public var isPaused: Bool { pausedAll }
+    public var activeCount: Int {
+        activeTasks.count
+    }
 
-    public var allTasks: [UploadTask] { get async {
-        let queued = await queue.tasks
-        return Array(activeTasks.values) + queued
-    }}
+    public var queuedCount: Int {
+        get async { await queue.count }
+    }
+
+    public var isPaused: Bool {
+        pausedAll
+    }
+
+    public var allTasks: [UploadTask] {
+        get async {
+            let queued = await queue.tasks
+            return Array(activeTasks.values) + queued
+        }
+    }
 
     // MARK: - Private
 
@@ -153,7 +168,9 @@ public actor UploadScheduler {
                 }
             }
             Task {
-                for await _ in stream { break }
+                for await _ in stream {
+                    break
+                }
                 continuation.resume()
             }
         }
