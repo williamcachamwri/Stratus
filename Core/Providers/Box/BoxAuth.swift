@@ -1,18 +1,30 @@
-import Foundation
 import AuthenticationServices
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - BoxAuth
+
 // OAuth2 + PKCE (RFC 7636) for Box.com
 
 public actor BoxAuth {
-    private static var clientID: String { SharedConfig.string("CLIENT_ID", providerID: "box") ?? "" }
-    private static var clientSecret: String? { SharedConfig.string("CLIENT_SECRET", providerID: "box") }
-    private static var redirectURI: String { SharedConfig.string("REDIRECT_URI", providerID: "box") ?? "stratus://oauth/box" }
+    private static var clientID: String {
+        SharedConfig.string("CLIENT_ID", providerID: "box") ?? ""
+    }
+
+    private static var clientSecret: String? {
+        SharedConfig.string("CLIENT_SECRET", providerID: "box")
+    }
+
+    private static var redirectURI: String {
+        SharedConfig.string("REDIRECT_URI", providerID: "box") ?? "stratus://oauth/box"
+    }
+
     private static let authURL = "https://account.box.com/api/oauth2/authorize"
     private static let tokenURL = "https://api.box.com/oauth2/token"
-    private static var scope: String { SharedConfig.string("SCOPES", providerID: "box") ?? "root_readwrite manage_webhooks" }
+    private static var scope: String {
+        SharedConfig.string("SCOPES", providerID: "box") ?? "root_readwrite manage_webhooks"
+    }
 
     private let vault = CredentialVault.shared
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "BoxAuth")
@@ -23,7 +35,8 @@ public actor BoxAuth {
 
     public func authenticate(presentingWindow: NSWindow?) async throws -> OAuthCredential {
         guard !Self.clientID.isEmpty else {
-            throw ProviderError.authenticationFailed("Missing STRATUS_BOX_CLIENT_ID in shared/oauth.config or environment")
+            throw ProviderError
+                .authenticationFailed("Missing STRATUS_BOX_CLIENT_ID in shared/oauth.config or environment")
         }
 
         let (verifier, challenge) = generatePKCE()
@@ -33,12 +46,12 @@ public actor BoxAuth {
             throw ProviderError.authenticationFailed("Invalid Box auth URL")
         }
         components.queryItems = [
-            .init(name: "client_id",             value: Self.clientID),
-            .init(name: "redirect_uri",           value: Self.redirectURI),
-            .init(name: "response_type",          value: "code"),
-            .init(name: "state",                  value: state),
-            .init(name: "code_challenge",         value: challenge),
-            .init(name: "code_challenge_method",  value: "S256"),
+            .init(name: "client_id", value: Self.clientID),
+            .init(name: "redirect_uri", value: Self.redirectURI),
+            .init(name: "response_type", value: "code"),
+            .init(name: "state", value: state),
+            .init(name: "code_challenge", value: challenge),
+            .init(name: "code_challenge_method", value: "S256"),
         ]
         guard let authorizationURL = components.url else {
             throw ProviderError.authenticationFailed("Could not build Box authorization URL")
@@ -49,8 +62,13 @@ public actor BoxAuth {
                 url: authorizationURL,
                 callbackURLScheme: "stratus"
             ) { url, error in
-                if let error { continuation.resume(throwing: error); return }
-                guard let url else { continuation.resume(throwing: ProviderError.authenticationFailed("No callback URL")); return }
+                if let error { continuation.resume(throwing: error)
+                    return
+                }
+                guard let url
+                else { continuation.resume(throwing: ProviderError.authenticationFailed("No callback URL"))
+                    return
+                }
                 continuation.resume(returning: url)
             }
             session.prefersEphemeralWebBrowserSession = true
@@ -91,13 +109,18 @@ public actor BoxAuth {
         let (data, _) = try await URLSession.shared.data(for: request)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let access = json["access_token"] as? String,
-              let refresh = json["refresh_token"] as? String else {
+              let refresh = json["refresh_token"] as? String
+        else {
             throw ProviderError.authenticationFailed("Box token exchange failed")
         }
         let expiresIn = json["expires_in"] as? TimeInterval ?? 3600
         logger.info("Box authentication successful")
-        return OAuthCredential(accessToken: access, refreshToken: refresh,
-                                expiresAt: Date().addingTimeInterval(expiresIn), scope: Self.scope)
+        return OAuthCredential(
+            accessToken: access,
+            refreshToken: refresh,
+            expiresAt: Date().addingTimeInterval(expiresIn),
+            scope: Self.scope
+        )
     }
 
     // MARK: - PKCE
