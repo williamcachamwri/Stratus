@@ -1,28 +1,32 @@
-import Foundation
 import FileProvider
+import Foundation
 import os.log
 
-// Wraps a non-Sendable value for capture in Task closures (FileProvider callbacks are not @Sendable).
+/// Wraps a non-Sendable value for capture in Task closures (FileProvider callbacks are not @Sendable).
 private final class Box<T>: @unchecked Sendable {
     let value: T
-    init(_ value: T) { self.value = value }
+    init(_ value: T) {
+        self.value = value
+    }
 }
 
 // MARK: - StratusFileProviderEnumerator
+
 // Enumerates items at a given container item for the File Provider extension.
 
 public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable {
-
     private let containerItem: NSFileProviderItemIdentifier
     private let domainIdentifier: String
     private let resolver: StratusFileProviderDomainResolver
     private let logger = Logger(subsystem: "com.stratus.cloudmanager", category: "FileProviderEnumerator")
 
-    public init(containerItem: NSFileProviderItemIdentifier,
-                domain: NSFileProviderDomain,
-                resolver: StratusFileProviderDomainResolver = .shared) {
+    public init(
+        containerItem: NSFileProviderItemIdentifier,
+        domain: NSFileProviderDomain,
+        resolver: StratusFileProviderDomainResolver = .shared
+    ) {
         self.containerItem = containerItem
-        self.domainIdentifier = domain.identifier.rawValue
+        domainIdentifier = domain.identifier.rawValue
         self.resolver = resolver
     }
 
@@ -30,7 +34,10 @@ public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumer
 
     public func invalidate() {}
 
-    public func enumerateItems(for observer: any NSFileProviderEnumerationObserver, startingAt page: NSFileProviderPage) {
+    public func enumerateItems(
+        for observer: any NSFileProviderEnumerationObserver,
+        startingAt page: NSFileProviderPage
+    ) {
         let containerRaw = containerItem.rawValue
         let isRoot = containerItem == .rootContainer || containerItem == .workingSet
         let pageToken = page == NSFileProviderPage.initialPageSortedByName as NSFileProviderPage
@@ -44,8 +51,13 @@ public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumer
         Task {
             do {
                 let context = try await resolver.resolve(domainIdentifier: domainID)
-                let result = try await context.provider.listDirectory(path: path, account: context.account, pageToken: pageToken)
-                let parentID = isRoot ? NSFileProviderItemIdentifier.rootContainer : NSFileProviderItemIdentifier(rawValue: containerRaw)
+                let result = try await context.provider.listDirectory(
+                    path: path,
+                    account: context.account,
+                    pageToken: pageToken
+                )
+                let parentID = isRoot ? NSFileProviderItemIdentifier
+                    .rootContainer : NSFileProviderItemIdentifier(rawValue: containerRaw)
                 let providerItems: [NSFileProviderItem] = result.items.map { item in
                     StratusFileProviderItem(item: item, parentID: parentID, accountID: context.account.id)
                 }
@@ -63,7 +75,10 @@ public final class StratusFileProviderEnumerator: NSObject, NSFileProviderEnumer
         }
     }
 
-    public func enumerateChanges(for observer: any NSFileProviderChangeObserver, from anchor: NSFileProviderSyncAnchor) {
+    public func enumerateChanges(
+        for observer: any NSFileProviderChangeObserver,
+        from anchor: NSFileProviderSyncAnchor
+    ) {
         observer.finishEnumeratingChanges(upTo: anchor, moreComing: false)
     }
 
