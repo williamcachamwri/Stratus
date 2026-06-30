@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 import os.log
 
 // MARK: - TLSPinningError
@@ -27,23 +27,22 @@ public enum TLSPinningError: Error, Sendable {
 /// In debug builds the validation is skipped so development proxies (e.g.
 /// Charles) work without injecting their CA into the trust store.
 public final class TLSPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
-
     // MARK: - Well-Known Hashes
 
     /// Default public-key hashes for Google Drive, Dropbox, and OneDrive OAuth
     /// endpoints.  These are SHA-256 digests of the DER-encoded SubjectPublicKeyInfo.
     public static let defaultHashes: Set<String> = [
         // Google APIs (*.googleapis.com) leaf + intermediate backups
-        "ZC3kMACRMiXdCDUJvnMcW2J6TvlF2E8QR4JQSZ7GqRc=",  // GTS CA 1C3
-        "hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Vg=",  // GTS Root R1
+        "ZC3kMACRMiXdCDUJvnMcW2J6TvlF2E8QR4JQSZ7GqRc=", // GTS CA 1C3
+        "hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Vg=", // GTS Root R1
 
         // Dropbox (*.dropboxapi.com)
-        "x7/KNovFAK+HqOi7tCz7MFoFgmxkMzYRRyiGw5pfjiI=",  // DigiCert CA
-        "r/mIkG3eEpVdm+u/ko/cwxzOMo1bk4TyHIlByibiA5E=",  // Baltimore CyberTrust
+        "x7/KNovFAK+HqOi7tCz7MFoFgmxkMzYRRyiGw5pfjiI=", // DigiCert CA
+        "r/mIkG3eEpVdm+u/ko/cwxzOMo1bk4TyHIlByibiA5E=", // Baltimore CyberTrust
 
         // Microsoft (login.microsoftonline.com, graph.microsoft.com)
-        "xjXxgkOYlag7jCtR5DreZm9b61iaIhd+J3+4mj5GGZU=",  // Microsoft RSA TLS CA 01
-        "hl5nTi5Z5T6kl20fVNPZGgMYfKqb0uXCYDGqKxVOFdA=",  // DigiCert Global G2 TLS
+        "xjXxgkOYlag7jCtR5DreZm9b61iaIhd+J3+4mj5GGZU=", // Microsoft RSA TLS CA 01
+        "hl5nTi5Z5T6kl20fVNPZGgMYfKqb0uXCYDGqKxVOFdA=", // DigiCert Global G2 TLS
     ]
 
     // MARK: - Private State
@@ -75,11 +74,11 @@ public final class TLSPinningDelegate: NSObject, URLSessionDelegate, @unchecked 
         }
 
         #if DEBUG
-        if bypassInDebug {
-            logger.warning("TLS pinning bypassed in DEBUG build for \(challenge.protectionSpace.host)")
-            completionHandler(.performDefaultHandling, nil)
-            return
-        }
+            if bypassInDebug {
+                logger.warning("TLS pinning bypassed in DEBUG build for \(challenge.protectionSpace.host)")
+                completionHandler(.performDefaultHandling, nil)
+                return
+            }
         #endif
 
         guard let serverTrust = challenge.protectionSpace.serverTrust else {
@@ -145,15 +144,15 @@ public final class TLSPinningDelegate: NSObject, URLSessionDelegate, @unchecked 
     private func spkiEncoded(keyData: Data, publicKey: SecKey) -> Data {
         // RSA 2048-bit SPKI header
         let rsaHeader2048 = Data([
-            0x30, 0x82, 0x01, 0x22, 0x30, 0x0d, 0x06, 0x09,
-            0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01,
-            0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0f, 0x00,
+            0x30, 0x82, 0x01, 0x22, 0x30, 0x0D, 0x06, 0x09,
+            0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01,
+            0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0F, 0x00,
         ])
         // EC P-256 SPKI header
         let ecHeader256 = Data([
-            0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86,
-            0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a,
-            0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03,
+            0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2A, 0x86,
+            0x48, 0xCE, 0x3D, 0x02, 0x01, 0x06, 0x08, 0x2A,
+            0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07, 0x03,
             0x42, 0x00,
         ])
 
